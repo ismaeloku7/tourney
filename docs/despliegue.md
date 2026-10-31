@@ -32,6 +32,29 @@ Dominio propio de un organizador (fase 4): se añade como alias del mismo
 sitio y se emite su certificado; el host resuelve al organizador por su
 fila en `domains`.
 
+## Con el dominio gratuito `on-forge.com`
+
+Forge da a cada sitio un dominio `tourney.on-forge.com` con certificado
+automático. Sirve para la plataforma (landing, `/plataforma`) y para
+desplegar desde el primer día, pero **no para los organizadores**: sus
+subdominios `{slug}.tourney.on-forge.com` necesitan un registro DNS
+comodín y un certificado comodín, y el DNS de `on-forge.com` lo lleva
+Forge, sin comodín para un sitio ni credenciales de DNS que darle.
+
+Mientras se use solo ese dominio:
+
+- `SAAS_DOMINIO=tourney.on-forge.com`, `APP_URL=https://tourney.on-forge.com`
+  y `SESSION_DOMAIN=null`.
+- Las páginas de un organizador no se pueden abrir desde fuera. La fase 1
+  no tiene interfaz, así que no bloquea nada; en la fase 2 (inscripción
+  pública y panel del organizador) hace falta el dominio propio de abajo.
+
+Cuando llegue ese momento: un dominio de la plataforma con el DNS en
+Cloudflare (gratis) u otro proveedor con API, los registros `A` del
+dominio y de `*.dominio` a la IP del servidor, el dominio y `*.dominio`
+como dominios del sitio, y el certificado comodín del apartado siguiente.
+El sitio `on-forge.com` puede seguir como alias.
+
 ## Certificado
 
 Comodín para `tourney.app` y `*.tourney.app` con LetsEncrypt. Forge
