@@ -67,6 +67,14 @@ sube un certificado comodín propio.
 DNS: un registro `A` para `tourney.app` y otro `A` para `*.tourney.app`,
 los dos a la IP del servidor.
 
+Vale igual un subdominio de un dominio que ya exista: `tourney.agencia.com`
+y `*.tourney.agencia.com`. En Cloudflare, los dos registros con el proxy
+**desactivado** (nube gris, «DNS only»): el certificado universal de
+Cloudflare solo cubre un nivel de subdominio, así que con el proxy
+activado `demo.tourney.agencia.com` daría error de certificado aunque el
+de Forge esté bien. El certificado lo pone Forge en el servidor con la
+API de Cloudflare (un token con permiso de edición de DNS en esa zona).
+
 ## Variables de entorno
 
 Lo que cambia respecto a [`.env.example`](../.env.example). El resto
