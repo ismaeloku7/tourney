@@ -21,8 +21,8 @@ de despliegue y `php artisan actualizar` lo que se ejecuta tras cada uno.
 
 | Campo de Forge | Valor |
 | --- | --- |
-| Root domain | El dominio de la plataforma, `SAAS_DOMINIO` (por ejemplo `tourney.app`) |
-| Aliases | `*.tourney.app`, o la opción «Wildcard sub-domains» del sitio |
+| Root domain | El dominio de la plataforma, `SAAS_DOMINIO` (por ejemplo `tourney.clubceas.es`) |
+| Aliases | `*.tourney.clubceas.es` (y `tourney.on-forge.com` como alias), o la opción «Wildcard sub-domains» del sitio |
 | Project type | Laravel (`public` como web directory) |
 | PHP version | 8.4 |
 | Repository | `ismaeloku7/tourney`, rama `main`, sin «Install composer dependencies» (lo hace el script) |
@@ -57,21 +57,21 @@ El sitio `on-forge.com` puede seguir como alias.
 
 ## Certificado
 
-Comodín para `tourney.app` y `*.tourney.app` con LetsEncrypt. Forge
+Comodín para `tourney.clubceas.es` y `*.tourney.clubceas.es` con LetsEncrypt. Forge
 necesita validar por DNS, así que el DNS del dominio tiene que estar en
 un proveedor con API que Forge conozca (Cloudflare, DigitalOcean, Route53,
 Linode, OVH…) y hay que darle sus credenciales en el apartado SSL del
 sitio. Si el DNS está en otro sitio, se mueve a Cloudflare (gratis) o se
 sube un certificado comodín propio.
 
-DNS: un registro `A` para `tourney.app` y otro `A` para `*.tourney.app`,
+DNS: un registro `A` para `tourney.clubceas.es` y otro `A` para `*.tourney.clubceas.es`,
 los dos a la IP del servidor.
 
-Vale igual un subdominio de un dominio que ya exista: `tourney.agencia.com`
-y `*.tourney.agencia.com`. En Cloudflare, los dos registros con el proxy
+El dominio de la plataforma es un subdominio de uno que ya existe:
+`tourney.clubceas.es` y `*.tourney.clubceas.es`. En Cloudflare, los dos registros con el proxy
 **desactivado** (nube gris, «DNS only»): el certificado universal de
 Cloudflare solo cubre un nivel de subdominio, así que con el proxy
-activado `demo.tourney.agencia.com` daría error de certificado aunque el
+activado `demo.tourney.clubceas.es` daría error de certificado aunque el
 de Forge esté bien. El certificado lo pone Forge en el servidor con la
 API de Cloudflare (un token con permiso de edición de DNS en esa zona).
 
@@ -85,9 +85,9 @@ APP_NAME=Tourney
 APP_ENV=production
 APP_KEY=                        # php artisan key:generate --show
 APP_DEBUG=false
-APP_URL=https://tourney.app
+APP_URL=https://tourney.clubceas.es
 
-SAAS_DOMINIO=tourney.app
+SAAS_DOMINIO=tourney.clubceas.es
 SAAS_TITULAR_NOMBRE=
 SAAS_TITULAR_NIF=
 SAAS_TITULAR_DOMICILIO=
@@ -108,20 +108,20 @@ DB_USERNAME=forge
 DB_PASSWORD=
 
 SESSION_DRIVER=database
-SESSION_DOMAIN=.tourney.app     # la sesión vale en el dominio y sus subdominios
+SESSION_DOMAIN=.tourney.clubceas.es     # la sesión vale en el dominio y sus subdominios
 SESSION_SECURE_COOKIE=true
 CACHE_STORE=database
 QUEUE_CONNECTION=database
 
 MAIL_MAILER=resend
 RESEND_API_KEY=
-MAIL_FROM_ADDRESS=hola@tourney.app
+MAIL_FROM_ADDRESS=hola@clubceas.es
 MAIL_FROM_NAME="${APP_NAME}"
 
 # php artisan push:claves, una vez, cuando llegue la PWA.
 WEBPUSH_VAPID_PUBLIC_KEY=
 WEBPUSH_VAPID_PRIVATE_KEY=
-WEBPUSH_VAPID_SUBJECT=mailto:hola@tourney.app
+WEBPUSH_VAPID_SUBJECT=mailto:hola@clubceas.es
 ```
 
 La base central `tourney` se crea desde el apartado Database de Forge.
