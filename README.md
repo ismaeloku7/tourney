@@ -21,20 +21,21 @@ seeder con una cuenta por rol.
 
 ## Stack
 
-| Pieza | Versión en `composer.json` | Papel |
+Versiones fijadas el 31 de octubre de 2026 en [`composer.lock`](composer.lock)
+y [`package-lock.json`](package-lock.json), resueltas para PHP 8.4
+(`config.platform` de `composer.json`):
+
+| Pieza | Versión | Papel |
 | --- | --- | --- |
 | PHP | `^8.4` | Lo exigen Symfony 8 y Pest 5 |
-| Laravel | `^13.17` | Núcleo, colas, correo, programador |
-| Livewire | `^4.1` | Front público, inscripción, resultados en vivo |
-| Filament | `^5.0` | Panel del organizador (`/panel`) y de plataforma (`/plataforma`) |
-| stancl/tenancy | `^3.10` | Una base por organizador, resuelta por host |
-| minishlink/web-push | `^11.0` | Notificaciones push de la PWA |
-| dompdf | `^3.1` | Cuadros, horarios y clasificaciones en PDF |
-| Tailwind + Vite | `^4`, `vite-plus` | Front público |
-| Pest, Pint, Larastan | `^5.3`, `^1.27`, `^3.9` | Pruebas, formato, tipos (nivel 7) |
-
-Las versiones se fijarán en `composer.lock` y `package-lock.json` en la
-primera instalación, a partir de las de CEAS de octubre de 2026.
+| Laravel | 13.39 | Núcleo, colas, correo, programador |
+| Livewire | 4.4 | Front público, inscripción, resultados en vivo |
+| Filament | 5.11 | Panel del organizador (`/panel`) y de plataforma (`/plataforma`) |
+| stancl/tenancy | 3.10 | Una base por organizador, resuelta por host |
+| minishlink/web-push | 11.0 | Notificaciones push de la PWA |
+| dompdf | 3.1 | Cuadros, horarios y clasificaciones en PDF |
+| Tailwind + Vite | 4.3, Vite 8 (`vite-plus`) | Front público |
+| Pest, Pint, Larastan | 5.3, 1.32, 3.13 | Pruebas, formato, tipos (nivel 7) |
 
 ## Instalación
 
@@ -79,5 +80,5 @@ Eloquent, con cobertura total en `tests/Unit/Competicion`.
 ## Estado
 
 Fase 1, commit 1 de 6 ([orden de commits](docs/propuesta-fase-1.md#orden-de-commits)):
-proyecto base. Pendiente generar `composer.lock` y `package-lock.json`
-con la primera instalación.
+proyecto base con las dependencias fijadas. Pendiente la primera
+instalación con `composer run setup` y pasar `composer ci:check`.
