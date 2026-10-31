@@ -77,6 +77,14 @@ organizadores irán con `php artisan tenants:migrate`.
 El motor de competición vive en `app/Competicion`: clases puras, sin
 Eloquent, con cobertura total en `tests/Unit/Competicion`.
 
+## Despliegue
+
+En un VPS con Laravel Forge, con DNS comodín para los subdominios de los
+organizadores y MySQL con permiso para crear una base por organizador.
+Los pasos, las variables de entorno y el script de despliegue
+(`forge/deploy.sh`, que llama a `php artisan actualizar`) están en
+[docs/despliegue.md](docs/despliegue.md).
+
 ## Estado
 
 Fase 1, commit 1 de 6 ([orden de commits](docs/propuesta-fase-1.md#orden-de-commits)):
