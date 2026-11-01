@@ -76,6 +76,15 @@ class InscripcionEnTorneo extends Component
     /** Paso 1. */
     public function identificarme(MandarEnlaceDeAcceso $mandar): void
     {
+        // Sin inscripción online, la web no crea cuentas ni manda enlaces desde aquí.
+        try {
+            InscribirseOnline::comprobarQueEstaAbierta($this->torneo);
+        } catch (OperacionNoPermitida $e) {
+            $this->addError('inscripcion', $e->getMessage());
+
+            return;
+        }
+
         $this->validate([
             'email' => ['required', 'email', 'max:190'],
         ], [], ['email' => 'correo electrónico']);

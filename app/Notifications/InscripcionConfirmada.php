@@ -3,6 +3,7 @@
 namespace App\Notifications;
 
 use App\Models\Inscripcion;
+use App\Tenancy\OrganizadorActual;
 
 /** La pareja está dentro: por fin, o al liberarse una plaza de la lista de espera. */
 class InscripcionConfirmada extends AvisoAlJugador
@@ -31,6 +32,14 @@ class InscripcionConfirmada extends AvisoAlJugador
 
     public function lineas(): array
     {
-        return ['Los horarios os llegarán cuando se publiquen.'];
+        return [
+            'Los horarios os llegarán cuando se publiquen.',
+            'Para ver tus partidos y tus avisos, entra en tu portal con tu correo: '.$this->urlDelPortal(),
+        ];
+    }
+
+    private function urlDelPortal(): string
+    {
+        return app(OrganizadorActual::class)->organizador()->url('jugador/acceso');
     }
 }

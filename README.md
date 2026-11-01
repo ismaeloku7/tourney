@@ -157,7 +157,10 @@ con plazas, inscritos, grupos, cuadro y horarios, con alias si el torneo
 lo pide), el tablero para la tele y la página de cada pista con su QR. Se
 refrescan solas mientras el torneo está en juego.
 
-Los jugadores se inscriben solos desde la ficha del torneo: cuenta ligera
+Cada torneo decide si tiene inscripción online. Sin ella, solo inscribe
+la organización desde el panel y la web no deja crear cuentas; los
+jugadores añadidos con su correo entran en su portal con el enlace de
+acceso. Con ella, los jugadores se inscriben solos desde la ficha del torneo: cuenta ligera
 o enlace de acceso por correo (15 minutos, un solo uso), y el compañero
 confirma desde su invitación (48 horas). En su portal (/jugador) ven sus
 inscripciones y partidos, se dan de baja mientras la inscripción está
