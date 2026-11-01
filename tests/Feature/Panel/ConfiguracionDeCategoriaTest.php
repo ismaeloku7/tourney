@@ -5,6 +5,7 @@ use App\Enums\Rol;
 use App\Enums\TipoDeFase;
 use App\Filament\Resources\Categorias\Pages\EditCategoria;
 use App\Filament\Resources\Categorias\RelationManagers\FasesRelationManager;
+use App\Filament\Resources\Pistas\Pages\ListPistas;
 use App\Filament\Resources\Torneos\Pages\EditTorneo;
 use App\Filament\Resources\Torneos\RelationManagers\PistasRelationManager;
 use App\Models\Categoria;
@@ -164,12 +165,62 @@ test('las pistas del torneo se añaden con su disponibilidad validada', function
     ])->assertNotified('La disponibilidad no es válida');
     expect($torneoPista->refresh()->disponibilidad)->toHaveCount(2);
 
-    // «Añadir todas las de la sede» trae las activas que faltan, de 09:00 a 22:00 los tres días.
+    // «Añadir varias» trae, de una vez, las activas de la sede que faltan con la disponibilidad que se ponga.
     // (Componente nuevo: el formulario rechazado se queda abierto en el anterior.)
+    $otraSede = Sede::factory()->create();
+    Pista::factory()->create(['sede_id' => $otraSede->id, 'nombre' => 'Lejana']);
     Livewire::test(PistasRelationManager::class, ['ownerRecord' => $this->torneo, 'pageClass' => EditTorneo::class])
-        ->callAction(TestAction::make('anadirLasDeLaSede')->table())->assertHasNoActionErrors();
+        ->callAction(TestAction::make('anadirVarias')->table())
+        ->assertHasNoActionErrors()
+        ->assertNotified('Una pista añadida');
 
     expect($this->torneo->torneoPistas()->count())->toBe(2)
         ->and(TorneoPista::query()->whereHas('pista', fn ($q) => $q->where('nombre', 'Pista 2'))->sole()->disponibilidad)->toHaveCount(3)
         ->and(PistasRelationManager::disponibilidadPorDefecto($this->torneo)[0])->toBe(['fecha' => '2027-05-07', 'desde' => '09:00', 'hasta' => '22:00']);
+});
+
+test('varias pistas se añaden y se ajustan en bloque con la misma disponibilidad', function () {
+    $sede = Sede::factory()->create();
+    $pistas = collect(range(1, 4))->map(fn (int $n): Pista => Pista::factory()->create(['sede_id' => $sede->id, 'nombre' => "Pista {$n}", 'orden' => $n]));
+    $this->actingAs($this->propietario);
+    $mañanas = [
+        ['fecha' => '2027-05-08', 'desde' => '09:00', 'hasta' => '14:00'],
+        ['fecha' => '2027-05-09', 'desde' => '09:00', 'hasta' => '14:00'],
+    ];
+
+    Livewire::test(PistasRelationManager::class, ['ownerRecord' => $this->torneo, 'pageClass' => EditTorneo::class])
+        ->callAction(TestAction::make('anadirVarias')->table(), [
+            'sede_id' => $sede->id,
+            'pistas' => $pistas->take(3)->modelKeys(),
+            'disponibilidad' => $mañanas,
+        ])
+        ->assertHasNoActionErrors()
+        ->assertNotified('3 pistas añadidas');
+
+    $enElTorneo = TorneoPista::query()->orderBy('orden')->get();
+    expect($enElTorneo->pluck('pista_id')->all())->toBe($pistas->take(3)->modelKeys())
+        ->and($enElTorneo->pluck('orden')->all())->toBe([1, 2, 3])
+        ->and($enElTorneo->every(fn (TorneoPista $tp): bool => $tp->disponibilidad === $mañanas))->toBeTrue();
+
+    $tardes = [['fecha' => '2027-05-07', 'desde' => '16:00', 'hasta' => '22:00']];
+    Livewire::test(PistasRelationManager::class, ['ownerRecord' => $this->torneo, 'pageClass' => EditTorneo::class])
+        ->selectTableRecords($enElTorneo->take(2)->modelKeys())
+        ->callAction(TestAction::make('disponibilidad')->table()->bulk(), ['disponibilidad' => $tardes])
+        ->assertHasNoActionErrors()
+        ->assertNotified('Disponibilidad guardada en 2 pistas');
+
+    expect($enElTorneo->map(fn (TorneoPista $tp): array => $tp->refresh()->disponibilidad)->all())->toBe([$tardes, $tardes, $mañanas]);
+});
+
+test('en instalaciones se crean varias pistas numeradas de una vez', function () {
+    $sede = Sede::factory()->create();
+    Pista::factory()->create(['sede_id' => $sede->id, 'nombre' => 'Central', 'orden' => 1]);
+    $this->actingAs($this->propietario);
+
+    Livewire::test(ListPistas::class)
+        ->callAction('crearVarias', ['sede_id' => $sede->id, 'prefijo' => 'Pista', 'desde' => 2, 'cuantas' => 3])
+        ->assertHasNoActionErrors()
+        ->assertNotified('3 pistas creadas');
+
+    expect(Pista::query()->where('sede_id', $sede->id)->orderBy('orden')->pluck('nombre')->all())->toBe(['Central', 'Pista 2', 'Pista 3', 'Pista 4']);
 });
