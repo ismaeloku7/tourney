@@ -165,7 +165,17 @@ abierta, anotan y validan resultados si el torneo lo permite, dicen
 cuándo no pueden jugar y pueden borrar sus datos. Los árbitros anotan
 desde /mesa los partidos de sus pistas, y los resultados sin validar
 cuentan solos al vencer el plazo (resultados:validar-vencidos, cada
-minuto). Faltan la PWA y los avisos por push y correo.
+minuto).
+
+La web de cada organizador se instala en el móvil como aplicación, con su
+nombre, su color y su logotipo (manifiesto e iconos propios), y las
+páginas de torneos que ya se vieron se abren sin cobertura. Los jugadores
+reciben avisos por correo, push y en su portal (inscripción confirmada o
+plaza liberada, horarios con sus partidos, resultado por validar,
+resultado, cruce del cuadro, «juegas en media hora» y los avisos libres
+que manda la organización desde el panel), y eligen qué canales quieren.
+Cualquiera puede seguir un torneo sin cuenta y recibir horarios y
+resultados por push. Con esto queda cerrada la fase 3 del MVP.
 
 `composer ci:check` (Pint, PHPStan nivel 7 y Pest) corre en GitHub
 Actions en cada pull request y en `main`.

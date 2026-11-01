@@ -2,6 +2,7 @@
 
 namespace App\Actions\Competicion;
 
+use App\Avisos\Avisos;
 use App\Competicion\ConstructorDeConsolacion;
 use App\Competicion\ConstructorDeCuadro;
 use App\Competicion\Datos\Clasificacion as ClasificacionDto;
@@ -53,7 +54,7 @@ final class CerrarFase
             throw new OperacionNoPermitida('Quedan partidos sin resultado: no se puede cerrar la fase.');
         }
 
-        return DB::transaction(function () use ($fase, $usuario): array {
+        $resultado = DB::transaction(function () use ($fase, $usuario): array {
             $clasificados = $fase->tipo->esDeGrupos() ? $this->cerrarGrupos($fase) : [];
 
             $fase->estado = EstadoFase::Cerrada;
@@ -66,6 +67,12 @@ final class CerrarFase
 
             return $clasificados;
         });
+
+        if ($fase->tipo->esDeGrupos()) {
+            app(Avisos::class)->crucesDe($fase);
+        }
+
+        return $resultado;
     }
 
     /**

@@ -11,6 +11,7 @@
             <p class="mt-2">Hemos mandado a tu compañero un correo para que confirme. Hasta que lo haga (tiene 48 horas), la inscripción no ocupa plaza.</p>
             <a href="{{ route('jugador.portal') }}" class="mt-4 inline-block underline">Ver mis inscripciones</a>
         </div>
+        <x-pwa.instalar class="mt-4" />
     @elseif (! $yo)
         @if ($enlaceEnviado)
             <div class="mt-6 rounded-xl border border-green-200 bg-green-50 p-5 text-green-900">

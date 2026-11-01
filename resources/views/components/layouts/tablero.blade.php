@@ -10,6 +10,7 @@
         @if (file_exists(public_path('build/manifest.json')) || file_exists(public_path('hot')))
             @vite(['resources/css/app.css', 'resources/js/app.js'])
         @endif
+        <link rel="manifest" href="/manifest.webmanifest">
         @livewireStyles
     </head>
     <body class="min-h-screen bg-neutral-950 text-white antialiased" style="--acento: {{ $color }}">

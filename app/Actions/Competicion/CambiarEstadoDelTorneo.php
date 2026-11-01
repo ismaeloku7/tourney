@@ -2,6 +2,7 @@
 
 namespace App\Actions\Competicion;
 
+use App\Avisos\Avisos;
 use App\Competicion\Errores\OperacionNoPermitida;
 use App\Enums\EstadoTorneo;
 use App\Models\Partido;
@@ -32,6 +33,7 @@ final class CambiarEstadoDelTorneo
             throw new OperacionNoPermitida('No se pasa a en juego sin horarios: planifique los partidos antes.');
         }
 
+        $sinHorariosPublicados = $torneo->horarios_publicados_en === null;
         $torneo->estado = $estado;
 
         if ($estado->publicado() && $torneo->publicado_en === null) {
@@ -50,6 +52,11 @@ final class CambiarEstadoDelTorneo
         $torneo->save();
 
         RegistroDeCambio::anotar('cambiar_estado', $torneo, $usuario, ['estado' => $actual->value], ['estado' => $estado->value]);
+
+        // Al publicar los horarios por primera vez, a cada jugador los suyos.
+        if ($estado === EstadoTorneo::EnJuego && $sinHorariosPublicados) {
+            app(Avisos::class)->horariosPublicados($torneo);
+        }
 
         return $torneo;
     }

@@ -22,6 +22,14 @@
         @if ($logo)
             <link rel="icon" href="{{ $logo }}">
         @endif
+        @if ($organizador)
+            {{-- La aplicación instalable del organizador (manifiesto, iconos y service worker). --}}
+            <link rel="manifest" href="/manifest.webmanifest">
+            <link rel="apple-touch-icon" href="/icono-apple.png?v={{ \App\Publico\IconosDelOrganizador::version() }}">
+            <meta name="apple-mobile-web-app-capable" content="yes">
+            <meta name="apple-mobile-web-app-title" content="{{ $nombre }}">
+            <script>if ('serviceWorker' in navigator) { window.addEventListener('load', function () { navigator.serviceWorker.register('/sw.js', { scope: '/' }).catch(function () {}); }); }</script>
+        @endif
         @livewireStyles
     </head>
     <body class="flex min-h-screen flex-col bg-neutral-50 text-neutral-900 antialiased" style="--acento: {{ $color }}">

@@ -2,6 +2,7 @@
 
 namespace App\Actions\Competicion;
 
+use App\Avisos\Avisos;
 use App\Competicion\Errores\OperacionNoPermitida;
 use App\Enums\EstadoPartido;
 use App\Models\Jugador;
@@ -36,7 +37,7 @@ final class ValidarResultado
             }
         }
 
-        return DB::transaction(function () use ($partido, $quien): Partido {
+        $resultado = DB::transaction(function () use ($partido, $quien): Partido {
             $partido->fill([
                 'estado' => $partido->especial !== null ? EstadoPartido::Walkover : EstadoPartido::Jugado,
                 'validado_en' => now(),
@@ -50,5 +51,9 @@ final class ValidarResultado
 
             return $partido->refresh();
         });
+
+        app(Avisos::class)->resultadoDelPartido($resultado);
+
+        return $resultado;
     }
 }

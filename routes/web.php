@@ -3,6 +3,7 @@
 use App\Http\Controllers\AccesoDelJugador;
 use App\Http\Controllers\PaginasLegales;
 use App\Http\Controllers\Portada;
+use App\Http\Controllers\Pwa;
 use App\Http\Controllers\VerificarAlta;
 use App\Http\Middleware\ExigirEquipo;
 use App\Http\Middleware\ExigirJugador;
@@ -35,6 +36,10 @@ Route::middleware(SoloPlataforma::class)->group(function (): void {
 
 // Las páginas públicas de un torneo, en el host de su organizador.
 Route::middleware(ExigirOrganizador::class)->group(function (): void {
+    // La aplicación instalable del organizador.
+    Route::get('/manifest.webmanifest', [Pwa::class, 'manifiesto'])->name('pwa.manifiesto');
+    Route::get('/icono-{tamano}.png', [Pwa::class, 'icono'])->where('tamano', '192|512|maskable-512|apple')->name('pwa.icono');
+
     Route::get('/torneos/{torneo:slug}', FichaDelTorneo::class)->name('torneo.ficha');
     Route::get('/torneos/{torneo:slug}/tablero', Tablero::class)->name('torneo.tablero');
     Route::get('/torneos/{torneo:slug}/pista/{pista}', PartidosDePista::class)->name('torneo.pista');

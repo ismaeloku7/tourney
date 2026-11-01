@@ -19,12 +19,15 @@ use App\Models\Disponibilidad;
 use App\Models\Inscripcion;
 use App\Models\Jugador;
 use App\Models\Partido;
+use App\Models\SuscripcionPush;
 use App\Models\Torneo;
 use App\Publico\DatosDelTorneo;
 use App\Publico\NombrePublico;
+use App\Push\Push;
 use Illuminate\Contracts\View\View;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\Auth;
+use InvalidArgumentException;
 use Livewire\Attributes\Layout;
 use Livewire\Component;
 
@@ -52,6 +55,10 @@ class PortalDelJugador extends Component
 
     public string $confirmarBorrado = '';
 
+    public bool $avisosCorreo = true;
+
+    public bool $avisosPush = true;
+
     public ?string $aviso = null;
 
     public function mount(): void
@@ -61,6 +68,29 @@ class PortalDelJugador extends Component
         $this->apellidos = $yo->apellidos;
         $this->telefono = (string) $yo->getAttribute('telefono');
         $this->alias = (string) $yo->alias;
+        $this->avisosCorreo = (bool) ($yo->avisos['correo'] ?? true);
+        $this->avisosPush = (bool) ($yo->avisos['push'] ?? true);
+    }
+
+    public function guardarAvisos(): void
+    {
+        $this->yo()->update(['avisos' => ['correo' => $this->avisosCorreo, 'push' => $this->avisosPush]]);
+        $this->aviso = 'Avisos guardados.';
+    }
+
+    /** @param  array<string, mixed>  $suscripcion */
+    public function guardarPush(array $suscripcion, ?string $dispositivo = null): void
+    {
+        try {
+            app(Push::class)->guardar($suscripcion, $this->yo(), $dispositivo);
+        } catch (InvalidArgumentException) {
+            $this->addError('portal', 'No se han podido activar las notificaciones en este dispositivo.');
+        }
+    }
+
+    public function quitarPush(string $endpoint): void
+    {
+        SuscripcionPush::query()->where('endpoint_hash', hash('sha256', $endpoint))->where('jugador_id', $this->yo()->id)->delete();
     }
 
     public function darmeDeBaja(int $inscripcion, DarseDeBaja $baja): void
@@ -173,6 +203,7 @@ class PortalDelJugador extends Component
             'partidos' => $partidos->map(fn (Partido $p): array => $this->filaDePartido($p, $yo))->all(),
             'torneosConHuecos' => $torneosAbiertosAlHorario,
             'noDisponibilidades' => Disponibilidad::query()->where('jugador_id', $yo->id)->orderBy('desde')->get()->groupBy('torneo_id'),
+            'historial' => $yo->notifications()->latest()->limit(15)->get(),
         ]);
     }
 

@@ -2,6 +2,7 @@
 
 namespace App\Actions\Competicion;
 
+use App\Avisos\Avisos;
 use App\Competicion\Datos\Resultado;
 use App\Competicion\Errores\OperacionNoPermitida;
 use App\Competicion\Errores\ResultadoInvalido;
@@ -56,7 +57,7 @@ final class RegistrarResultado
             throw new ResultadoInvalido($validacion->errores);
         }
 
-        return DB::transaction(function () use ($partido, $resultado, $quien, $torneo, $porJugador, $validacion): Partido {
+        $guardado = DB::transaction(function () use ($partido, $resultado, $quien, $torneo, $porJugador, $validacion): Partido {
             $antes = $partido->only(['estado', 'ganador_id', 'especial']);
 
             $partido->sets()->delete();
@@ -100,6 +101,14 @@ final class RegistrarResultado
 
             return $partido->refresh();
         });
+
+        if ($guardado->estado === EstadoPartido::PendienteValidacion) {
+            app(Avisos::class)->resultadoPorValidar($guardado);
+        } elseif ($guardado->cerrado()) {
+            app(Avisos::class)->resultadoDelPartido($guardado);
+        }
+
+        return $guardado;
     }
 
     private function juegaEn(Jugador $jugador, Partido $partido): bool

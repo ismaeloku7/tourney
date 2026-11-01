@@ -3,6 +3,7 @@
 namespace App\Actions\Jugadores;
 
 use App\Actions\Inscripciones\InscribirPareja;
+use App\Avisos\Avisos;
 use App\Enums\EstadoInscripcion;
 use App\Models\Inscripcion;
 use App\Models\ParticipanteJugador;
@@ -28,7 +29,9 @@ final class ConfirmarInvitacion
 
     public function handle(ParticipanteJugador $invitacion): Inscripcion
     {
-        return DB::transaction(function () use ($invitacion): Inscripcion {
+        $estabaPendiente = $invitacion->participante->inscripcion?->estado === EstadoInscripcion::Pendiente;
+
+        $resultado = DB::transaction(function () use ($invitacion): Inscripcion {
             $invitacion->forceFill(['confirmado_en' => now(), 'invitacion_token' => null, 'invitacion_expira_en' => null])->save();
 
             $jugador = $invitacion->jugador;
@@ -54,5 +57,11 @@ final class ConfirmarInvitacion
 
             return $inscripcion->refresh();
         });
+
+        if ($estabaPendiente && $resultado->estado === EstadoInscripcion::Confirmada) {
+            app(Avisos::class)->inscripcionConfirmada($resultado);
+        }
+
+        return $resultado;
     }
 }

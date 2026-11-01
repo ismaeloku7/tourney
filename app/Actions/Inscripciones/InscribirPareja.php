@@ -2,6 +2,7 @@
 
 namespace App\Actions\Inscripciones;
 
+use App\Avisos\Avisos;
 use App\Competicion\Errores\OperacionNoPermitida;
 use App\Enums\EstadoInscripcion;
 use App\Enums\EstadoParticipante;
@@ -41,7 +42,7 @@ final class InscribirPareja
             }
         }
 
-        return DB::transaction(function () use ($categoria, $primero, $segundo, $origen, $registradaPor, $confirmada, $notas): Inscripcion {
+        $inscripcion = DB::transaction(function () use ($categoria, $primero, $segundo, $origen, $registradaPor, $confirmada, $notas): Inscripcion {
             $participante = Participante::query()->create([
                 'categoria_id' => $categoria->id,
                 'nombre' => Participante::nombreDesdeJugadores($primero, $segundo),
@@ -74,6 +75,12 @@ final class InscribirPareja
 
             return $inscripcion;
         });
+
+        if ($inscripcion->estado === EstadoInscripcion::Confirmada) {
+            app(Avisos::class)->inscripcionConfirmada($inscripcion);
+        }
+
+        return $inscripcion;
     }
 
     public static function alCupo(Categoria $categoria): bool
