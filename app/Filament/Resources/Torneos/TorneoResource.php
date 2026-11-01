@@ -6,6 +6,7 @@ use App\Enums\Rol;
 use App\Filament\Resources\Torneos\Pages\CreateTorneo;
 use App\Filament\Resources\Torneos\Pages\EditTorneo;
 use App\Filament\Resources\Torneos\Pages\ListTorneos;
+use App\Filament\Resources\Torneos\Pages\PartidosDelTorneo;
 use App\Filament\Resources\Torneos\RelationManagers\CategoriasRelationManager;
 use App\Filament\Resources\Torneos\RelationManagers\PistasRelationManager;
 use App\Filament\Resources\Torneos\Schemas\TorneoForm;
@@ -76,6 +77,7 @@ class TorneoResource extends Resource
             'index' => ListTorneos::route('/'),
             'create' => CreateTorneo::route('/nuevo'),
             'edit' => EditTorneo::route('/{record}/editar'),
+            'partidos' => PartidosDelTorneo::route('/{record}/partidos'),
         ];
     }
 }
