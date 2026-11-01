@@ -46,8 +46,9 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $validado_en
  * @property int|null $validado_por
  * @property string|null $notas
+ * @property Carbon|null $aviso_proximo_en
  */
-#[Fillable(['fase_id', 'grupo_id', 'jornada', 'ronda', 'posicion', 'es_tercer_puesto', 'local_id', 'visitante_id', 'origen_local', 'origen_visitante', 'formato_partido_id', 'pista_id', 'franja_id', 'estado', 'especial', 'ganador_id', 'registrado_por_jugador_id', 'registrado_en', 'validacion_vence_en', 'validado_en', 'validado_por', 'notas'])]
+#[Fillable(['fase_id', 'grupo_id', 'jornada', 'ronda', 'posicion', 'es_tercer_puesto', 'local_id', 'visitante_id', 'origen_local', 'origen_visitante', 'formato_partido_id', 'pista_id', 'franja_id', 'estado', 'especial', 'ganador_id', 'registrado_por_jugador_id', 'registrado_en', 'validacion_vence_en', 'validado_en', 'validado_por', 'notas', 'aviso_proximo_en'])]
 class Partido extends Model
 {
     /** @use HasFactory<PartidoFactory> */
@@ -67,6 +68,7 @@ class Partido extends Model
             'registrado_en' => 'datetime',
             'validacion_vence_en' => 'datetime',
             'validado_en' => 'datetime',
+            'aviso_proximo_en' => 'datetime',
         ];
     }
 

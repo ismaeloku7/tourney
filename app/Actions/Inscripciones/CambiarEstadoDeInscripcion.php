@@ -9,6 +9,7 @@ use App\Models\Inscripcion;
 use App\Models\RegistroDeCambio;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use App\Avisos\Avisos;
 
 /**
  * Confirmar (respetando el cupo), mover a lista de espera o dar de baja.
@@ -29,7 +30,7 @@ final class CambiarEstadoDeInscripcion
             throw new OperacionNoPermitida('La categoría está al cupo: amplíelo o dé de baja a otra pareja antes.');
         }
 
-        return DB::transaction(function () use ($inscripcion, $estado, $anterior, $usuario): Inscripcion {
+        $resultado = DB::transaction(function () use ($inscripcion, $estado, $anterior, $usuario): Inscripcion {
             $inscripcion->fill([
                 'estado' => $estado,
                 'posicion_espera' => $estado === EstadoInscripcion::ListaDeEspera ? InscribirPareja::siguientePosicionDeEspera($inscripcion->categoria) : null,
@@ -47,6 +48,12 @@ final class CambiarEstadoDeInscripcion
 
             return $inscripcion->refresh();
         });
+
+        if ($estado === EstadoInscripcion::Confirmada) {
+            app(Avisos::class)->inscripcionConfirmada($resultado, desdeEspera: $anterior === EstadoInscripcion::ListaDeEspera);
+        }
+
+        return $resultado;
     }
 
     /** Las posiciones de la lista de espera quedan seguidas tras sacar a alguien. */

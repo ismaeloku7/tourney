@@ -13,6 +13,7 @@ use App\Models\Participante;
 use App\Models\RegistroDeCambio;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use App\Avisos\Avisos;
 
 /**
  * Inscribe a una pareja en una categoría: crea el participante con sus
@@ -41,7 +42,7 @@ final class InscribirPareja
             }
         }
 
-        return DB::transaction(function () use ($categoria, $primero, $segundo, $origen, $registradaPor, $confirmada, $notas): Inscripcion {
+        $inscripcion = DB::transaction(function () use ($categoria, $primero, $segundo, $origen, $registradaPor, $confirmada, $notas): Inscripcion {
             $participante = Participante::query()->create([
                 'categoria_id' => $categoria->id,
                 'nombre' => Participante::nombreDesdeJugadores($primero, $segundo),
@@ -74,6 +75,12 @@ final class InscribirPareja
 
             return $inscripcion;
         });
+
+        if ($inscripcion->estado === EstadoInscripcion::Confirmada) {
+            app(Avisos::class)->inscripcionConfirmada($inscripcion);
+        }
+
+        return $inscripcion;
     }
 
     public static function alCupo(Categoria $categoria): bool

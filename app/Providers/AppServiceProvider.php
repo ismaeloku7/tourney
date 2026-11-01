@@ -2,6 +2,8 @@
 
 namespace App\Providers;
 
+use App\Push\Remitente;
+use App\Push\RemitenteWebPush;
 use App\Tenancy\OrganizadorActual;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Date;
@@ -18,6 +20,9 @@ class AppServiceProvider extends ServiceProvider
     {
         // Uno por petición o job: nunca se arrastra el organizador de la anterior.
         $this->app->scoped(OrganizadorActual::class);
+
+        // En producción, Web Push; las pruebas lo cambian por RemitenteDePruebas.
+        $this->app->bind(Remitente::class, RemitenteWebPush::class);
     }
 
     /**

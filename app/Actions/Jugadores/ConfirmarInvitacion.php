@@ -8,6 +8,7 @@ use App\Models\Inscripcion;
 use App\Models\ParticipanteJugador;
 use App\Models\RegistroDeCambio;
 use Illuminate\Support\Facades\DB;
+use App\Avisos\Avisos;
 
 /**
  * El compañero invitado acepta: queda confirmado y la inscripción pasa a
@@ -28,7 +29,9 @@ final class ConfirmarInvitacion
 
     public function handle(ParticipanteJugador $invitacion): Inscripcion
     {
-        return DB::transaction(function () use ($invitacion): Inscripcion {
+        $estabaPendiente = $invitacion->participante->inscripcion?->estado === EstadoInscripcion::Pendiente;
+
+        $resultado = DB::transaction(function () use ($invitacion): Inscripcion {
             $invitacion->forceFill(['confirmado_en' => now(), 'invitacion_token' => null, 'invitacion_expira_en' => null])->save();
 
             $jugador = $invitacion->jugador;
@@ -54,5 +57,11 @@ final class ConfirmarInvitacion
 
             return $inscripcion->refresh();
         });
+
+        if ($estabaPendiente && $resultado->estado === EstadoInscripcion::Confirmada) {
+            app(Avisos::class)->inscripcionConfirmada($resultado);
+        }
+
+        return $resultado;
     }
 }

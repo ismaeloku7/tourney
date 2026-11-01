@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Torneos\Pages;
 
+use App\Actions\Avisos\EnviarComunicacion;
 use App\Actions\Competicion\CambiarEstadoDelTorneo;
 use App\Actions\Competicion\GenerarFranjas;
 use App\Actions\Competicion\PlanificarHorarios;
@@ -11,12 +12,17 @@ use App\Enums\EstadoTorneo;
 use App\Exportaciones\AccionesDeExportacion;
 use App\Filament\Avisos;
 use App\Filament\Resources\Torneos\TorneoResource;
+use App\Models\Categoria;
 use App\Models\Torneo;
 use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\CheckboxList;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Textarea;
+use Filament\Forms\Components\TextInput;
 use Filament\Resources\Pages\EditRecord;
 use Filament\Support\Icons\Heroicon;
 
@@ -63,6 +69,35 @@ class EditTorneo extends EditRecord
                         ...array_map(fn (Conflicto $c): string => "Partido {$c->partido}: {$c->detalle}", array_slice($conflictos, 0, 5)),
                         count($conflictos) > 5 ? 'Y '.(count($conflictos) - 5).' más.' : '',
                     ]);
+                }),
+            Action::make('aviso')
+                ->label('Enviar aviso')
+                ->icon(Heroicon::OutlinedMegaphone)
+                ->color('gray')
+                ->modalHeading('Aviso a los inscritos')
+                ->modalDescription('Les llega a las parejas inscritas (confirmadas, pendientes y en espera) por los canales que elijas, y queda en su portal.')
+                ->modalSubmitActionLabel('Enviar')
+                ->schema([
+                    Select::make('categoria_id')->label('A quién')->placeholder('Todo el torneo')
+                        ->options(fn (): array => $this->torneo()->categorias()->pluck('nombre', 'id')->all()),
+                    TextInput::make('titulo')->label('Título')->required()->maxLength(120),
+                    Textarea::make('cuerpo')->label('Mensaje')->required()->rows(4)->maxLength(2000),
+                    CheckboxList::make('canales')->label('Canales')->required()
+                        ->options(['correo' => 'Correo', 'push' => 'Push (móvil)'])->default(['correo', 'push'])->columns(2),
+                ])
+                ->action(function (array $data, Action $action): void {
+                    $categoria = filled($data['categoria_id'] ?? null) ? Categoria::query()->find((int) $data['categoria_id']) : null;
+
+                    try {
+                        $comunicacion = app(EnviarComunicacion::class)->handle($this->torneo(), $categoria, (string) $data['titulo'], (string) $data['cuerpo'], array_values((array) $data['canales']), $this->usuario());
+                    } catch (ErrorDeCompeticion $e) {
+                        Avisos::error('No se ha podido enviar', [$e->getMessage()]);
+                        $action->halt();
+
+                        return;
+                    }
+
+                    Avisos::hecho('Aviso enviado', $comunicacion->destinatarios === 1 ? 'A 1 jugador.' : "A {$comunicacion->destinatarios} jugadores.");
                 }),
             ActionGroup::make([
                 AccionesDeExportacion::pdfDeHorarios(),

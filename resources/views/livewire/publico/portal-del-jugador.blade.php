@@ -107,6 +107,33 @@
     @endif
 
     <section>
+        <h2 class="text-lg font-semibold">Avisos</h2>
+        <x-pwa.instalar class="mt-3" />
+        <div class="mt-3 space-y-3 rounded-xl border border-neutral-200 bg-white p-4">
+            <x-push.activar />
+            <form wire:submit="guardarAvisos" class="flex flex-wrap items-center gap-4 text-sm">
+                <label class="flex items-center gap-2"><input type="checkbox" wire:model="avisosCorreo"> Por correo</label>
+                <label class="flex items-center gap-2"><input type="checkbox" wire:model="avisosPush"> En el móvil (push)</label>
+                <button type="submit" class="rounded-lg px-3 py-1.5 font-medium text-white" style="background: var(--acento)">Guardar</button>
+            </form>
+            <p class="text-xs text-neutral-500">Inscripciones, horarios, resultados por validar, cruces y los avisos de la organización.</p>
+        </div>
+        @if ($historial->isNotEmpty())
+            <ul class="mt-3 divide-y divide-neutral-100 rounded-xl border border-neutral-200 bg-white text-sm">
+                @foreach ($historial as $notificacion)
+                    <li class="flex justify-between gap-3 px-4 py-2">
+                        <a href="{{ $notificacion->data['url'] ?? '/' }}" class="min-w-0">
+                            <span class="block font-medium">{{ $notificacion->data['titulo'] ?? '' }}</span>
+                            <span class="block truncate text-neutral-500">{{ $notificacion->data['texto'] ?? '' }}</span>
+                        </a>
+                        <span class="shrink-0 text-xs text-neutral-400">{{ $notificacion->created_at?->diffForHumans() }}</span>
+                    </li>
+                @endforeach
+            </ul>
+        @endif
+    </section>
+
+    <section>
         <h2 class="text-lg font-semibold">Mis datos</h2>
         <form wire:submit="guardarDatos" class="mt-3 grid gap-4 rounded-xl border border-neutral-200 bg-white p-4 sm:grid-cols-2">
             <label class="block text-sm"><span class="font-medium">Nombre</span><input type="text" wire:model="nombre" class="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2">@error('nombre') <span class="text-red-700">{{ $message }}</span> @enderror</label>

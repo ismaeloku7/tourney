@@ -9,6 +9,7 @@ use App\Models\Partido;
 use App\Models\RegistroDeCambio;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use App\Avisos\Avisos;
 
 /**
  * Da por bueno un resultado pendiente de validación: lo hace el rival
@@ -36,7 +37,7 @@ final class ValidarResultado
             }
         }
 
-        return DB::transaction(function () use ($partido, $quien): Partido {
+        $resultado = DB::transaction(function () use ($partido, $quien): Partido {
             $partido->fill([
                 'estado' => $partido->especial !== null ? EstadoPartido::Walkover : EstadoPartido::Jugado,
                 'validado_en' => now(),
@@ -50,5 +51,9 @@ final class ValidarResultado
 
             return $partido->refresh();
         });
+
+        app(Avisos::class)->resultadoDelPartido($resultado);
+
+        return $resultado;
     }
 }

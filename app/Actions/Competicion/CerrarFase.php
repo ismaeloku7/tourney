@@ -19,6 +19,7 @@ use App\Models\Partido;
 use App\Models\RegistroDeCambio;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use App\Avisos\Avisos;
 
 /**
  * Cierra una fase con todos sus partidos jugados. En una fase de grupos,
@@ -53,7 +54,7 @@ final class CerrarFase
             throw new OperacionNoPermitida('Quedan partidos sin resultado: no se puede cerrar la fase.');
         }
 
-        return DB::transaction(function () use ($fase, $usuario): array {
+        $resultado = DB::transaction(function () use ($fase, $usuario): array {
             $clasificados = $fase->tipo->esDeGrupos() ? $this->cerrarGrupos($fase) : [];
 
             $fase->estado = EstadoFase::Cerrada;
@@ -66,6 +67,12 @@ final class CerrarFase
 
             return $clasificados;
         });
+
+        if ($fase->tipo->esDeGrupos()) {
+            app(Avisos::class)->crucesDe($fase);
+        }
+
+        return $resultado;
     }
 
     /**
