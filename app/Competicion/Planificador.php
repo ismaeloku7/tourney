@@ -60,13 +60,19 @@ final readonly class Planificador
             $noAntesDe = null;
             foreach ($partido->dependeDe as $previo) {
                 if (! isset($asignadas[$previo])) {
-                    $conflicto ??= new Conflicto($partido->id, Conflicto::ORDEN_DE_RONDAS, "El partido {$previo} tiene que jugarse antes y no tiene hora.");
+                    $conflicto = new Conflicto($partido->id, Conflicto::ORDEN_DE_RONDAS, "El partido {$previo} tiene que jugarse antes y no tiene hora.");
 
-                    continue 2;
+                    break;
                 }
                 if ($noAntesDe === null || $asignadas[$previo]->fin > $noAntesDe) {
                     $noAntesDe = $asignadas[$previo]->fin;
                 }
+            }
+
+            if ($conflicto !== null) {
+                $conflictos[] = $conflicto;
+
+                continue;
             }
 
             foreach ($libres as $i => $franja) {
