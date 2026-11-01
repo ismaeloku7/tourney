@@ -130,12 +130,15 @@ Las de los organizadores no: las crea la aplicación.
 ## Script de despliegue
 
 El contenido de [`forge/deploy.sh`](../forge/deploy.sh), pegado en
-«Deployment script». Hace, en este orden: `git pull`, `composer install`
-sin dependencias de desarrollo, `npm ci` y `npm run build`, modo
-mantenimiento, `php artisan actualizar` (migra la central y cada
-organizador), `php artisan optimize`, fin del mantenimiento,
-`queue:restart` y recarga de PHP-FPM. Si un paso falla, el despliegue se
-corta y Forge lo marca en rojo.
+«Deployment script». Vale para el modo sin caída de Forge (cada versión
+en su carpeta, `FORGE_RELEASE_DIRECTORY`, y `current` apuntando a la
+última que acabó bien) y para el clásico (`git pull` en la carpeta del
+sitio). Hace, en este orden: `composer install` sin dependencias de
+desarrollo, `npm ci` y `npm run build`, `php artisan actualizar` (migra la
+central y cada organizador), `php artisan optimize`, `queue:restart` y
+recarga de PHP-FPM. Si un paso falla, el despliegue se corta, Forge lo
+marca en rojo y, en el modo sin caída, la versión anterior sigue
+sirviendo.
 
 ## Cola y programador
 

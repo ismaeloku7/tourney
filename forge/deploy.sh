@@ -1,13 +1,23 @@
 #!/usr/bin/env bash
 # Script de despliegue del sitio en Laravel Forge. Se pega en el apartado
-# «Deployment script» del sitio (o se envía por la API). Forge define
-# FORGE_SITE_PATH, FORGE_SITE_BRANCH, FORGE_COMPOSER, FORGE_PHP y
+# «Deployment script» del sitio (o se envía por la API). Vale para los
+# dos modos de Forge:
+#
+# - Sin caída (zero downtime): Forge clona cada versión en una carpeta
+#   nueva, FORGE_RELEASE_DIRECTORY, enlaza .env y storage, ejecuta este
+#   script ahí y, si acaba bien, apunta `current` a la versión nueva.
+# - Clásico: una sola carpeta, FORGE_SITE_PATH, que se actualiza con pull.
+#
+# Forge define además FORGE_SITE_BRANCH, FORGE_COMPOSER, FORGE_PHP y
 # FORGE_PHP_FPM. Cualquier paso que falle corta el despliegue.
 set -euo pipefail
 
-cd "$FORGE_SITE_PATH"
-
-git pull origin "$FORGE_SITE_BRANCH"
+if [ -n "${FORGE_RELEASE_DIRECTORY:-}" ]; then
+    cd "$FORGE_RELEASE_DIRECTORY"
+else
+    cd "$FORGE_SITE_PATH"
+    git pull origin "$FORGE_SITE_BRANCH"
+fi
 
 # Dependencias de PHP, exactamente las del composer.lock.
 "$FORGE_COMPOSER" install --no-dev --no-interaction --prefer-dist --optimize-autoloader --no-progress
@@ -16,17 +26,12 @@ git pull origin "$FORGE_SITE_BRANCH"
 npm ci --no-audit --no-fund
 npm run build
 
-# Mantenimiento solo durante las migraciones; la landing y las páginas
-# públicas vuelven en segundos.
-"$FORGE_PHP" artisan down --retry=10 || true
-
-# Base central y bases de los organizadores, en un solo comando.
+# Base central y bases de los organizadores, en un solo comando. En el
+# modo sin caída corre antes de que la versión nueva esté publicada.
 "$FORGE_PHP" artisan actualizar
 
 # Cachés de configuración, rutas, vistas y eventos.
 "$FORGE_PHP" artisan optimize
-
-"$FORGE_PHP" artisan up
 
 # Los workers cargan el código nuevo en el siguiente trabajo.
 "$FORGE_PHP" artisan queue:restart
