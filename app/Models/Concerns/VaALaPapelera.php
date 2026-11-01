@@ -3,6 +3,7 @@
 namespace App\Models\Concerns;
 
 use Carbon\CarbonInterface;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\DB;
 
@@ -19,7 +20,7 @@ use Illuminate\Support\Facades\DB;
  * Solo pasa con `delete()` sobre el modelo: un `->delete()` sobre una
  * consulta no dispara eventos y no arrastra nada.
  *
- * @mixin \Illuminate\Database\Eloquent\Model
+ * @mixin Model
  */
 trait VaALaPapelera
 {

@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Plataforma\CambiarEstadoDelOrganizador;
 use App\Enums\EstadoOrganizador;
 use App\Enums\Rol;
 use App\Models\AuditoriaGlobal;
@@ -111,7 +112,7 @@ test('destruir exige confirmación y borra la fila y la base', function () {
 
 test('suspender deja de servir los hosts y reactivar los devuelve', function () {
     $organizador = Organizador::factory()->create(['id' => 'norte', 'nombre' => 'Pádel Norte']);
-    $accion = app(App\Actions\Plataforma\CambiarEstadoDelOrganizador::class);
+    $accion = app(CambiarEstadoDelOrganizador::class);
 
     $accion->handle($organizador, EstadoOrganizador::Suspendido, motivo: 'impago');
     $this->get('http://norte.saas.test/')->assertNotFound();

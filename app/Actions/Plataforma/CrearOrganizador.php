@@ -11,9 +11,9 @@ use App\Models\User;
 use App\Models\UsuarioPlataforma;
 use Database\Seeders\Organizador\BaseDelOrganizadorSeeder;
 use Illuminate\Support\Facades\Validator;
-use Illuminate\Validation\Validator as ValidadorConcreto;
 use Illuminate\Support\Str;
 use Illuminate\Validation\ValidationException;
+use Illuminate\Validation\Validator as ValidadorConcreto;
 use Stancl\Tenancy\Database\Models\Domain;
 
 /**

@@ -26,7 +26,6 @@ use App\Models\Partido;
 use App\Models\Pista;
 use App\Models\Torneo;
 use App\Models\User;
-use Database\Factories\FaseFactory;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Carbon;
 
