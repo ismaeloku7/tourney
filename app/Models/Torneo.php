@@ -6,6 +6,7 @@ use App\Enums\EstadoTorneo;
 use App\Enums\ResultadosPorJugadores;
 use App\Models\Concerns\VaALaPapelera;
 use App\Tenancy\EnLaBaseDelOrganizador;
+use Carbon\CarbonInterface;
 use Database\Factories\TorneoFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
@@ -13,7 +14,6 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Support\Carbon;
 
 /**
  * Un torneo del organizador, con sus categorías, su equipo, sus pistas y
@@ -25,10 +25,10 @@ use Illuminate\Support\Carbon;
  * @property string $deporte
  * @property int|null $sede_id
  * @property string|null $direccion
- * @property Carbon $fecha_inicio
- * @property Carbon $fecha_fin
- * @property Carbon|null $inscripcion_desde
- * @property Carbon|null $inscripcion_hasta
+ * @property CarbonInterface $fecha_inicio
+ * @property CarbonInterface $fecha_fin
+ * @property CarbonInterface|null $inscripcion_desde
+ * @property CarbonInterface|null $inscripcion_hasta
  * @property EstadoTorneo $estado
  * @property bool $listado_en_plataforma
  * @property ResultadosPorJugadores $resultados_por_jugadores
@@ -40,10 +40,10 @@ use Illuminate\Support\Carbon;
  * @property int $descanso_minimo_minutos
  * @property int $margen_entre_partidos_minutos
  * @property array<string, mixed>|null $campos_extra
- * @property Carbon|null $publicado_en
- * @property Carbon|null $horarios_publicados_en
- * @property Carbon|null $finalizado_en
- * @property Carbon|null $archivado_en
+ * @property CarbonInterface|null $publicado_en
+ * @property CarbonInterface|null $horarios_publicados_en
+ * @property CarbonInterface|null $finalizado_en
+ * @property CarbonInterface|null $archivado_en
  * @property int|null $creado_por
  */
 #[Fillable(['nombre', 'slug', 'deporte', 'sede_id', 'direccion', 'fecha_inicio', 'fecha_fin', 'inscripcion_desde', 'inscripcion_hasta', 'estado', 'listado_en_plataforma', 'resultados_por_jugadores', 'minutos_para_validar', 'privacidad_alias', 'cartel_path', 'normativa', 'contacto', 'descanso_minimo_minutos', 'margen_entre_partidos_minutos', 'campos_extra', 'publicado_en', 'horarios_publicados_en', 'finalizado_en', 'archivado_en', 'creado_por'])]

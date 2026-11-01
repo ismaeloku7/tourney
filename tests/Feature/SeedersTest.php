@@ -30,7 +30,8 @@ test('el seeder deja la plataforma y el organizador demo completos, y se puede r
             ->and(Pista::query()->count())->toBe(4)
             ->and(FormatoPartido::query()->count())->toBe(4)
             ->and(FormatoPartido::query()->where('es_predeterminado', true)->count())->toBe(1)
-            ->and(Jugador::query()->count())->toBe(48)
+            // Los 48 de JugadoresSeeder; el seeder de torneos añade más para sus parejas.
+            ->and(Jugador::query()->where('email', 'like', 'jugador%@example.com')->count())->toBe(48)
             ->and(Jugador::query()->where('email', 'jugador@example.com')->exists())->toBeTrue();
     });
 });

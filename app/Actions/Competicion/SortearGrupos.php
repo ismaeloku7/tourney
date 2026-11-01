@@ -42,13 +42,16 @@ final class SortearGrupos
             ->orderBy('id')
             ->get()
             ->map(fn (Participante $p): ParticipanteDto => new ParticipanteDto($p->id, $p->nombre, $p->cabeza_de_serie, $p->idsDeJugadores()))
-            ->values()
             ->all();
+        $participantes = array_values($participantes);
 
         $configuracion = $fase->configuracionDeGrupos();
 
         return DB::transaction(function () use ($fase, $usuario, $participantes, $configuracion): RepartoDeGrupos {
-            $antes = $fase->grupos()->with('participantes')->get()->map(fn ($g): array => [$g->nombre => $g->participantes->pluck('id')->all()])->collapse()->all();
+            $antes = [];
+            foreach ($fase->grupos()->with('participantes')->get() as $grupoAnterior) {
+                $antes[$grupoAnterior->nombre] = $grupoAnterior->participantes->pluck('id')->all();
+            }
 
             $reparto = $this->repartidor->repartir($participantes, $configuracion);
 

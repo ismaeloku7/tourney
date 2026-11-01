@@ -76,7 +76,7 @@ final readonly class ValidadorDeResultado
             return new ValidacionDeResultado(false, ['Hace falta al menos un set.']);
         }
 
-        foreach (array_values($resultado->sets) as $i => $set) {
+        foreach ($resultado->sets as $i => $set) {
             $numero = $i + 1;
 
             if ($setsLocal >= $paraGanar || $setsVisitante >= $paraGanar) {

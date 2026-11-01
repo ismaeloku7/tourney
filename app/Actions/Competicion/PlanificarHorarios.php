@@ -73,10 +73,9 @@ final class PlanificarHorarios
             }
         }
 
-        $libres = $torneo->franjas()->where('bloqueada', false)->whereDoesntHave('partido')->get()
+        $libres = array_values($torneo->franjas()->where('bloqueada', false)->whereDoesntHave('partido')->get()
             ->map(fn (Franja $f): FranjaDisponible => $this->franjaDto($f))
-            ->values()
-            ->all();
+            ->all());
 
         $noDisponibilidades = [];
         foreach ($torneo->disponibilidades as $disponibilidad) {

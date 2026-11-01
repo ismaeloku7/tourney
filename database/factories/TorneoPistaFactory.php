@@ -21,7 +21,7 @@ class TorneoPistaFactory extends Factory
             'pista_id' => Pista::factory(),
             'orden' => 0,
             'disponibilidad' => function (array $atributos): array {
-                $torneo = Torneo::query()->findOrFail($atributos['torneo_id']);
+                $torneo = Torneo::query()->findOrFail((int) $atributos['torneo_id']);
                 $tramos = [];
 
                 foreach ($torneo->fecha_inicio->toPeriod($torneo->fecha_fin) as $dia) {

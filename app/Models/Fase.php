@@ -8,13 +8,13 @@ use App\Enums\EstadoFase;
 use App\Enums\TipoDeFase;
 use App\Models\Concerns\VaALaPapelera;
 use App\Tenancy\EnLaBaseDelOrganizador;
+use Carbon\CarbonInterface;
 use Database\Factories\FaseFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Support\Carbon;
 
 /**
  * Una fase de una categoría: grupos, cuadro, consolación o liga, con su
@@ -30,7 +30,7 @@ use Illuminate\Support\Carbon;
  * @property EstadoFase $estado
  * @property int|null $fase_origen_id
  * @property int|null $semilla_sorteo
- * @property Carbon|null $cerrada_en
+ * @property CarbonInterface|null $cerrada_en
  */
 #[Fillable(['categoria_id', 'tipo', 'nombre', 'orden', 'configuracion', 'formato_partido_id', 'estado', 'fase_origen_id', 'semilla_sorteo', 'cerrada_en'])]
 class Fase extends Model

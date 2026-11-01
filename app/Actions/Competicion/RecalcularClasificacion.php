@@ -22,8 +22,8 @@ final class RecalcularClasificacion
     {
         $fase = $grupo->fase;
         $configuracion = $fase->configuracionDeGrupos();
-        $participantes = $grupo->participantes()->pluck('participantes.id')->map(fn (mixed $id): int => (int) $id)->values()->all();
-        $partidos = $grupo->partidos()->with('sets')->get()->map(fn (Partido $p): PartidoDto => $p->aDto())->values()->all();
+        $participantes = array_values($grupo->participantes()->pluck('participantes.id')->map(fn (mixed $id): int => (int) $id)->all());
+        $partidos = array_values($grupo->partidos()->with('sets')->get()->map(fn (Partido $p): PartidoDto => $p->aDto())->all());
         $sorteos = Clasificacion::query()->where('grupo_id', $grupo->id)->whereNotNull('sorteo_desempate')->pluck('sorteo_desempate', 'participante_id')->map(fn (mixed $v): int => (int) $v)->all();
 
         $clasificacion = $this->calculador->calcular($participantes, $partidos, $configuracion->puntuacion, $configuracion->criteriosDeDesempate, $sorteos, $grupo->id);

@@ -24,7 +24,7 @@ final readonly class DisponibilidadDePista
         $errores = [];
         $tramos = [];
 
-        foreach (array_values($datos) as $i => $tramo) {
+        foreach ($datos as $i => $tramo) {
             $n = $i + 1;
             $fecha = (string) ($tramo['fecha'] ?? '');
             $desde = (string) ($tramo['desde'] ?? '');

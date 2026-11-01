@@ -1,8 +1,8 @@
 <?php
 
 use App\Models\Jugador;
-use App\Models\UsuarioPlataforma;
 use App\Models\User;
+use App\Models\UsuarioPlataforma;
 
 return [
 
@@ -92,7 +92,6 @@ return [
             'model' => Jugador::class,
         ],
 
-
         // 'users' => [
         //     'driver' => 'database',
         //     'table' => 'users',
@@ -117,7 +116,6 @@ return [
     | quickly generating a very large amount of password reset tokens.
     |
     */
-
 
     'passwords' => [
         'users' => [

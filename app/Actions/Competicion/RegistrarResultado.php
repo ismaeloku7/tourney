@@ -61,7 +61,7 @@ final class RegistrarResultado
 
             $partido->sets()->delete();
 
-            foreach (array_values($resultado->sets) as $i => $set) {
+            foreach ($resultado->sets as $i => $set) {
                 $partido->sets()->create([
                     'numero' => $i + 1,
                     'juegos_local' => $set->juegosLocal,

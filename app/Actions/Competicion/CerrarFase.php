@@ -76,9 +76,9 @@ final class CerrarFase
         $configuracion = $fase->configuracionDeGrupos();
         $grupos = $fase->grupos()->with('participantes')->get();
         $nombres = $grupos->pluck('nombre', 'id')->all();
-        $partidos = $fase->partidos()->with('sets')->get()->map(fn (Partido $p): PartidoDto => $p->aDto())->values()->all();
+        $partidos = array_values($fase->partidos()->with('sets')->get()->map(fn (Partido $p): PartidoDto => $p->aDto())->all());
 
-        $clasificaciones = $grupos->map(fn (Grupo $g): ClasificacionDto => $this->recalcular->handle($g))->values()->all();
+        $clasificaciones = array_values($grupos->map(fn (Grupo $g): ClasificacionDto => $this->recalcular->handle($g))->all());
 
         $clasificados = $this->selector->seleccionar($clasificaciones, $configuracion->clasificados, $configuracion->criteriosDeDesempate, $configuracion->puntuacion, $partidos, $nombres);
 

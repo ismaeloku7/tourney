@@ -19,7 +19,7 @@ final readonly class GeneradorRoundRobin
      */
     public function generar(Grupo $grupo, ?int $partidosPorParticipante = null, bool $idaYVuelta = false): array
     {
-        $ids = array_values($grupo->participantes);
+        $ids = $grupo->participantes;
         $n = count($ids);
 
         if ($n < 2) {
@@ -65,7 +65,7 @@ final readonly class GeneradorRoundRobin
      */
     public function descansos(Grupo $grupo): array
     {
-        $ids = array_values($grupo->participantes);
+        $ids = $grupo->participantes;
 
         if (count($ids) % 2 === 0) {
             return [];
