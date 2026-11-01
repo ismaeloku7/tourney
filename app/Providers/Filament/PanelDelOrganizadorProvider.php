@@ -99,5 +99,4 @@ class PanelDelOrganizadorProvider extends PanelProvider
 
         return $panel;
     }
-
 }
