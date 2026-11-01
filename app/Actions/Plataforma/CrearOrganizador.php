@@ -2,6 +2,7 @@
 
 namespace App\Actions\Plataforma;
 
+use App\Enums\EstadoOrganizador;
 use App\Enums\Rol;
 use App\Models\AuditoriaGlobal;
 use App\Models\Organizador;
@@ -49,7 +50,7 @@ class CrearOrganizador
             'plan_id' => $plan->id,
             'responsable_nombre' => trim($datos->responsableNombre),
             'responsable_email' => Str::lower(trim($datos->responsableEmail)),
-            'verificado_en' => now(),
+            'verificado_en' => $datos->estado === EstadoOrganizador::Pendiente ? null : now(),
             'dominio' => $dominio,
         ], fn (mixed $valor): bool => $valor !== null && $valor !== ''));
 

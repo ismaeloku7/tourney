@@ -8,6 +8,7 @@ use App\Actions\Competicion\PlanificarHorarios;
 use App\Competicion\Datos\Conflicto;
 use App\Competicion\Errores\ErrorDeCompeticion;
 use App\Enums\EstadoTorneo;
+use App\Exportaciones\AccionesDeExportacion;
 use App\Filament\Avisos;
 use App\Filament\Resources\Torneos\TorneoResource;
 use App\Models\Torneo;
@@ -63,6 +64,14 @@ class EditTorneo extends EditRecord
                         count($conflictos) > 5 ? 'Y '.(count($conflictos) - 5).' más.' : '',
                     ]);
                 }),
+            ActionGroup::make([
+                AccionesDeExportacion::pdfDeHorarios(),
+                AccionesDeExportacion::csvDeInscritos(),
+            ])
+                ->label('Exportar')
+                ->icon(Heroicon::OutlinedArrowDownTray)
+                ->color('gray')
+                ->button(),
             ActionGroup::make($this->accionesDeEstado())
                 ->label(fn (): string => 'Estado: '.$this->torneo()->estado->etiqueta())
                 ->icon(Heroicon::OutlinedFlag)

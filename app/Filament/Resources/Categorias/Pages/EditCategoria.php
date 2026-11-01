@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Categorias\Pages;
 
+use App\Exportaciones\AccionesDeExportacion;
 use App\Filament\Resources\Categorias\CategoriaResource;
 use App\Filament\Resources\Torneos\TorneoResource;
 use App\Models\Categoria;
@@ -38,6 +39,7 @@ class EditCategoria extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
+            AccionesDeExportacion::pdfDeCategoria(),
             Action::make('torneo')
                 ->label('Volver al torneo')
                 ->icon(Heroicon::OutlinedArrowUturnLeft)
