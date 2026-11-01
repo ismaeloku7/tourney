@@ -30,6 +30,18 @@ enum EstadoPartido: string
     }
 
     /** Un partido cerrado cuenta para la clasificación y el cuadro. */
+    public function color(): string
+    {
+        return match ($this) {
+            self::Pendiente => 'gray',
+            self::Programado => 'info',
+            self::EnJuego => 'warning',
+            self::PendienteValidacion => 'warning',
+            self::Jugado, self::Walkover => 'success',
+            self::Anulado => 'danger',
+        };
+    }
+
     public function cerrado(): bool
     {
         return $this === self::Jugado || $this === self::Walkover;

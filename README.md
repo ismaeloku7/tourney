@@ -142,8 +142,11 @@ el equipo, las instalaciones, los formatos, los jugadores y los torneos;
 cada categoría tiene su ficha con las fases (validadas por el motor), las
 pistas del torneo con su disponibilidad y las inscripciones a mano
 (parejas con jugadores de la base o nuevos, cupo con lista de espera,
-bajas, pago y cabezas de serie). Falta llevar la competición al panel
-(sorteo, horarios, resultados), las exportaciones y el alta self-service.
+bajas, pago y cabezas de serie). La competición se lleva desde el panel:
+estado del torneo, sorteo de grupos, planificación de horarios, mesa de
+partidos con resultados, validación, anulación y hora a mano, cierre de
+fases con el cuadro, y la clasificación y el cuadro a la vista. Faltan
+las exportaciones y el alta self-service.
 
 `composer ci:check` (Pint, PHPStan nivel 7 y Pest) corre en GitHub
 Actions en cada pull request y en `main`.

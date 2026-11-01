@@ -27,4 +27,14 @@ enum EstadoFase: string
             self::Cerrada => 'Cerrada',
         };
     }
+
+    public function color(): string
+    {
+        return match ($this) {
+            self::Pendiente => 'gray',
+            self::Preparada => 'info',
+            self::EnJuego => 'warning',
+            self::Cerrada => 'success',
+        };
+    }
 }
