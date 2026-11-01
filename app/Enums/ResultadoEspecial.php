@@ -2,6 +2,8 @@
 
 namespace App\Enums;
 
+use App\Enums\Concerns\ConEtiqueta;
+
 /**
  * Un partido que no se jugó o no se acabó: walkover (un lado no se
  * presenta), retirada (abandono a mitad) y no presentado (ninguno de los
@@ -9,6 +11,8 @@ namespace App\Enums;
  */
 enum ResultadoEspecial: string
 {
+    use ConEtiqueta;
+
     case Walkover = 'walkover';
     case Retirada = 'retirada';
     case NoPresentado = 'no_presentado';

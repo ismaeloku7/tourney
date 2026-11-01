@@ -2,6 +2,8 @@
 
 namespace App\Enums;
 
+use App\Enums\Concerns\ConEtiqueta;
+
 /**
  * Los criterios, en el orden que fije la fase. Enfrentamiento directo
  * solo decide entre dos; con tres o más se calcula la mini-liga entre
@@ -9,6 +11,8 @@ namespace App\Enums;
  */
 enum CriterioDeDesempate: string
 {
+    use ConEtiqueta;
+
     case Puntos = 'puntos';
     case EnfrentamientoDirecto = 'enfrentamiento_directo';
     case DiferenciaDeSets = 'diferencia_de_sets';

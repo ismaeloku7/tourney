@@ -2,6 +2,8 @@
 
 namespace App\Enums;
 
+use App\Enums\Concerns\ConEtiqueta;
+
 /**
  * El ciclo de vida de un torneo, en orden. `siguiente()` y `anterior()`
  * dan los vecinos; las comprobaciones de cada transición (no se publica
@@ -10,6 +12,8 @@ namespace App\Enums;
  */
 enum EstadoTorneo: string
 {
+    use ConEtiqueta;
+
     case Borrador = 'borrador';
     case InscripcionAbierta = 'inscripcion_abierta';
     case InscripcionCerrada = 'inscripcion_cerrada';

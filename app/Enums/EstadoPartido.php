@@ -2,8 +2,12 @@
 
 namespace App\Enums;
 
+use App\Enums\Concerns\ConEtiqueta;
+
 enum EstadoPartido: string
 {
+    use ConEtiqueta;
+
     case Pendiente = 'pendiente';
     case Programado = 'programado';
     case EnJuego = 'en_juego';

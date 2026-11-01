@@ -2,8 +2,12 @@
 
 namespace App\Enums;
 
+use App\Enums\Concerns\ConEtiqueta;
+
 enum EstadoInscripcion: string
 {
+    use ConEtiqueta;
+
     case Pendiente = 'pendiente';
     case Confirmada = 'confirmada';
     case ListaDeEspera = 'lista_de_espera';

@@ -2,6 +2,8 @@
 
 namespace App\Enums;
 
+use App\Enums\Concerns\ConEtiqueta;
+
 /**
  * Pendiente (sin sortear), preparada (grupos o cuadro hechos, sin
  * resultados), en juego (algún resultado) y cerrada (clasificados
@@ -9,6 +11,8 @@ namespace App\Enums;
  */
 enum EstadoFase: string
 {
+    use ConEtiqueta;
+
     case Pendiente = 'pendiente';
     case Preparada = 'preparada';
     case EnJuego = 'en_juego';

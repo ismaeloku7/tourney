@@ -1,0 +1,14 @@
+@import '../../../../vendor/filament/filament/resources/css/theme.css';
+
+@source '../../../../app/Filament/**/*';
+@source '../../../../resources/views/filament/**/*';
+
+/*
+ * Tema del panel del organizador: fondo gris muy claro y tarjetas blancas.
+ * El acento lo pone el organizador en --panel-acento
+ * (resources/views/filament/panel/color.blade.php).
+ */
+
+.fi-body {
+    @apply bg-[#f6f7f9] dark:bg-gray-950;
+}

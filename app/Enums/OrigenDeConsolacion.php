@@ -2,8 +2,12 @@
 
 namespace App\Enums;
 
+use App\Enums\Concerns\ConEtiqueta;
+
 enum OrigenDeConsolacion: string
 {
+    use ConEtiqueta;
+
     case Ninguna = 'ninguna';
     case NoClasificados = 'no_clasificados';
     case PerdedoresPrimeraRonda = 'perdedores_primera_ronda';

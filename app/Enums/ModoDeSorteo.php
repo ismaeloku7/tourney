@@ -2,8 +2,12 @@
 
 namespace App\Enums;
 
+use App\Enums\Concerns\ConEtiqueta;
+
 enum ModoDeSorteo: string
 {
+    use ConEtiqueta;
+
     case Aleatorio = 'aleatorio';
     case CabezasDeSerie = 'cabezas_de_serie';
     case Manual = 'manual';

@@ -2,6 +2,8 @@
 
 namespace App\Enums;
 
+use App\Enums\Concerns\ConEtiqueta;
+
 /**
  * Ciclo de vida de un organizador: pendiente (registrado, sin verificar el
  * correo), activo, suspendido (impago o abuso: el panel se bloquea y las
@@ -10,6 +12,8 @@ namespace App\Enums;
  */
 enum EstadoOrganizador: string
 {
+    use ConEtiqueta;
+
     case Pendiente = 'pendiente';
     case Activo = 'activo';
     case Suspendido = 'suspendido';

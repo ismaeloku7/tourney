@@ -2,8 +2,12 @@
 
 namespace App\Enums;
 
+use App\Enums\Concerns\ConEtiqueta;
+
 enum Genero: string
 {
+    use ConEtiqueta;
+
     case Masculino = 'masculino';
     case Femenino = 'femenino';
     case Mixto = 'mixto';
