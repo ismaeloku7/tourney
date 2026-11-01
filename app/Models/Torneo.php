@@ -29,6 +29,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property CarbonInterface $fecha_fin
  * @property CarbonInterface|null $inscripcion_desde
  * @property CarbonInterface|null $inscripcion_hasta
+ * @property bool $inscripcion_online
  * @property EstadoTorneo $estado
  * @property bool $listado_en_plataforma
  * @property ResultadosPorJugadores $resultados_por_jugadores
@@ -46,7 +47,7 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property CarbonInterface|null $archivado_en
  * @property int|null $creado_por
  */
-#[Fillable(['nombre', 'slug', 'deporte', 'sede_id', 'direccion', 'fecha_inicio', 'fecha_fin', 'inscripcion_desde', 'inscripcion_hasta', 'estado', 'listado_en_plataforma', 'resultados_por_jugadores', 'minutos_para_validar', 'privacidad_alias', 'cartel_path', 'normativa', 'contacto', 'descanso_minimo_minutos', 'margen_entre_partidos_minutos', 'campos_extra', 'publicado_en', 'horarios_publicados_en', 'finalizado_en', 'archivado_en', 'creado_por'])]
+#[Fillable(['nombre', 'slug', 'deporte', 'sede_id', 'direccion', 'fecha_inicio', 'fecha_fin', 'inscripcion_desde', 'inscripcion_hasta', 'inscripcion_online', 'estado', 'listado_en_plataforma', 'resultados_por_jugadores', 'minutos_para_validar', 'privacidad_alias', 'cartel_path', 'normativa', 'contacto', 'descanso_minimo_minutos', 'margen_entre_partidos_minutos', 'campos_extra', 'publicado_en', 'horarios_publicados_en', 'finalizado_en', 'archivado_en', 'creado_por'])]
 class Torneo extends Model
 {
     /** @use HasFactory<TorneoFactory> */
@@ -59,6 +60,7 @@ class Torneo extends Model
             'fecha_fin' => 'date',
             'inscripcion_desde' => 'datetime',
             'inscripcion_hasta' => 'datetime',
+            'inscripcion_online' => 'boolean',
             'estado' => EstadoTorneo::class,
             'listado_en_plataforma' => 'boolean',
             'resultados_por_jugadores' => ResultadosPorJugadores::class,
@@ -131,5 +133,11 @@ class Torneo extends Model
     public function inscripcionAbierta(): bool
     {
         return $this->estado === EstadoTorneo::InscripcionAbierta;
+    }
+
+    /** Si la web ofrece inscribirse: la inscripción está abierta y no la hace solo la organización. */
+    public function admiteInscripcionOnline(): bool
+    {
+        return $this->inscripcionAbierta() && $this->inscripcion_online;
     }
 }

@@ -160,7 +160,8 @@ class InscripcionesRelationManager extends RelationManager
             ->createOptionForm([
                 TextInput::make('nombre')->label('Nombre')->required()->maxLength(80),
                 TextInput::make('apellidos')->label('Apellidos')->required()->maxLength(120),
-                TextInput::make('email')->label('Correo electrónico')->email()->maxLength(190)->unique(Jugador::class, 'email'),
+                TextInput::make('email')->label('Correo electrónico')->email()->maxLength(190)->unique(Jugador::class, 'email')
+                    ->helperText('Con su correo puede entrar en su portal para ver sus partidos y le llegan los avisos. Sin correo, no.'),
                 TextInput::make('telefono')->label('Teléfono')->tel()->maxLength(30),
                 Select::make('genero')->label('Género')->options(Genero::opciones())->placeholder('Sin indicar'),
             ])

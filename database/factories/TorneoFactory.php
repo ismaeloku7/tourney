@@ -26,6 +26,7 @@ class TorneoFactory extends Factory
             'fecha_fin' => $inicio->addDays(1)->toDateString(),
             'inscripcion_desde' => now()->subDay(),
             'inscripcion_hasta' => $inicio->subDays(2),
+            'inscripcion_online' => true,
             'estado' => EstadoTorneo::Borrador,
             'listado_en_plataforma' => false,
             'resultados_por_jugadores' => ResultadosPorJugadores::Desactivado,
@@ -39,6 +40,12 @@ class TorneoFactory extends Factory
     public function enEstado(EstadoTorneo $estado): static
     {
         return $this->state(['estado' => $estado, 'publicado_en' => $estado->publicado() ? now() : null]);
+    }
+
+    /** La inscripción la hace solo la organización, a mano. */
+    public function soloInscribeLaOrganizacion(): static
+    {
+        return $this->state(['inscripcion_online' => false]);
     }
 
     public function conInscripcionAbierta(): static

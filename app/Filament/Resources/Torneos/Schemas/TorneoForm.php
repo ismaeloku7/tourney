@@ -10,6 +10,7 @@ use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Illuminate\Support\Str;
@@ -61,17 +62,27 @@ class TorneoForm
                             ->native(false)
                             ->displayFormat('d/m/Y')
                             ->afterOrEqual('fecha_inicio'),
+                        Toggle::make('inscripcion_online')
+                            ->label('Inscripción online')
+                            ->default(true)
+                            ->live()
+                            ->columnSpanFull()
+                            ->helperText(fn (Get $get): string => $get('inscripcion_online')
+                                ? 'Las parejas se inscriben solas desde la página del torneo.'
+                                : 'Solo inscribe la organización, a mano. En la web no hay botón para inscribirse ni se pueden crear cuentas; los jugadores que añadas con su correo entran en su portal con un enlace que les llega al correo.'),
                         DateTimePicker::make('inscripcion_desde')
                             ->label('Inscripción abierta desde')
                             ->native(false)
                             ->displayFormat('d/m/Y H:i')
-                            ->seconds(false),
+                            ->seconds(false)
+                            ->visible(fn (Get $get): bool => (bool) $get('inscripcion_online')),
                         DateTimePicker::make('inscripcion_hasta')
                             ->label('Inscripción abierta hasta')
                             ->native(false)
                             ->displayFormat('d/m/Y H:i')
                             ->seconds(false)
-                            ->afterOrEqual('inscripcion_desde'),
+                            ->afterOrEqual('inscripcion_desde')
+                            ->visible(fn (Get $get): bool => (bool) $get('inscripcion_online')),
                         TextInput::make('contacto')
                             ->label('Contacto para los jugadores')
                             ->maxLength(255)

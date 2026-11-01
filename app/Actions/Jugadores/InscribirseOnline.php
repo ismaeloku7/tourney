@@ -90,6 +90,10 @@ final class InscribirseOnline
     /** @throws OperacionNoPermitida */
     public static function comprobarQueEstaAbierta(Torneo $torneo): void
     {
+        if (! $torneo->inscripcion_online) {
+            throw new OperacionNoPermitida('En este torneo inscribe la organización: escríbeles para apuntaros.');
+        }
+
         $abierta = $torneo->inscripcionAbierta()
             && ($torneo->inscripcion_desde === null || $torneo->inscripcion_desde->isPast())
             && ($torneo->inscripcion_hasta === null || $torneo->inscripcion_hasta->isFuture());

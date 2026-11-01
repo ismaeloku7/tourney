@@ -7,7 +7,7 @@
         · <span class="font-medium">{{ $torneo->estado->etiqueta() }}</span>
     </p>
     <div class="mt-4 flex flex-wrap items-center gap-3">
-        @if ($torneo->inscripcionAbierta())
+        @if ($torneo->admiteInscripcionOnline())
             <a href="{{ route('torneo.inscripcion', $torneo) }}" class="inline-block rounded-lg px-5 py-2.5 font-medium text-white" style="background: var(--acento)">Inscribirnos</a>
         @endif
         <x-push.activar texto="Seguir este torneo" :siguiendo="true" wire:key="seguir-{{ $torneo->id }}" />
@@ -51,8 +51,10 @@
                             </li>
                         @endforeach
                     </ul>
-                    @if ($torneo->inscripcionAbierta())
+                    @if ($torneo->admiteInscripcionOnline())
                         <a href="{{ route('torneo.inscripcion', $torneo) }}" class="mt-4 block rounded-lg px-4 py-2.5 text-center font-medium text-white" style="background: var(--acento)">Inscribirnos</a>
+                    @elseif ($torneo->inscripcionAbierta())
+                        <p class="mt-4 text-sm text-neutral-600">En este torneo inscribe la organización.@if ($torneo->contacto) Para apuntaros: {{ $torneo->contacto }}.@endif</p>
                     @endif
                 </div>
             </div>
