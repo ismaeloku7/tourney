@@ -98,7 +98,11 @@ class User extends Authenticatable implements FilamentUser, HasName
         return $this->nombre_completo;
     }
 
-    /** Los torneos que administra (solo cuenta para el rol administrador). */
+    /**
+     * Los torneos que administra (solo cuenta para el rol administrador).
+     *
+     * @return BelongsToMany<Torneo, $this>
+     */
     public function torneosQueAdministra(): BelongsToMany
     {
         return $this->belongsToMany(Torneo::class, 'torneo_administradores')->withTimestamps();
