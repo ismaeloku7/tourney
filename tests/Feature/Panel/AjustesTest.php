@@ -24,7 +24,7 @@ test('el propietario guarda la marca, el contacto y los textos legales', functio
 
     Livewire::test(Ajustes::class)
         ->assertSuccessful()
-        ->assertSee('Pádel Norte')
+        ->assertSee('Marca')
         ->fillForm([
             Ajuste::NombrePublico->value => 'Club Pádel Norte',
             Ajuste::ColorPrimario->value => '#0E7490',
