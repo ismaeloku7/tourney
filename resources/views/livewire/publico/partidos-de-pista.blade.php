@@ -1,12 +1,12 @@
 {{-- Los partidos del día en una pista, para el QR colgado en ella. Se refresca cada 15 segundos. --}}
 <div class="mx-auto max-w-2xl px-4 py-8" wire:poll.15s>
     <p class="text-sm text-neutral-500"><a href="{{ route('torneo.ficha', $torneo) }}" class="underline">{{ $torneo->nombre }}</a></p>
-    <h1 class="mt-1 text-2xl font-semibold">{{ $pista->nombre }}</h1>
+    <h1 class="mt-1 text-2xl font-normal">{{ $pista->nombre }}</h1>
     <p class="text-neutral-600">{{ ucfirst($dia) }}</p>
 
     <ul class="mt-6 space-y-3">
         @forelse ($partidos as $p)
-            <li class="rounded-xl border border-neutral-200 bg-white p-4">
+            <li class="tarjeta p-4">
                 <div class="flex justify-between gap-3 text-sm text-neutral-500"><span>{{ $p['horaCorta'] }} · {{ $p['categoria'] }}</span><span>{{ $p['estado']->etiqueta() }}</span></div>
                 <div class="mt-1 font-semibold">{{ $p['partido'] }}</div>
                 @if ($p['resultado'] !== '')

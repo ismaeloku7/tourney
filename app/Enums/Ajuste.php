@@ -30,7 +30,7 @@ enum Ajuste: string
     {
         return match ($this) {
             self::ZonaHoraria => 'Europe/Madrid',
-            self::ColorPrimario => '#1d4ed8',
+            self::ColorPrimario => '#4cc17d',
             self::PrivacidadAliasPorDefecto => false,
             default => null,
         };

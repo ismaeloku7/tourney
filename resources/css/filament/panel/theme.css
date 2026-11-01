@@ -4,11 +4,351 @@
 @source '../../../../resources/views/filament/**/*';
 
 /*
- * Tema del panel del organizador: fondo gris muy claro y tarjetas blancas.
- * El acento lo pone el organizador en --panel-acento
- * (resources/views/filament/panel/color.blade.php).
+ * Tema del panel del organizador.
+ *
+ * Fondo gris muy claro, tarjetas blancas planas con un borde fino, la
+ * barra lateral estrecha (solo iconos, el activo en el color del
+ * organizador), pestañas subrayadas en azul, botones redondeados y
+ * contadores en naranja. El color principal lo pone el organizador
+ * (primary); el azul de enlaces y pestañas y el naranja de los contadores
+ * son del tema.
  */
 
+@theme {
+    --color-tema-fondo: #f3f4f6;
+    --color-tema-borde: #e6e8eb;
+    --color-tema-texto: #3b4147;
+    --color-tema-suave: #8a939b;
+    --color-tema-azul: #3a8ee0;
+    --color-tema-naranja: #f26b3a;
+    --color-tema-amarillo: #f5b62f;
+    --color-tema-pizarra: #6d7a84;
+}
+
+/* ── Base ─────────────────────────────────────────────────────────── */
+
 .fi-body {
-    @apply bg-[#f6f7f9] dark:bg-gray-950;
+    @apply bg-tema-fondo text-tema-texto dark:bg-gray-950;
+}
+
+.fi-main {
+    @apply lg:px-10;
+}
+
+.fi-header-heading {
+    @apply text-2xl font-normal tracking-normal text-tema-texto dark:text-white;
+}
+
+.fi-header-subheading {
+    @apply text-sm text-tema-suave;
+}
+
+.fi-breadcrumbs {
+    @apply text-xs;
+}
+
+.fi-link {
+    @apply text-tema-azul;
+}
+
+/* ── Barra superior y lateral ─────────────────────────────────────── */
+
+.fi-topbar {
+    @apply shadow-none ring-0 border-b border-tema-borde dark:border-white/10;
+}
+
+.fi-sidebar {
+    @apply lg:bg-white lg:border-e lg:border-tema-borde dark:lg:bg-gray-900 dark:lg:border-white/10;
+}
+
+.fi-sidebar-nav {
+    @apply px-3 py-5;
+}
+
+.fi-sidebar-group-label {
+    @apply text-[0.6875rem] font-semibold tracking-wider uppercase text-tema-suave;
+}
+
+.fi-sidebar-item-btn {
+    @apply rounded-md;
+
+    & > .fi-icon {
+        @apply text-tema-pizarra;
+    }
+}
+
+.fi-sidebar-item-label {
+    @apply font-normal text-tema-texto;
+}
+
+.fi-sidebar-item.fi-active > .fi-sidebar-item-btn {
+    @apply bg-primary-500 dark:bg-primary-500;
+
+    & > .fi-icon,
+    & > .fi-sidebar-item-label {
+        @apply text-white dark:text-white;
+    }
+}
+
+/* ── Tarjetas: secciones, tablas, widgets ─────────────────────────── */
+
+.fi-section:not(.fi-section-not-contained):not(.fi-aside),
+.fi-section.fi-aside > .fi-section-content-ctn,
+.fi-ta-ctn,
+.fi-wi-stats-overview-stat,
+.fi-fo-repeater-item,
+.fi-in-repeatable-item {
+    @apply rounded-[3px] shadow-none ring-1 ring-tema-borde dark:ring-white/10;
+}
+
+.fi-section-header-heading,
+.fi-ta-header-heading {
+    @apply text-sm font-semibold text-tema-texto dark:text-white;
+}
+
+.fi-section-header-description,
+.fi-ta-header-description {
+    @apply text-xs text-tema-suave;
+}
+
+.fi-ta-header-cell {
+    @apply text-xs font-medium tracking-wide text-tema-suave;
+}
+
+.fi-ta-text-item-label,
+.fi-ta-cell {
+    @apply text-[0.8125rem];
+}
+
+.fi-wi-stats-overview-stat-label {
+    @apply text-xs text-tema-suave;
+}
+
+.fi-wi-stats-overview-stat-value {
+    @apply text-2xl font-normal text-tema-texto;
+}
+
+/* ── Pestañas: subrayadas, sin caja ───────────────────────────────── */
+
+.fi-tabs:not(.fi-contained) {
+    @apply mx-0 gap-x-6 rounded-none bg-transparent p-0 shadow-none ring-0 border-b border-tema-borde dark:bg-transparent dark:border-white/10;
+}
+
+.fi-tabs.fi-contained {
+    @apply gap-x-6 px-4 py-0;
+}
+
+.fi-tabs:not(.fi-vertical) .fi-tabs-item {
+    @apply -mb-px rounded-none border-b-2 border-transparent px-0 py-3 hover:bg-transparent focus-visible:bg-transparent dark:hover:bg-transparent;
+
+    &.fi-active {
+        @apply border-tema-azul bg-transparent dark:bg-transparent;
+
+        & .fi-tabs-item-label,
+        & > .fi-icon {
+            @apply text-tema-texto dark:text-white;
+        }
+    }
+
+    & .fi-tabs-item-label {
+        @apply text-tema-suave;
+    }
+
+    & .fi-badge {
+        @apply min-w-5 rounded-full bg-tema-naranja px-1.5 py-0 text-[0.6875rem] text-white ring-0;
+    }
+}
+
+/* ── Botones, insignias, campos ───────────────────────────────────── */
+
+.fi-btn {
+    @apply rounded-full px-4;
+
+    &.fi-size-xs,
+    &.fi-size-sm {
+        @apply px-3;
+    }
+}
+
+.fi-btn.fi-color-gray:not(.fi-outlined) {
+    @apply bg-white ring-1 ring-tema-borde;
+}
+
+.fi-badge {
+    @apply rounded-[3px];
+}
+
+.fi-sidebar-item-badge-ctn .fi-badge,
+.fi-topbar .fi-badge {
+    @apply rounded-full bg-tema-naranja text-white ring-0;
+}
+
+.fi-input-wrp {
+    @apply rounded-[3px] shadow-none ring-tema-borde;
+}
+
+.fi-modal-window {
+    @apply rounded-md;
+}
+
+/* ── Escritorio (resources/views/filament/pages/escritorio.blade.php) ─ */
+
+.esc {
+    @apply flex flex-col gap-6 pb-10;
+}
+
+.esc-titulo {
+    @apply flex items-center gap-1.5 text-xl font-normal text-tema-texto dark:text-white;
+
+    & svg {
+        @apply size-4 text-tema-suave;
+    }
+}
+
+.esc-titulo-ctn {
+    @apply flex items-baseline justify-between gap-3;
+}
+
+.esc-tarjeta {
+    @apply rounded-[3px] bg-white ring-1 ring-tema-borde dark:bg-gray-900 dark:ring-white/10;
+}
+
+.esc-columnas {
+    @apply grid divide-y divide-tema-borde md:grid-cols-3 md:divide-x md:divide-y-0 dark:divide-white/10;
+
+    & > div {
+        @apply flex flex-col gap-2.5 px-5 py-4;
+    }
+}
+
+.esc-rejilla {
+    @apply grid gap-4 lg:grid-cols-2;
+}
+
+.esc-pila {
+    @apply flex flex-col gap-4;
+}
+
+.esc-cabecera {
+    @apply flex items-center justify-between gap-2 px-5 pt-4 text-[0.8125rem] font-semibold text-tema-texto dark:text-white;
+}
+
+.esc-cuerpo {
+    @apply px-5 pt-3 pb-4 text-[0.8125rem] text-tema-texto dark:text-gray-300;
+}
+
+.esc-pie {
+    @apply mt-auto flex flex-wrap items-center gap-x-4 gap-y-1 px-5 pb-4 text-xs;
+}
+
+.esc-etiqueta {
+    @apply text-[0.8125rem] font-semibold text-tema-texto dark:text-white;
+}
+
+.esc-dato {
+    @apply flex items-center gap-2 text-[0.8125rem];
+
+    & b {
+        @apply font-semibold;
+    }
+
+    & .esc-num {
+        @apply min-w-6;
+    }
+}
+
+.esc-grande {
+    @apply text-3xl font-light tabular-nums text-tema-azul;
+}
+
+.esc-suave {
+    @apply text-xs text-tema-suave;
+}
+
+.esc-enlace {
+    @apply text-xs text-tema-azul hover:underline;
+}
+
+.esc-cuadro {
+    @apply inline-flex size-[18px] items-center justify-center rounded-[2px] text-[0.6875rem] font-semibold text-white;
+
+    &.naranja {
+        @apply bg-tema-naranja;
+    }
+
+    &.amarillo {
+        @apply bg-tema-amarillo;
+    }
+
+    &.verde {
+        @apply bg-primary-500;
+    }
+
+    &.gris {
+        @apply bg-gray-300 text-gray-700;
+    }
+}
+
+.esc-contador {
+    @apply inline-flex min-w-5 items-center justify-center rounded-full bg-tema-naranja px-1.5 text-[0.6875rem] leading-5 font-semibold text-white;
+}
+
+.esc-flechas {
+    @apply flex items-center gap-1;
+
+    & button {
+        @apply rounded p-1 text-tema-suave hover:bg-gray-100 hover:text-tema-texto disabled:opacity-30 dark:hover:bg-white/5;
+    }
+
+    & svg {
+        @apply size-4;
+    }
+}
+
+.esc-boton {
+    @apply inline-flex items-center justify-center rounded-full px-5 py-1.5 text-xs font-medium text-white transition;
+
+    &.verde {
+        @apply bg-primary-500 hover:bg-primary-600;
+    }
+
+    &.pizarra {
+        @apply bg-tema-pizarra hover:bg-gray-600;
+    }
+}
+
+.esc-lista {
+    @apply divide-y divide-tema-borde dark:divide-white/10;
+
+    & > li {
+        @apply flex items-center gap-3 py-2;
+    }
+}
+
+.esc-hora {
+    @apply w-11 shrink-0 text-[0.8125rem] font-medium tabular-nums text-tema-azul;
+}
+
+.esc-check {
+    @apply inline-flex items-center gap-1.5 text-xs text-tema-suave hover:text-tema-texto;
+
+    & span {
+        @apply inline-block size-3.5 rounded-[2px] ring-1 ring-gray-300;
+    }
+}
+
+.esc-donut {
+    @apply relative size-14 shrink-0;
+
+    & circle:first-child {
+        @apply stroke-gray-200 dark:stroke-white/10;
+    }
+
+    & circle:last-child {
+        @apply stroke-tema-azul;
+    }
+}
+
+.esc-vacio {
+    @apply py-6 text-center text-xs text-tema-suave;
 }

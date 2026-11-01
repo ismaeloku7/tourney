@@ -7,10 +7,10 @@
 
     <div class="grid flex-1 gap-6 lg:grid-cols-3">
         <section>
-            <h2 class="text-2xl font-semibold" style="color: var(--acento)">En pista</h2>
+            <h2 class="text-2xl font-normal" style="color: var(--acento)">En pista</h2>
             <ul class="mt-4 space-y-3">
                 @forelse ($enPista as $p)
-                    <li class="rounded-xl bg-neutral-900 p-4">
+                    <li class="rounded-[3px] bg-neutral-900 p-4">
                         <div class="text-sm text-neutral-400">{{ $p['pista'] }} · {{ $p['categoria'] }}</div>
                         <div class="mt-1 text-xl font-semibold">{{ $p['partido'] }}</div>
                     </li>
@@ -20,10 +20,10 @@
             </ul>
         </section>
         <section>
-            <h2 class="text-2xl font-semibold" style="color: var(--acento)">Próximos</h2>
+            <h2 class="text-2xl font-normal" style="color: var(--acento)">Próximos</h2>
             <ul class="mt-4 space-y-3">
                 @forelse ($proximos as $p)
-                    <li class="rounded-xl bg-neutral-900 p-4">
+                    <li class="rounded-[3px] bg-neutral-900 p-4">
                         <div class="text-sm text-neutral-400">{{ $p['horaCorta'] }} · {{ $p['pista'] }} · {{ $p['categoria'] }}</div>
                         <div class="mt-1 text-xl font-semibold">{{ $p['partido'] }}</div>
                     </li>
@@ -33,10 +33,10 @@
             </ul>
         </section>
         <section>
-            <h2 class="text-2xl font-semibold" style="color: var(--acento)">Últimos resultados</h2>
+            <h2 class="text-2xl font-normal" style="color: var(--acento)">Últimos resultados</h2>
             <ul class="mt-4 space-y-3">
                 @forelse ($ultimos as $p)
-                    <li class="rounded-xl bg-neutral-900 p-4">
+                    <li class="rounded-[3px] bg-neutral-900 p-4">
                         <div class="text-sm text-neutral-400">{{ $p['categoria'] }}</div>
                         <div class="mt-1 text-xl font-semibold">{{ $p['partido'] }}</div>
                         <div class="mt-1 text-lg tabular-nums text-neutral-300">{{ $p['resultado'] }}</div>

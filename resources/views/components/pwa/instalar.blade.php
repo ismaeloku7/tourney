@@ -31,7 +31,7 @@
     }"
     x-show="visible"
     x-cloak
-    {{ $attributes->merge(['class' => 'rounded-xl border border-neutral-200 bg-white p-4 text-sm']) }}
+    {{ $attributes->merge(['class' => 'tarjeta p-4 text-sm']) }}
 >
     <div class="flex items-start justify-between gap-3">
         <div>
@@ -41,5 +41,5 @@
         </div>
         <button type="button" x-on:click="cerrar()" class="text-neutral-400 hover:text-neutral-700" aria-label="Cerrar">✕</button>
     </div>
-    <button type="button" x-show="!ios" x-on:click="instalar()" class="mt-3 rounded-lg px-4 py-2 font-medium text-white" style="background: var(--acento)">Instalar</button>
+    <button type="button" x-show="!ios" x-on:click="instalar()" class="boton mt-3">Instalar</button>
 </div>

@@ -19,7 +19,6 @@ use Filament\PanelProvider;
 use Filament\Support\Colors\Color;
 use Filament\Support\Enums\Width;
 use Filament\View\PanelsRenderHook;
-use Filament\Widgets\AccountWidget;
 use Illuminate\Cookie\Middleware\AddQueuedCookiesToResponse;
 use Illuminate\Cookie\Middleware\EncryptCookies;
 use Illuminate\Foundation\Http\Middleware\PreventRequestForgery;
@@ -53,7 +52,7 @@ class PanelDelOrganizadorProvider extends PanelProvider
             ->colors(fn (): array => [
                 'primary' => Color::hex(ColorDelPanel::hex()),
             ])
-            ->font('Plus Jakarta Sans')
+            ->font('Montserrat')
             ->sidebarCollapsibleOnDesktop()
             ->maxContentWidth(Width::Full)
             ->navigationGroups([
@@ -63,14 +62,12 @@ class PanelDelOrganizadorProvider extends PanelProvider
             ])
             // El acento lo elige el organizador en sus ajustes; el tema solo lee la variable.
             ->renderHook(PanelsRenderHook::HEAD_END, fn (): string => view('filament.panel.color')->render())
+            // La barra lateral empieza plegada (solo iconos); quien la abra, la encuentra abierta la próxima vez.
+            ->renderHook(PanelsRenderHook::HEAD_END, fn (): string => view('filament.panel.barra-lateral')->render())
             ->discoverResources(in: app_path('Filament/Resources'), for: 'App\Filament\Resources')
             ->discoverPages(in: app_path('Filament/Pages'), for: 'App\Filament\Pages')
             ->pages([
                 PanelDelOrganizador::class,
-            ])
-            ->discoverWidgets(in: app_path('Filament/Widgets'), for: 'App\Filament\Widgets')
-            ->widgets([
-                AccountWidget::class,
             ])
             ->middleware([
                 // Primero el organizador: un host desconocido no llega a abrir sesión.
