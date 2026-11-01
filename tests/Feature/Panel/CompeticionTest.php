@@ -102,7 +102,8 @@ test('desde las fases se sortea, se mira la clasificación y se cierra', functio
     // Con la fase sin jugar, cerrar no puede ser; la clasificación ya se puede mirar.
     // (Tras una acción rechazada su diálogo se queda abierto: componente nuevo para la siguiente.)
     $componente->callAction(TestAction::make('cerrar')->table($this->grupos))->assertNotified('No se ha podido cerrar la fase');
-    fasesDe($this->categoria)->mountAction(TestAction::make('clasificacion')->table($this->grupos))->assertSee('Grupo A');
+    fasesDe($this->categoria)->assertActionVisible(TestAction::make('clasificacion')->table($this->grupos));
+    expect(view('filament.panel.competicion.clasificacion', ['fase' => $this->grupos->refresh()])->render())->toContain('Grupo A')->toContain('Pts');
 
     jugarTodosLosPartidosDe($this->grupos, $this->propietario);
 
@@ -114,7 +115,8 @@ test('desde las fases se sortea, se mira la clasificación y se cierra', functio
         ->and($this->cuadro->refresh()->estado)->toBe(EstadoFase::Preparada)
         ->and($this->cuadro->partidos()->count())->toBe(7);
 
-    fasesDe($this->categoria)->mountAction(TestAction::make('cuadro')->table($this->cuadro))->assertSee('Cuartos de final')->assertSee('Final');
+    fasesDe($this->categoria)->assertActionVisible(TestAction::make('cuadro')->table($this->cuadro));
+    expect(view('filament.panel.competicion.cuadro', ['fase' => $this->cuadro])->render())->toContain('Cuartos de final')->toContain('Final');
 });
 
 test('la mesa de partidos registra, rechaza, anula y programa', function () {
