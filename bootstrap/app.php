@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Middleware\ResolverOrganizadorPorHost;
 use Illuminate\Foundation\Application;
 use Illuminate\Foundation\Configuration\Exceptions;
 use Illuminate\Foundation\Configuration\Middleware;
@@ -12,8 +13,8 @@ return Application::configure(basePath: dirname(__DIR__))
         health: '/up',
     )
     ->withMiddleware(function (Middleware $middleware): void {
-        // El middleware que elige el organizador por el host llega con la
-        // base central (stancl/tenancy).
+        // Primero el organizador: un host desconocido no llega a abrir sesión.
+        $middleware->web(prepend: [ResolverOrganizadorPorHost::class]);
     })
     ->withExceptions(function (Exceptions $exceptions): void {
         $exceptions->shouldRenderJsonWhen(

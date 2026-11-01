@@ -61,20 +61,53 @@ Lo mismo que la integración continua (Pint, PHPStan y Pest):
 composer ci:check
 ```
 
-## Estructura prevista
+## Estructura
 
-Cada organizador tendrá su propia base de datos
+Cada organizador tiene su propia base de datos
 ([stancl/tenancy](https://tenancyforlaravel.com)); la central guarda los
-organizadores, sus dominios, planes y usuarios de plataforma. El
-organizador se elige por el host: su subdominio del SaaS
-(`demo.saas.localhost` en local, con `SAAS_DOMINIO`) o su dominio propio.
-En local se puede abrir en `localhost` gracias a
-`ORGANIZADORES_HOSTS_DESARROLLO`.
+organizadores, sus dominios, planes, usuarios de plataforma, métricas de
+uso y auditoría. El organizador se elige por el host
+(`ResolverOrganizadorPorHost`): su subdominio del SaaS
+(`demo.saas.localhost` en local, con `SAAS_DOMINIO`) o su dominio
+propio. El dominio del SaaS no es de ningún organizador; un host
+desconocido responde 404. En local se puede abrir en `localhost` gracias
+a `ORGANIZADORES_HOSTS_DESARROLLO`, que no cuenta fuera de `local` y
+`testing`.
 
-`php artisan migrate` solo migra la base central; las de los
-organizadores irán con `php artisan tenants:migrate`.
+`php artisan migrate` solo migra la base central. Las de los
+organizadores (`database/migrations/tenant`):
 
-El motor de competición vive en `app/Competicion`: clases puras, sin
+```bash
+php artisan tenants:migrate
+```
+
+Tras cada despliegue, un solo comando hace las dos cosas; es el que va
+en el script de Forge:
+
+```bash
+php artisan actualizar
+```
+
+`php artisan db:seed` siembra los tres planes, el usuario de plataforma
+`admin@example.com` y el organizador `demo` («Club Demo», plan Club) con
+su base `database/organizador_demo.sqlite` y su propietario
+`propietario@example.com`, todos con la clave `password`. Repetirlo no
+duplica nada.
+
+Un organizador real se da de alta desde la consola mientras no exista el
+alta self-service:
+
+```bash
+php artisan organizadores:crear ceas "Club CEAS" padel@clubceas.es --dominio=tourney.clubceas.es --plan=club
+```
+
+Crea su fila central, su base migrada, su subdominio, su dominio propio y
+su propietario; si no se pasa `--clave`, genera una y la enseña una sola
+vez. `php artisan organizadores:destruir ceas --confirmar` lo borra con
+su base. El primer usuario de la plataforma se crea con
+`php artisan plataforma:administrador`.
+
+El motor de competición vivirá en `app/Competicion`: clases puras, sin
 Eloquent, con cobertura total en `tests/Unit/Competicion`.
 
 ## Despliegue
@@ -87,6 +120,7 @@ Los pasos, las variables de entorno y el script de despliegue
 
 ## Estado
 
-Fase 1, commit 1 de 6 ([orden de commits](docs/propuesta-fase-1.md#orden-de-commits)):
-proyecto base con las dependencias fijadas. Pendiente la primera
-instalación con `composer run setup` y pasar `composer ci:check`.
+Fase 1, commit 2 de 6 ([orden de commits](docs/propuesta-fase-1.md#orden-de-commits)):
+proyecto base y base central con tenancy. Los commits 1 y 2 se han
+escrito sin poder ejecutar Pint, PHPStan ni Pest: la primera
+`composer ci:check` en verde está pendiente.

@@ -3,7 +3,7 @@
 use Illuminate\Support\Str;
 use Pdo\Mysql;
 
-return [
+$config = [
 
     /*
     |--------------------------------------------------------------------------
@@ -184,3 +184,11 @@ return [
 
 ];
 
+/*
+| Plantilla de las bases de organizador (stancl/tenancy): la misma conexión
+| que la central, con otro nombre. Sobre ella se crean y borran las bases,
+| y de ella sale la conexión `tenant` de cada organizador.
+*/
+$config['connections']['organizador_plantilla'] = $config['connections'][(string) $config['default']] ?? $config['connections']['sqlite'];
+
+return $config;

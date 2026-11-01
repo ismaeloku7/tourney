@@ -146,9 +146,20 @@ sirviendo.
 
 1. `php artisan key:generate --show` en local y pegar la clave en
    `APP_KEY`; o generarla en el servidor desde «Commands».
-2. El primer usuario de plataforma, cuando llegue la base central:
+2. El primer usuario de plataforma, desde Commands:
    `php artisan plataforma:administrador`.
-3. Copias de seguridad: cada organizador es una base distinta. Forge las
+3. El organizador CEAS con su dominio propio, desde Commands. Crea su
+   base `organizador_ceas` (el usuario `forge` de MySQL puede crear bases),
+   su subdominio, el dominio y el propietario, y enseña la contraseña una
+   sola vez si no se pasa `--clave`:
+
+   ```bash
+   php artisan organizadores:crear ceas "Club CEAS" padel@clubceas.es --dominio=tourney.clubceas.es --plan=club
+   ```
+
+   Desde entonces `https://tourney.clubceas.es` es la portada del CEAS y
+   `https://tourney.on-forge.com` sigue siendo la plataforma.
+4. Copias de seguridad: cada organizador es una base distinta. Forge las
    hace de todas las bases del servidor si se marca «All databases» en el
    apartado Backups, o con un volcado por base en un cron.
 

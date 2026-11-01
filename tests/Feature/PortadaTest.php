@@ -1,7 +1,7 @@
 <?php
 
-test('la portada responde en español', function () {
-    $this->get('/')
+test('la portada de la plataforma responde en el dominio del SaaS', function () {
+    $this->get('http://saas.test/')
         ->assertOk()
         ->assertSee('Gestión de torneos de pádel');
 });

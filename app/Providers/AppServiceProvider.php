@@ -2,6 +2,7 @@
 
 namespace App\Providers;
 
+use App\Tenancy\OrganizadorActual;
 use Carbon\CarbonImmutable;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
@@ -15,7 +16,8 @@ class AppServiceProvider extends ServiceProvider
      */
     public function register(): void
     {
-        //
+        // Uno por petición o job: nunca se arrastra el organizador de la anterior.
+        $this->app->scoped(OrganizadorActual::class);
     }
 
     /**
