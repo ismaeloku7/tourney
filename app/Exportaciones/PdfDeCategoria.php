@@ -53,7 +53,7 @@ final class PdfDeCategoria
         foreach ($partidos->where('es_tercer_puesto', false)->groupBy('ronda') as $ronda => $delaRonda) {
             $salida[] = [
                 'nombre' => Marcador::ronda((int) $ronda, $rondas),
-                'partidos' => $delaRonda->map(fn (Partido $p): array => $this->linea($p))->values()->all(),
+                'partidos' => array_values($delaRonda->map(fn (Partido $p): array => $this->linea($p))->all()),
             ];
         }
 
