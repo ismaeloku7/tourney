@@ -148,7 +148,7 @@ final readonly class RepartidorDeGrupos
             [$valores[$i], $valores[$j]] = [$valores[$j], $valores[$i]];
         }
 
-        return $valores;
+        return array_values($valores);
     }
 
     /**
