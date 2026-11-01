@@ -157,7 +157,23 @@ sirviendo.
   `default`, `--tries=3 --timeout=90`, un proceso. Los correos y los
   avisos push salen por aquí; sin worker no sale nada.
 - Scheduler, en el servidor: `php artisan schedule:run` cada minuto, con
-  el PHP 8.4 del sitio, para las tareas de `routes/console.php`.
+  el PHP 8.4 del sitio, para las tareas de `routes/console.php`: los
+  resultados sin validar que cuentan solos (`resultados:validar-vencidos`)
+  y el «juegas en media hora» (`avisos:proximos-partidos`).
+
+## Notificaciones push
+
+Las claves VAPID se generan una sola vez, desde Commands:
+
+```bash
+php artisan push:claves --guardar
+```
+
+Escribe `WEBPUSH_VAPID_PUBLIC_KEY`, `WEBPUSH_VAPID_PRIVATE_KEY` y
+`WEBPUSH_VAPID_SUBJECT` al final del `.env` (en el modo sin caída, el
+compartido); después, un despliegue para que se lean. Sin ellas la web no
+ofrece las notificaciones y no se manda ninguna. Si se cambian, cada móvil
+tiene que volver a activarlas.
 
 ## Después del primer despliegue
 
