@@ -132,13 +132,18 @@ Los pasos, las variables de entorno y el script de despliegue
 
 ## Estado
 
-Fase 1 completa en código ([orden de commits](docs/propuesta-fase-1.md#orden-de-commits)):
+Fase 1 completa y en verde en CI ([orden de commits](docs/propuesta-fase-1.md#orden-de-commits)):
 proyecto base, base central con tenancy, modelo de dominio del
 organizador, DTOs, los nueve servicios del motor de competición y las
 acciones que unen motor y modelos, con el seeder de un torneo por estado.
 
-Las 90 pruebas del motor (`tests/Unit/Competicion`) se han ejecutado en
-verde con PHP a secas. El resto de pruebas (tenancy, modelo, acciones,
-seeders) y Pint y PHPStan están escritos pero sin ejecutar: la primera
-`composer ci:check` en verde está pendiente de un entorno con PHP 8.4 y
-acceso a los paquetes. No hay interfaz todavía: es la fase 2.
+Fase 2 en marcha: el panel del organizador en `/panel` (Filament 5) con
+el equipo, las instalaciones, los formatos, los jugadores y los torneos;
+cada categoría tiene su ficha con las fases (validadas por el motor), las
+pistas del torneo con su disponibilidad y las inscripciones a mano
+(parejas con jugadores de la base o nuevos, cupo con lista de espera,
+bajas, pago y cabezas de serie). Falta llevar la competición al panel
+(sorteo, horarios, resultados), las exportaciones y el alta self-service.
+
+`composer ci:check` (Pint, PHPStan nivel 7 y Pest) corre en GitHub
+Actions en cada pull request y en `main`.
