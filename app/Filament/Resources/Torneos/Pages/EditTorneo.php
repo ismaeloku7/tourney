@@ -6,6 +6,7 @@ use App\Actions\Avisos\EnviarComunicacion;
 use App\Actions\Competicion\CambiarEstadoDelTorneo;
 use App\Actions\Competicion\GenerarFranjas;
 use App\Actions\Competicion\PlanificarHorarios;
+use App\Actions\Inscripciones\ImportarParejas;
 use App\Competicion\Datos\Conflicto;
 use App\Competicion\Errores\ErrorDeCompeticion;
 use App\Enums\EstadoTorneo;
@@ -20,11 +21,14 @@ use Filament\Actions\ActionGroup;
 use Filament\Actions\DeleteAction;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\CheckboxList;
+use Filament\Forms\Components\FileUpload;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
 use Filament\Forms\Components\TextInput;
+use Filament\Forms\Components\Toggle;
 use Filament\Resources\Pages\EditRecord;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Support\Facades\Storage;
 
 /**
  * La ficha del torneo. Arriba, lo que mueve el torneo: su estado (de uno
@@ -69,6 +73,53 @@ class EditTorneo extends EditRecord
                         ...array_map(fn (Conflicto $c): string => "Partido {$c->partido}: {$c->detalle}", array_slice($conflictos, 0, 5)),
                         count($conflictos) > 5 ? 'Y '.(count($conflictos) - 5).' más.' : '',
                     ]);
+                }),
+            Action::make('importar')
+                ->label('Importar parejas')
+                ->icon(Heroicon::OutlinedArrowUpTray)
+                ->color('gray')
+                ->modalHeading('Importar parejas y jugadores')
+                ->modalDescription('Un Excel (.xlsx) o CSV con una fila por pareja: categoría (o nivel), nombre del equipo, jugador 1 y jugador 2 con su correo y su teléfono. Las categorías que no existan se crean; las parejas sin compañero entran pendientes; importar dos veces el mismo archivo no duplica nada.')
+                ->modalSubmitActionLabel('Importar')
+                ->schema([
+                    FileUpload::make('archivo')->label('Archivo')->required()
+                        ->disk('local')->directory('importaciones')->visibility('private')
+                        ->acceptedFileTypes(['application/vnd.openxmlformats-officedocument.spreadsheetml.sheet', 'application/zip', 'application/octet-stream', 'text/csv', 'text/plain', 'application/vnd.ms-excel'])
+                        ->maxSize(5 * 1024),
+                    Toggle::make('confirmar')->label('Confirmar las parejas completas')->default(true)
+                        ->helperText('Desactivado, entran pendientes y las confirmas tú.'),
+                    Toggle::make('avisar')->label('Avisar a los jugadores por correo')->default(false)
+                        ->helperText('Les llega «Inscripción confirmada» con la dirección de su portal.'),
+                ])
+                ->action(function (array $data): void {
+                    $ruta = (string) $data['archivo'];
+                    $disco = Storage::disk('local');
+
+                    $informe = app(ImportarParejas::class)->handle(
+                        $this->torneo(),
+                        $disco->path($ruta),
+                        pathinfo($ruta, PATHINFO_EXTENSION),
+                        $this->usuario(),
+                        avisar: (bool) ($data['avisar'] ?? false),
+                        confirmar: (bool) ($data['confirmar'] ?? true),
+                    );
+                    $disco->delete($ruta);
+
+                    $incidencias = [...$informe->errores, ...$informe->avisos];
+
+                    if ($informe->parejas + $informe->sinCompanero + $informe->yaEstaban === 0) {
+                        Avisos::error('No se ha importado nada', array_slice($incidencias, 0, 8));
+
+                        return;
+                    }
+
+                    Avisos::hecho('Importación hecha', $informe->resumen());
+                    if ($incidencias !== []) {
+                        Avisos::error(count($incidencias).' cosas que revisar', [
+                            ...array_slice($incidencias, 0, 12),
+                            ...(count($incidencias) > 12 ? ['Y '.(count($incidencias) - 12).' más en el registro de cambios.'] : []),
+                        ]);
+                    }
                 }),
             Action::make('aviso')
                 ->label('Enviar aviso')

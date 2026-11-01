@@ -18,6 +18,7 @@
         "livewire/blaze": "^1.0",
         "livewire/livewire": "^4.1",
         "minishlink/web-push": "^11.0",
+        "openspout/openspout": "^4.23",
         "rap2hpoutre/laravel-log-viewer": "^3.1",
         "stancl/tenancy": "^3.10"
     },
