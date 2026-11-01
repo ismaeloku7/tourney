@@ -131,7 +131,9 @@ class PistasRelationManager extends RelationManager
                     ->schema([$this->campoDeDisponibilidad()])
                     ->action(function (Collection $records, array $data, Action $action): void {
                         $disponibilidad = self::comprobar($data, $action)['disponibilidad'];
-                        $records->each(fn (TorneoPista $record) => $record->update(['disponibilidad' => $disponibilidad]));
+                        foreach ($records as $record) {
+                            $record->update(['disponibilidad' => $disponibilidad]);
+                        }
 
                         Avisos::hecho($records->count() === 1 ? 'Disponibilidad guardada' : "Disponibilidad guardada en {$records->count()} pistas");
                     })
