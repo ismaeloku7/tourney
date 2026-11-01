@@ -83,7 +83,9 @@ test('desde la tabla se confirma, se da de baja, se anota el pago y se fija la c
     // Al cupo: confirmar a la que espera no puede ser.
     $componente->callAction(TestAction::make('confirmar')->table($enEspera))->assertNotified('No se ha podido cambiar la inscripción');
 
-    // Baja de la primera, y entonces sí.
+    // Baja de la primera, y entonces sí. (Componente nuevo tras una acción
+    // rechazada: su diálogo se queda abierto en el anterior.)
+    $componente = componenteDeInscripciones($this->categoria);
     $componente->callAction(TestAction::make('baja')->table($parejas[0]))->assertHasNoActionErrors();
     $componente->callAction(TestAction::make('confirmar')->table($enEspera))->assertHasNoActionErrors();
 
@@ -100,7 +102,7 @@ test('desde la tabla se confirma, se da de baja, se anota el pago y se fija la c
         ->and($parejas[1]->participante->refresh()->cabeza_de_serie)->toBeNull();
 
     // Las acciones que no tocan no se ofrecen.
-    $componente->assertActionHidden(TestAction::make('confirmar')->table($enEspera))
+    componenteDeInscripciones($this->categoria)->assertActionHidden(TestAction::make('confirmar')->table($enEspera))
         ->assertActionHidden(TestAction::make('baja')->table($parejas[0]))
         ->assertActionVisible(TestAction::make('readmitir')->table($parejas[0]));
 });

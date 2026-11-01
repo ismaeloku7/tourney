@@ -165,7 +165,9 @@ test('las pistas del torneo se añaden con su disponibilidad validada', function
     expect($torneoPista->refresh()->disponibilidad)->toHaveCount(2);
 
     // «Añadir todas las de la sede» trae las activas que faltan, de 09:00 a 22:00 los tres días.
-    $componente->callAction(TestAction::make('anadirLasDeLaSede')->table())->assertHasNoActionErrors();
+    // (Componente nuevo: el formulario rechazado se queda abierto en el anterior.)
+    Livewire::test(PistasRelationManager::class, ['ownerRecord' => $this->torneo, 'pageClass' => EditTorneo::class])
+        ->callAction(TestAction::make('anadirLasDeLaSede')->table())->assertHasNoActionErrors();
 
     expect($this->torneo->torneoPistas()->count())->toBe(2)
         ->and(TorneoPista::query()->whereHas('pista', fn ($q) => $q->where('nombre', 'Pista 2'))->sole()->disponibilidad)->toHaveCount(3)
