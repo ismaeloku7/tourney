@@ -191,14 +191,14 @@ test('varias pistas se añaden y se ajustan en bloque con la misma disponibilida
     Livewire::test(PistasRelationManager::class, ['ownerRecord' => $this->torneo, 'pageClass' => EditTorneo::class])
         ->callAction(TestAction::make('anadirVarias')->table(), [
             'sede_id' => $sede->id,
-            'pistas' => $pistas->take(3)->modelKeys(),
+            'pistas' => $pistas->take(3)->pluck('id')->all(),
             'disponibilidad' => $mañanas,
         ])
         ->assertHasNoActionErrors()
         ->assertNotified('3 pistas añadidas');
 
     $enElTorneo = TorneoPista::query()->orderBy('orden')->get();
-    expect($enElTorneo->pluck('pista_id')->all())->toBe($pistas->take(3)->modelKeys())
+    expect($enElTorneo->pluck('pista_id')->all())->toBe($pistas->take(3)->pluck('id')->all())
         ->and($enElTorneo->pluck('orden')->all())->toBe([1, 2, 3])
         ->and($enElTorneo->every(fn (TorneoPista $tp): bool => $tp->disponibilidad === $mañanas))->toBeTrue();
 
