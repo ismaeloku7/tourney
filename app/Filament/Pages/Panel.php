@@ -40,10 +40,10 @@ class Panel extends Dashboard
     protected string $view = 'filament.pages.escritorio';
 
     /** Días desde hoy del día que se enseña en «Partidos del día». */
-    public int $dia = 0;
+    public int $diasDesdeHoy = 0;
 
     /** Página de «Por revisar». */
-    public int $revision = 0;
+    public int $paginaDeRevision = 0;
 
     private const POR_PAGINA = 3;
 
@@ -60,22 +60,22 @@ class Panel extends Dashboard
 
     public function diaAnterior(): void
     {
-        $this->dia--;
+        $this->diasDesdeHoy--;
     }
 
     public function diaSiguiente(): void
     {
-        $this->dia++;
+        $this->diasDesdeHoy++;
     }
 
     public function revisionAnterior(): void
     {
-        $this->revision = max(0, $this->revision - 1);
+        $this->paginaDeRevision = max(0, $this->paginaDeRevision - 1);
     }
 
     public function revisionSiguiente(): void
     {
-        $this->revision++;
+        $this->paginaDeRevision++;
     }
 
     public function confirmarInscripcion(int $id): void
@@ -177,7 +177,7 @@ class Panel extends Dashboard
     /** @return array<string, mixed> */
     private function partidosDelDia(): array
     {
-        $dia = CarbonImmutable::today()->addDays($this->dia);
+        $dia = CarbonImmutable::today()->addDays($this->diasDesdeHoy);
 
         $partidos = $this->partidos()
             ->whereHas('franja', fn (Builder $q) => $q->whereDate('inicio', $dia->toDateString()))
@@ -190,7 +190,7 @@ class Panel extends Dashboard
         $siguiente = $partidos->first(fn (Partido $p): bool => in_array($p->estado, [EstadoPartido::Pendiente, EstadoPartido::Programado], true) && $p->franja !== null && $p->franja->inicio->isFuture());
 
         return [
-            'titulo' => ucfirst($dia->translatedFormat('D j M')).match ($this->dia) {
+            'titulo' => ucfirst($dia->translatedFormat('D j M')).match ($this->diasDesdeHoy) {
                 0 => ' (hoy)',
                 1 => ' (mañana)',
                 -1 => ' (ayer)',
@@ -250,13 +250,13 @@ class Panel extends Dashboard
 
         $todo = $resultados->concat($inscripciones)->values();
         $paginas = max(1, (int) ceil($todo->count() / self::POR_PAGINA));
-        $this->revision = min($this->revision, $paginas - 1);
+        $this->paginaDeRevision = min($this->paginaDeRevision, $paginas - 1);
 
         return [
             'total' => $todo->count(),
-            'pagina' => $this->revision,
+            'pagina' => $this->paginaDeRevision,
             'paginas' => $paginas,
-            'items' => array_values($todo->slice($this->revision * self::POR_PAGINA, self::POR_PAGINA)->all()),
+            'items' => array_values($todo->slice($this->paginaDeRevision * self::POR_PAGINA, self::POR_PAGINA)->all()),
         ];
     }
 
