@@ -2,6 +2,8 @@
 
 namespace App\Models;
 
+use App\Competicion\Datos\ConfiguracionDeEliminatoria;
+use App\Competicion\Datos\ConfiguracionDeGrupos;
 use App\Enums\EstadoFase;
 use App\Enums\TipoDeFase;
 use App\Models\Concerns\VaALaPapelera;
@@ -88,6 +90,27 @@ class Fase extends Model
     public function clasificaciones(): HasMany
     {
         return $this->hasMany(Clasificacion::class);
+    }
+
+    /**
+     * La configuración como DTO según el tipo: valida lo guardado, así
+     * que una fase con una configuración rota no llega al motor.
+     */
+    public function configuracion(): ConfiguracionDeGrupos|ConfiguracionDeEliminatoria
+    {
+        return $this->tipo->esDeGrupos()
+            ? ConfiguracionDeGrupos::desdeArray($this->configuracion)
+            : ConfiguracionDeEliminatoria::desdeArray($this->configuracion);
+    }
+
+    public function configuracionDeGrupos(): ConfiguracionDeGrupos
+    {
+        return ConfiguracionDeGrupos::desdeArray($this->configuracion);
+    }
+
+    public function configuracionDeEliminatoria(): ConfiguracionDeEliminatoria
+    {
+        return ConfiguracionDeEliminatoria::desdeArray($this->configuracion);
     }
 
     /** La fase siguiente de la categoría, si la hay. */

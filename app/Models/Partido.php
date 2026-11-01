@@ -2,6 +2,10 @@
 
 namespace App\Models;
 
+use App\Competicion\Datos\Origen;
+use App\Competicion\Datos\Partido as PartidoDto;
+use App\Competicion\Datos\Resultado;
+use App\Competicion\Datos\Set as SetDto;
 use App\Enums\EstadoPartido;
 use App\Enums\ResultadoEspecial;
 use App\Models\Concerns\VaALaPapelera;
@@ -129,6 +133,54 @@ class Partido extends Model
     public function cerrado(): bool
     {
         return $this->estado->cerrado();
+    }
+
+    public function origenLocalDto(): ?Origen
+    {
+        return $this->origen_local === null ? null : Origen::desdeArray($this->origen_local);
+    }
+
+    public function origenVisitanteDto(): ?Origen
+    {
+        return $this->origen_visitante === null ? null : Origen::desdeArray($this->origen_visitante);
+    }
+
+    /** Los sets guardados como resultado del motor; nulo si no hay. */
+    public function resultadoDto(): ?Resultado
+    {
+        $sets = $this->sets->map(fn (Set $set): SetDto => new SetDto(
+            $set->juegos_local,
+            $set->juegos_visitante,
+            $set->tie_break_local,
+            $set->tie_break_visitante,
+            $set->es_super_tie_break,
+        ))->values()->all();
+
+        if ($sets === [] && $this->especial === null) {
+            return null;
+        }
+
+        return new Resultado($sets, $this->especial, $this->ganador_id === null ? null : $this->ganador_id === $this->local_id);
+    }
+
+    /** El partido tal y como lo ve el motor. */
+    public function aDto(): PartidoDto
+    {
+        return new PartidoDto(
+            id: $this->id,
+            grupo: $this->grupo_id,
+            jornada: $this->jornada,
+            ronda: $this->ronda,
+            posicion: $this->posicion,
+            esTercerPuesto: $this->es_tercer_puesto,
+            local: $this->local_id,
+            visitante: $this->visitante_id,
+            origenLocal: $this->origenLocalDto(),
+            origenVisitante: $this->origenVisitanteDto(),
+            estado: $this->estado,
+            ganador: $this->ganador_id,
+            resultado: $this->resultadoDto(),
+        );
     }
 
     /** El perdedor, cuando hay ganador y los dos huecos están ocupados. */

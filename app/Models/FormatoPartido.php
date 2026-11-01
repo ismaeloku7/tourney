@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Competicion\Datos\FormatoDePartido;
 use App\Models\Concerns\VaALaPapelera;
 use App\Tenancy\EnLaBaseDelOrganizador;
 use Database\Factories\FormatoPartidoFactory;
@@ -51,6 +52,22 @@ class FormatoPartido extends Model
             'duracion_estimada' => 'integer',
             'es_predeterminado' => 'boolean',
         ];
+    }
+
+    /** Las reglas de este formato para el motor. */
+    public function aDto(): FormatoDePartido
+    {
+        return new FormatoDePartido(
+            sets: $this->sets,
+            juegosPorSet: $this->juegos_por_set,
+            diferenciaParaGanarSet: $this->diferencia_para_ganar_set,
+            tieBreakEn: $this->tie_break_en,
+            tieBreakPuntos: $this->tie_break_puntos,
+            superTieBreakFinal: $this->super_tie_break_final,
+            superTieBreakPuntos: $this->super_tie_break_puntos,
+            porTiempoMinutos: $this->por_tiempo_minutos,
+            duracionEstimada: $this->duracion_estimada,
+        );
     }
 
     /**
