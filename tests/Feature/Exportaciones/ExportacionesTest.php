@@ -72,7 +72,7 @@ test('el PDF de la categoría y el de horarios se generan, y el CSV lleva a las 
     $csv = app(CsvDeInscritos::class)->generar($this->torneo);
     $lineas = preg_split('/\r\n/', trim($csv));
     expect($lineas)->toHaveCount(5)
-        ->and($lineas[0])->toContain('Categoría;Pareja;Jugador 1')
+        ->and($lineas[0])->toContain('Categoría;Pareja;"Jugador 1";"Correo 1"')
         ->and($csv)->toContain('García / López')
         ->and($csv)->toContain('ana@example.com')
         ->and($csv)->toContain(';Sí;');
