@@ -167,12 +167,15 @@ class PortalDelJugador extends Component
             'alias' => ['nullable', 'string', 'max:60'],
         ]);
 
-        try {
-            app(CambiarNivel::class)->handle($this->yo(), $this->yo(), $this->nivel);
-        } catch (ErrorDeCompeticion $e) {
-            $this->addError('nivel', $e->getMessage());
+        // El nivel solo se comprueba si lo cambia: uno antiguo («4ª») no le impide guardar lo demás.
+        if (trim($this->nivel) !== (string) $this->yo()->nivel_declarado) {
+            try {
+                app(CambiarNivel::class)->handle($this->yo(), $this->yo(), $this->nivel);
+            } catch (ErrorDeCompeticion $e) {
+                $this->addError('nivel', $e->getMessage());
 
-            return;
+                return;
+            }
         }
 
         $this->yo()->update(array_map(fn (mixed $v): ?string => is_string($v) && trim($v) !== '' ? trim($v) : null, $datos));
