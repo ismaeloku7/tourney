@@ -202,6 +202,7 @@ test('la pestaña Parejas del torneo enseña todas las parejas con su categoría
         ->assertSee('Adrianna Hernandez - Ester Hernandez')
         ->assertSee('Iniciación')
         ->assertSee('falta compañero')
+        ->assertSee('Media 1,5')
         ->filterTable('categoria', $this->intermedio->id)
         ->assertCanSeeTableRecords($this->intermedio->inscripciones()->get())
         ->assertCanNotSeeTableRecords([$sinCompanero]);
@@ -251,4 +252,14 @@ test('al importar desde el panel sin tocar nada, las parejas completas entran co
         ->assertHasNoActionErrors();
 
     expect(Inscripcion::query()->where('estado', EstadoInscripcion::Confirmada->value)->count())->toBe(4);
+});
+
+test('el nivel de la pareja es la media de los niveles numéricos de sus jugadores', function () {
+    $participante = Participante::factory()
+        ->conJugadores(...array_map(fn (?string $nivel): Jugador => Jugador::factory()->create(['nivel_declarado' => $nivel]), ['2,5', '3', null, '4ª']))
+        ->create(['categoria_id' => $this->intermedio->id]);
+
+    expect(Jugador::factory()->make(['nivel_declarado' => 'Iniciación'])->nivelNumerico())->toBeNull()
+        ->and($participante->refresh()->nivelMedio())->toBe(2.75)
+        ->and($participante->nivelMedioTexto())->toBe('Media 2,75');
 });

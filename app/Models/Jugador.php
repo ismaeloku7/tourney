@@ -65,6 +65,14 @@ class Jugador extends Authenticatable
         ];
     }
 
+    /** Su nivel declarado como número («2,5» → 2.5), o null si no es un número. */
+    public function nivelNumerico(): ?float
+    {
+        $nivel = str_replace(',', '.', trim((string) $this->nivel_declarado));
+
+        return is_numeric($nivel) ? (float) $nivel : null;
+    }
+
     /**
      * @return Attribute<string|null, string|null>
      */

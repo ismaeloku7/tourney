@@ -58,6 +58,10 @@ class ParejasRelationManager extends RelationManager
                 TextColumn::make('jugadores')->label('Jugadores')
                     ->state(fn (Inscripcion $record): array => $record->participante->jugadores->map(fn (Jugador $j): string => $j->nombre_completo)->all())
                     ->listWithLineBreaks(),
+                TextColumn::make('niveles')->label('Nivel')
+                    ->state(fn (Inscripcion $record): array => $record->participante->jugadores->map(fn (Jugador $j): string => $j->nivel_declarado ?? '—')->all())
+                    ->listWithLineBreaks()
+                    ->description(fn (Inscripcion $record): ?string => $record->participante->nivelMedioTexto()),
                 TextColumn::make('estado')->label('Estado')->badge()
                     ->formatStateUsing(fn (EstadoInscripcion $state, Inscripcion $record): string => $state->etiqueta()
                         .($record->participante->jugadores->count() < 2 ? ' · falta compañero' : '')

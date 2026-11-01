@@ -47,6 +47,25 @@ class Participante extends Model
         ];
     }
 
+    /**
+     * La media del nivel declarado de sus jugadores (los que lo tienen en
+     * número: «3», «2,5»…), o null si ninguno lo tiene.
+     */
+    public function nivelMedio(): ?float
+    {
+        $niveles = $this->jugadores->map(fn (Jugador $j): ?float => $j->nivelNumerico())->filter(fn (?float $n): bool => $n !== null);
+
+        return $niveles->isEmpty() ? null : round((float) $niveles->avg(), 2);
+    }
+
+    /** «Media 2,75», para enseñarla; null si no hay niveles. */
+    public function nivelMedioTexto(): ?string
+    {
+        $media = $this->nivelMedio();
+
+        return $media === null ? null : 'Media '.rtrim(rtrim(number_format($media, 2, ',', ''), '0'), ',');
+    }
+
     /** @return BelongsTo<Categoria, $this> */
     public function categoria(): BelongsTo
     {
