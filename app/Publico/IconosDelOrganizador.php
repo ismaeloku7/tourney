@@ -82,13 +82,14 @@ final class IconosDelOrganizador
     /** El logo centrado en un cuadrado, sin deformar. */
     private static function icono(GdImage $original, int $lado, ?string $fondo, float $proporcion): string
     {
+        $lado = max(1, $lado);
         $lienzo = imagecreatetruecolor($lado, $lado);
         imagealphablending($lienzo, false);
         imagesavealpha($lienzo, true);
 
         if ($fondo !== null) {
             [$r, $g, $b] = sscanf($fondo, '#%02x%02x%02x') ?? [255, 255, 255];
-            imagefill($lienzo, 0, 0, (int) imagecolorallocate($lienzo, (int) $r, (int) $g, (int) $b));
+            imagefill($lienzo, 0, 0, (int) imagecolorallocate($lienzo, max(0, min(255, (int) $r)), max(0, min(255, (int) $g)), max(0, min(255, (int) $b))));
         } else {
             imagefill($lienzo, 0, 0, (int) imagecolorallocatealpha($lienzo, 0, 0, 0, 127));
         }

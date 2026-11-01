@@ -21,6 +21,6 @@ class RemitenteDePruebas implements Remitente
     /** @return list<string> */
     public function titulos(): array
     {
-        return array_values(array_map(fn (array $e): string => (string) ($e['carga']['titulo'] ?? ''), $this->enviados));
+        return array_map(fn (array $e): string => (string) ($e['carga']['titulo'] ?? ''), $this->enviados);
     }
 }

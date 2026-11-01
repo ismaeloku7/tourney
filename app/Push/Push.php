@@ -78,7 +78,7 @@ class Push
     {
         $ids = [];
         foreach ($jugadores as $jugador) {
-            if ($jugador instanceof Jugador && (bool) ($jugador->avisos['push'] ?? true)) {
+            if ((bool) ($jugador->avisos['push'] ?? true)) {
                 $ids[] = $jugador->id;
             }
         }
