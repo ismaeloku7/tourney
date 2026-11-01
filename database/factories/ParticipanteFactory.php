@@ -28,17 +28,15 @@ class ParticipanteFactory extends Factory
     public function configure(): static
     {
         return $this->afterCreating(function (Participante $participante): void {
-            if ($participante->participanteJugadores()->exists()) {
-                return;
+            $jugadores = $participante->jugadoresPendientes ?? Jugador::factory()->count(2)->create()->all();
+            $participante->jugadoresPendientes = null;
+
+            foreach (array_values($jugadores) as $i => $jugador) {
+                $participante->participanteJugadores()->updateOrCreate(['jugador_id' => $jugador->id], ['orden' => $i + 1, 'confirmado_en' => now()]);
             }
 
-            $jugadores = Jugador::factory()->count(2)->create();
-            $participante->nombre = Participante::nombreDesdeJugadores(...$jugadores->all());
+            $participante->nombre = Participante::nombreDesdeJugadores(...$jugadores);
             $participante->save();
-
-            foreach ($jugadores->values() as $i => $jugador) {
-                $participante->participanteJugadores()->create(['jugador_id' => $jugador->id, 'orden' => $i + 1, 'confirmado_en' => now()]);
-            }
         });
     }
 
@@ -57,11 +55,8 @@ class ParticipanteFactory extends Factory
      */
     public function conJugadores(Jugador ...$jugadores): static
     {
-        return $this->state(['nombre' => Participante::nombreDesdeJugadores(...$jugadores)])
-            ->afterCreating(function (Participante $participante) use ($jugadores): void {
-                foreach (array_values($jugadores) as $i => $jugador) {
-                    $participante->participanteJugadores()->updateOrCreate(['jugador_id' => $jugador->id], ['orden' => $i + 1, 'confirmado_en' => now()]);
-                }
-            });
+        return $this->afterMaking(function (Participante $participante) use ($jugadores): void {
+            $participante->jugadoresPendientes = array_values($jugadores);
+        });
     }
 }

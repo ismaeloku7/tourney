@@ -31,6 +31,14 @@ class Participante extends Model
     /** @use HasFactory<ParticipanteFactory> */
     use EnLaBaseDelOrganizador, HasFactory, VaALaPapelera;
 
+    /**
+     * Jugadores decididos antes de guardar (la factory los recoge al crear):
+     * no es una columna.
+     *
+     * @var list<Jugador>|null
+     */
+    public ?array $jugadoresPendientes = null;
+
     protected function casts(): array
     {
         return [
