@@ -20,7 +20,7 @@
                     <h2 class="text-lg font-semibold">{{ $titulo }}</h2>
                     <div class="mt-4 grid gap-4 sm:grid-cols-2">
                         @foreach ($torneos as $torneo)
-                            <a href="{{ route('torneo.ficha', $torneo) }}" class="block rounded-xl border border-neutral-200 bg-white p-5 hover:border-neutral-400">
+                            <a href="{{ route('torneo.ficha', $torneo) }}" class="block rounded-[3px] border border-neutral-200 bg-white p-5 hover:border-neutral-400">
                                 <span class="block font-semibold">{{ $torneo->nombre }}</span>
                                 <span class="mt-1 block text-sm text-neutral-600">
                                     {{ $torneo->fecha_inicio->translatedFormat('j \d\e F') }}@if (! $torneo->fecha_fin->isSameDay($torneo->fecha_inicio)) – {{ $torneo->fecha_fin->translatedFormat('j \d\e F') }}@endif

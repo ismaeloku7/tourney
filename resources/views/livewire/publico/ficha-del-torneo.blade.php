@@ -1,6 +1,6 @@
 {{-- La ficha pública del torneo. En juego, se refresca cada 15 segundos. --}}
 <div class="mx-auto max-w-5xl px-4 py-8" @if ($enJuego) wire:poll.15s @endif>
-    <h1 class="text-2xl font-semibold sm:text-3xl">{{ $torneo->nombre }}</h1>
+    <h1 class="text-2xl font-normal sm:text-3xl">{{ $torneo->nombre }}</h1>
     <p class="mt-1 text-neutral-600">
         {{ $torneo->fecha_inicio->translatedFormat('l j \d\e F') }}@if (! $torneo->fecha_fin->isSameDay($torneo->fecha_inicio)) – {{ $torneo->fecha_fin->translatedFormat('l j \d\e F') }}@endif
         @if ($torneo->sede) · {{ $torneo->sede->nombre }} @endif
@@ -8,7 +8,7 @@
     </p>
     <div class="mt-4 flex flex-wrap items-center gap-3">
         @if ($torneo->admiteInscripcionOnline())
-            <a href="{{ route('torneo.inscripcion', $torneo) }}" class="inline-block rounded-lg px-5 py-2.5 font-medium text-white" style="background: var(--acento)">Inscribirnos</a>
+            <a href="{{ route('torneo.inscripcion', $torneo) }}" class="inline-block boton px-6 py-2.5">Inscribirnos</a>
         @endif
         <x-push.activar texto="Seguir este torneo" :siguiendo="true" wire:key="seguir-{{ $torneo->id }}" />
     </div>
@@ -36,7 +36,7 @@
                         <p class="mt-2 text-neutral-800">{{ $torneo->contacto }}</p>
                     @endif
                 </div>
-                <div class="rounded-xl border border-neutral-200 bg-white p-5">
+                <div class="tarjeta p-5">
                     <h2 class="font-semibold">Categorías</h2>
                     <ul class="mt-3 space-y-2">
                         @foreach ($datos->inscritos() as $fila)
@@ -52,7 +52,7 @@
                         @endforeach
                     </ul>
                     @if ($torneo->admiteInscripcionOnline())
-                        <a href="{{ route('torneo.inscripcion', $torneo) }}" class="mt-4 block rounded-lg px-4 py-2.5 text-center font-medium text-white" style="background: var(--acento)">Inscribirnos</a>
+                        <a href="{{ route('torneo.inscripcion', $torneo) }}" class="boton mt-4 flex w-full py-2.5">Inscribirnos</a>
                     @elseif ($torneo->inscripcionAbierta())
                         <p class="mt-4 text-sm text-neutral-600">En este torneo inscribe la organización.@if ($torneo->contacto) Para apuntaros: {{ $torneo->contacto }}.@endif</p>
                     @endif
@@ -61,7 +61,7 @@
         @elseif ($pestana === 'inscritos')
             <div class="grid gap-6 sm:grid-cols-2">
                 @forelse ($contenido as $fila)
-                    <section class="rounded-xl border border-neutral-200 bg-white p-5">
+                    <section class="tarjeta p-5">
                         <h2 class="font-semibold">{{ $fila['categoria']->nombre }}</h2>
                         <ol class="mt-3 list-decimal space-y-1 pl-5 text-sm">
                             @forelse ($fila['confirmadas'] as $nombre)
@@ -83,7 +83,7 @@
                 <h2 class="mt-6 text-lg font-semibold first:mt-0">{{ $bloque['categoria']->nombre }} · {{ $bloque['fase']->nombre }}</h2>
                 <div class="mt-3 grid gap-4 lg:grid-cols-2">
                     @foreach ($bloque['grupos'] as $g)
-                        <section class="rounded-xl border border-neutral-200 bg-white p-4">
+                        <section class="tarjeta p-4">
                             <h3 class="font-semibold">Grupo {{ $g['grupo']->nombre }}</h3>
                             <table class="mt-2 w-full text-sm">
                                 <thead class="text-left text-neutral-500"><tr><th class="py-1">#</th><th>Pareja</th><th class="text-right">Pts</th><th class="text-right">PJ</th><th class="text-right">Sets</th><th class="text-right">Juegos</th></tr></thead>
@@ -114,7 +114,7 @@
                         <div class="flex min-w-60 flex-1 flex-col justify-around gap-3">
                             <h3 class="text-center text-sm font-semibold">{{ $ronda['nombre'] }}</h3>
                             @foreach ($ronda['partidos'] as $p)
-                                <div class="rounded-lg border border-neutral-200 bg-white p-3 text-sm">
+                                <div class="tarjeta p-3 text-sm">
                                     <div>{{ $p['partido'] }}</div>
                                     <div class="mt-1 text-neutral-500">{{ $p['resultado'] ?: ($p['hora'] ?? '') }}</div>
                                 </div>
@@ -128,7 +128,7 @@
         @elseif ($pestana === 'horarios')
             @forelse ($contenido as $dia => $partidos)
                 <h2 class="mt-6 text-lg font-semibold first:mt-0">{{ ucfirst($dia) }}</h2>
-                <div class="mt-3 overflow-x-auto rounded-xl border border-neutral-200 bg-white">
+                <div class="mt-3 overflow-x-auto tarjeta">
                     <table class="w-full text-sm">
                         <thead class="text-left text-neutral-500"><tr><th class="px-3 py-2">Hora</th><th>Pista</th><th>Categoría</th><th>Partido</th><th>Resultado</th></tr></thead>
                         <tbody>

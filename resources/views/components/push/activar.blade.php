@@ -75,7 +75,7 @@
     >
         <template x-if="estado === 'inactivo' || estado === 'error'">
             <div>
-                <button type="button" x-on:click="activar()" x-bind:disabled="ocupado" class="rounded-lg px-4 py-2 font-medium text-white disabled:opacity-60" style="background: var(--acento)">🔔 {{ $texto }}</button>
+                <button type="button" x-on:click="activar()" x-bind:disabled="ocupado" class="boton">🔔 {{ $texto }}</button>
                 <p x-show="estado === 'error'" class="mt-1 text-neutral-600">No se han podido activar. Vuelve a intentarlo en un rato.</p>
             </div>
         </template>

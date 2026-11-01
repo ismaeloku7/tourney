@@ -4,10 +4,71 @@
 @source '../../vendor/laravel/framework/src/Illuminate/Pagination/resources/views/*.blade.php';
 
 @theme {
-    --font-sans: 'Instrument Sans', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+    --font-sans: 'Montserrat', ui-sans-serif, system-ui, sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji', 'Segoe UI Symbol', 'Noto Color Emoji';
+
+    /* Los mismos tonos que el panel (resources/css/filament/panel/theme.css). */
+    --color-tema-fondo: #f3f4f6;
+    --color-tema-borde: #e6e8eb;
+    --color-tema-texto: #3b4147;
+    --color-tema-suave: #8a939b;
+    --color-tema-azul: #3a8ee0;
+    --color-tema-naranja: #f26b3a;
+    --color-tema-amarillo: #f5b62f;
+    --color-tema-pizarra: #6d7a84;
 }
 
 /* Alpine: lo que aún no ha arrancado no se ve. */
 [x-cloak] {
     display: none !important;
+}
+
+/*
+ * Piezas de la web pública y del portal del jugador. El acento es el color
+ * del organizador (--acento, en el layout).
+ */
+@layer components {
+    .tarjeta {
+        @apply rounded-[3px] bg-white ring-1 ring-tema-borde;
+    }
+
+    .titulo-seccion {
+        @apply text-xl font-normal text-tema-texto;
+    }
+
+    .boton {
+        @apply inline-flex items-center justify-center rounded-full px-5 py-2 text-sm font-medium text-white transition hover:brightness-95 disabled:opacity-60;
+        background: var(--acento);
+    }
+
+    .boton-pizarra {
+        @apply inline-flex items-center justify-center rounded-full bg-tema-pizarra px-5 py-2 text-sm font-medium text-white transition hover:brightness-95;
+    }
+
+    .boton-claro {
+        @apply inline-flex items-center justify-center rounded-full bg-white px-4 py-2 text-sm font-medium text-tema-texto ring-1 ring-tema-borde transition hover:bg-tema-fondo;
+    }
+
+    .enlace {
+        @apply text-tema-azul hover:underline;
+    }
+
+    .campo {
+        @apply rounded-[3px] border border-tema-borde bg-white px-3 py-2 text-sm outline-none focus:border-tema-azul focus:ring-1 focus:ring-tema-azul;
+    }
+
+    .contador {
+        @apply inline-flex min-w-5 items-center justify-center rounded-full bg-tema-naranja px-1.5 text-[0.6875rem] leading-5 font-semibold text-white;
+    }
+
+    .pestanas {
+        @apply flex gap-6 overflow-x-auto border-b border-tema-borde;
+    }
+
+    .pestana {
+        @apply -mb-px flex shrink-0 items-center gap-2 border-b-2 border-transparent py-3 text-sm whitespace-nowrap text-tema-suave transition hover:text-tema-texto;
+
+        &[aria-selected='true'] {
+            @apply border-tema-azul text-tema-texto;
+        }
+    }
 }

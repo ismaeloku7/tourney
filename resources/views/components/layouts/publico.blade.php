@@ -4,7 +4,7 @@
     ($slot) y de componente <x-publico>.
 --}}
 @php($organizador = tenancy()->initialized ? tenant() : null)
-@php($color = $organizador ? \App\Filament\ColorDelPanel::hex() : '#1d4ed8')
+@php($color = $organizador ? \App\Filament\ColorDelPanel::hex() : '#4cc17d')
 @php($logo = $organizador ? \App\Filament\MarcaDelOrganizador::urlDelLogo() : null)
 @php($nombre = $organizador ? \App\Filament\MarcaDelOrganizador::nombre() : config('app.name'))
 @php($torneoDeLaRuta = request()->route('torneo'))
@@ -32,27 +32,27 @@
         @endif
         @livewireStyles
     </head>
-    <body class="flex min-h-screen flex-col bg-neutral-50 text-neutral-900 antialiased" style="--acento: {{ $color }}">
-        <header class="border-b border-neutral-200 bg-white">
+    <body class="flex min-h-screen flex-col bg-tema-fondo text-tema-texto antialiased" style="--acento: {{ $color }}">
+        <header class="border-b border-tema-borde bg-white">
             <div class="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">
                 <a href="{{ url('/') }}" class="flex min-w-0 items-center gap-3">
                     @if ($logo)
                         <img src="{{ $logo }}" alt="" class="h-10 w-auto max-w-40 object-contain">
                     @else
-                        <span class="flex size-9 items-center justify-center rounded-lg text-base font-bold text-white" style="background: var(--acento)" aria-hidden="true">{{ mb_strtoupper(mb_substr($nombre, 0, 1)) }}</span>
+                        <span class="flex size-9 items-center justify-center rounded-[3px] text-base font-bold text-white" style="background: var(--acento)" aria-hidden="true">{{ mb_strtoupper(mb_substr($nombre, 0, 1)) }}</span>
                     @endif
-                    <span class="truncate font-semibold">{{ $nombre }}</span>
+                    <span class="truncate text-sm font-medium">{{ $nombre }}</span>
                 </a>
-                <nav class="flex items-center gap-2 text-sm font-medium">
+                <nav class="flex items-center gap-1 text-sm">
                     @if ($organizador)
                         @if (\Illuminate\Support\Facades\Auth::guard('jugador')->check())
-                            <a href="{{ route('jugador.portal') }}" class="rounded-lg px-3 py-2 text-white" style="background: var(--acento)">Mis torneos</a>
+                            <a href="{{ route('jugador.portal') }}" class="boton px-4 py-1.5">Mis torneos</a>
                         @else
-                            <a href="{{ route('jugador.acceso') }}" class="rounded-lg px-3 py-2 text-neutral-600 hover:bg-neutral-100">Soy jugador</a>
+                            <a href="{{ route('jugador.acceso') }}" class="boton px-4 py-1.5">Soy jugador</a>
                         @endif
-                        <a href="{{ url('/panel') }}" class="rounded-lg px-3 py-2 text-neutral-400 hover:bg-neutral-100">Equipo</a>
+                        <a href="{{ url('/panel') }}" class="rounded-full px-3 py-1.5 text-tema-suave hover:text-tema-texto">Equipo</a>
                     @else
-                        <a href="{{ route('alta') }}" class="rounded-lg px-3 py-2 text-white" style="background: var(--acento)">Crear mi organización</a>
+                        <a href="{{ route('alta') }}" class="boton px-4 py-1.5">Crear mi organización</a>
                     @endif
                 </nav>
             </div>
@@ -62,8 +62,8 @@
             {{ $slot }}
         </main>
 
-        <footer class="border-t border-neutral-200 bg-white">
-            <div class="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-4 text-sm text-neutral-500">
+        <footer class="border-t border-tema-borde bg-white">
+            <div class="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-4 py-4 text-xs text-tema-suave">
                 <span>{{ $nombre }}@if ($organizador && ! $organizador->plan->sin_marca) · con {{ config('app.name') }}@endif</span>
                 <span class="flex gap-4">
                     <a href="{{ route('legal.aviso') }}" class="hover:text-neutral-900">Aviso legal</a>
