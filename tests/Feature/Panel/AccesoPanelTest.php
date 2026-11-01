@@ -50,14 +50,19 @@ test('el panel no manda el nombre del equipo a servicios de fuera', function () 
     $this->actingAs($usuario)->get('http://padel-norte.test/panel')->assertOk()->assertDontSee('ui-avatars.com');
 });
 
-test('el menú del propietario tiene instalaciones y equipo, y el del administrador no', function () {
+test('el menú del propietario tiene instalaciones y equipo', function () {
     $propietario = comoOrganizador($this->organizador, fn () => User::factory()->rol(Rol::Propietario)->create());
-    $administrador = comoOrganizador($this->organizador, fn () => User::factory()->rol(Rol::Administrador)->create());
 
     $this->actingAs($propietario)->get('http://padel-norte.test/panel')->assertOk()
         ->assertSee('http://padel-norte.test/panel/torneos', false)
         ->assertSee('http://padel-norte.test/panel/pistas', false)
         ->assertSee('http://padel-norte.test/panel/equipo', false);
+});
+
+// En una prueba aparte: el menú se calcula una vez por proceso y el del
+// propietario se quedaría puesto.
+test('el menú del administrador no tiene instalaciones ni equipo', function () {
+    $administrador = comoOrganizador($this->organizador, fn () => User::factory()->rol(Rol::Administrador)->create());
 
     $this->actingAs($administrador)->get('http://padel-norte.test/panel')->assertOk()
         ->assertSee('http://padel-norte.test/panel/torneos', false)

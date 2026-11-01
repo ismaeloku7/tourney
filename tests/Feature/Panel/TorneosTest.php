@@ -80,7 +80,8 @@ test('un administrador solo ve los torneos que tiene asignados y no crea torneos
         ->assertCanNotSeeTableRecords([$ajeno]);
 
     Livewire::test(CreateTorneo::class)->assertForbidden();
-    Livewire::test(EditTorneo::class, ['record' => $ajeno->getRouteKey()])->assertForbidden();
+    // El torneo ajeno queda fuera de su consulta: para él no existe.
+    Livewire::test(EditTorneo::class, ['record' => $ajeno->getRouteKey()])->assertNotFound();
     Livewire::test(EditTorneo::class, ['record' => $suyo->getRouteKey()])->assertSuccessful();
 
     $this->actingAs($this->propietario);
