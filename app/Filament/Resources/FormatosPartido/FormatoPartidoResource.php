@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Filament\Resources\FormatoPartidos;
+namespace App\Filament\Resources\FormatosPartido;
 
 use App\Filament\Resources\FormatosPartido\Pages\CreateFormatoPartido;
 use App\Filament\Resources\FormatosPartido\Pages\EditFormatoPartido;

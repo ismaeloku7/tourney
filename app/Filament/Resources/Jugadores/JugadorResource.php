@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Filament\Resources\Jugadors;
+namespace App\Filament\Resources\Jugadores;
 
 use App\Filament\Resources\Jugadores\Pages\CreateJugador;
 use App\Filament\Resources\Jugadores\Pages\EditJugador;
