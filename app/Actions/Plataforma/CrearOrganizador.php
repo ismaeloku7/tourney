@@ -9,6 +9,7 @@ use App\Models\Plan;
 use App\Models\SuscripcionPlan;
 use App\Models\User;
 use App\Models\UsuarioPlataforma;
+use Database\Seeders\Organizador\BaseDelOrganizadorSeeder;
 use Illuminate\Support\Facades\Validator;
 use Illuminate\Validation\Validator as ValidadorConcreto;
 use Illuminate\Support\Str;
@@ -59,14 +60,19 @@ class CrearOrganizador
             'cambiado_por' => $quien?->id,
         ]);
 
-        $organizador->run(fn (): User => User::query()->create([
-            'nombre' => $organizador->responsable_nombre,
-            'email' => $organizador->responsable_email,
-            'rol' => Rol::Propietario,
-            'activo' => true,
-            'email_verified_at' => now(),
-            'password' => $clave,
-        ]));
+        $organizador->run(function () use ($organizador, $clave): void {
+            User::query()->create([
+                'nombre' => $organizador->responsable_nombre,
+                'email' => $organizador->responsable_email,
+                'rol' => Rol::Propietario,
+                'activo' => true,
+                'email_verified_at' => now(),
+                'password' => $clave,
+            ]);
+
+            // Plantillas de formato de partido y nombre público.
+            (new BaseDelOrganizadorSeeder)->run();
+        });
 
         AuditoriaGlobal::anotar('crear', $organizador, $quien, ['plan' => $plan->clave, 'dominio' => $dominio]);
 

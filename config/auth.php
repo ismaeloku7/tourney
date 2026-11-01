@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Jugador;
 use App\Models\UsuarioPlataforma;
 use App\Models\User;
 
@@ -50,6 +51,12 @@ return [
             'driver' => 'session',
             'provider' => 'usuarios_plataforma',
         ],
+
+        // Los jugadores de un organizador, en su base (portal /jugador).
+        'jugador' => [
+            'driver' => 'session',
+            'provider' => 'jugadores',
+        ],
     ],
 
     /*
@@ -78,6 +85,11 @@ return [
         'usuarios_plataforma' => [
             'driver' => 'eloquent',
             'model' => UsuarioPlataforma::class,
+        ],
+
+        'jugadores' => [
+            'driver' => 'eloquent',
+            'model' => Jugador::class,
         ],
 
 
