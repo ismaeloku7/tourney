@@ -10,10 +10,22 @@ de despliegue y `php artisan actualizar` lo que se ejecuta tras cada uno.
 
 - Ubuntu 24.04 con PHP 8.4 y MySQL 8 (en Forge, servidor «App» o «Web»
   con la base en el mismo servidor; con servidores separados vale igual).
-- El usuario de MySQL del sitio necesita el privilegio `CREATE DATABASE`:
-  cada organizador tiene su propia base (`organizador_{slug}`), creada al
-  darle de alta y borrada al destruirlo. El usuario `forge` lo tiene; uno
-  creado desde el panel de Forge para una sola base, no.
+- El usuario de MySQL del sitio tiene que poder crear y borrar bases:
+  cada organizador tiene la suya (`organizador_{slug}`), creada al darle
+  de alta y borrada al destruirlo. El usuario `forge` puede; uno creado
+  desde el panel de Forge para una sola base (`tourney`), no, y el alta
+  se rompe a medias con «Access denied … to database 'organizador_x'».
+  Para seguir con un usuario propio, se le dan permisos solo sobre las
+  bases de organizador, con la contraseña del usuario `forge` (está en el
+  `.env` de cualquier sitio del servidor que lo use):
+
+  ```bash
+  mysql -h 127.0.0.1 -u forge -p -e "GRANT ALL PRIVILEGES ON \`organizador\_%\`.* TO 'tourney'@'%'; FLUSH PRIVILEGES;"
+  ```
+
+  Un alta que falló a medias deja la fila sin dominios (`tenants:list`
+  la muestra con `@` vacío): se quita con `organizadores:destruir` y se
+  repite.
 - Node 22 (Forge lo instala con el servidor) para `npm run build`.
 - Un worker de cola y el programador (más abajo).
 
