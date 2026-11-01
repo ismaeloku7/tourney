@@ -23,7 +23,9 @@ final class DuplicarCategoria
     public function handle(Categoria $origen, array $cambios = [], bool $conFases = true, ?User $usuario = null): Categoria
     {
         return DB::transaction(function () use ($origen, $cambios, $conFases, $usuario): Categoria {
-            $nueva = $origen->replicate(['fases_count', 'confirmadas_count', 'inscripciones_count', 'participantes_count']);
+            // Los contadores que traiga de la tabla (withCount) no son columnas.
+            $contadores = array_values(array_filter(array_keys($origen->getAttributes()), fn (string $campo): bool => str_ends_with($campo, '_count')));
+            $nueva = $origen->replicate($contadores);
             $nueva->fill([
                 'nombre' => $cambios['nombre'] ?? $origen->nombre.' (copia)',
                 'genero' => $cambios['genero'] ?? $origen->genero,
