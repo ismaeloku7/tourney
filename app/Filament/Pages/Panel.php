@@ -270,7 +270,7 @@ class Panel extends Dashboard
             ->get()
             ->map(fn (RegistroDeCambio $r): array => [
                 'texto' => self::frase($r),
-                'cuando' => (string) $r->created_at?->diffForHumans(),
+                'cuando' => $r->created_at->diffForHumans(),
             ])
             ->all());
     }
