@@ -25,6 +25,14 @@ class DatabaseSeeder extends Seeder
     {
         $this->call(PlanesSeeder::class);
 
+        // En producción no hay Faker (es de desarrollo) ni deben existir el
+        // organizador demo ni admin@example.com: solo los planes.
+        if (! app()->environment('local', 'testing')) {
+            $this->command?->warn('Entorno '.app()->environment().': solo se siembran los planes. Los datos de prueba son de local.');
+
+            return;
+        }
+
         // Plataforma: http://saas.localhost:8000/plataforma (fase 4).
         UsuarioPlataforma::query()->where('email', 'admin@example.com')->exists()
             || UsuarioPlataforma::factory()->create(['nombre' => 'Administración de la plataforma', 'email' => 'admin@example.com']);
