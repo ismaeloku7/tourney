@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\Inscripciones\CompletarPareja;
+use App\Actions\Inscripciones\ConfirmarParejasCompletas;
 use App\Actions\Inscripciones\ImportarParejas;
 use App\Competicion\Errores\OperacionNoPermitida;
 use App\Enums\EstadoInscripcion;
@@ -204,4 +205,50 @@ test('la pestaña Parejas del torneo enseña todas las parejas con su categoría
         ->filterTable('categoria', $this->intermedio->id)
         ->assertCanSeeTableRecords($this->intermedio->inscripciones()->get())
         ->assertCanNotSeeTableRecords([$sinCompanero]);
+});
+
+test('«Confirmar las completas» confirma las pendientes con dos jugadores y respeta el cupo', function () {
+    $this->intermedio->update(['cupo' => 1]);
+    app(ImportarParejas::class)->handle($this->torneo, excelDelRally(), 'xlsx', $this->propietario, confirmar: false);
+    expect(Inscripcion::query()->where('estado', EstadoInscripcion::Pendiente->value)->count())->toBe(5);
+
+    $resultado = app(ConfirmarParejasCompletas::class)->handle($this->torneo, usuario: $this->propietario);
+
+    expect($resultado)->toBe(['confirmadas' => 3, 'sin_plaza' => 1, 'sin_companero' => 1])
+        ->and($this->intermedio->inscripciones()->where('estado', EstadoInscripcion::Confirmada->value)->count())->toBe(1)
+        ->and(Inscripcion::query()->where('estado', EstadoInscripcion::Pendiente->value)->count())->toBe(2);
+    Mail::assertNothingSent();
+});
+
+test('el botón está en la pestaña Parejas del torneo y en cada categoría', function () {
+    app(ImportarParejas::class)->handle($this->torneo, excelDelRally(), 'xlsx', $this->propietario, confirmar: false);
+    Filament::setCurrentPanel('panel');
+    $this->actingAs($this->propietario);
+
+    Livewire::test(InscripcionesRelationManager::class, ['ownerRecord' => $this->intermedio, 'pageClass' => EditCategoria::class])
+        ->callAction(TestAction::make('confirmarCompletas')->table(), ['avisar' => false])
+        ->assertHasNoActionErrors()
+        ->assertNotified('2 parejas confirmadas');
+
+    Livewire::test(ParejasRelationManager::class, ['ownerRecord' => $this->torneo, 'pageClass' => EditTorneo::class])
+        ->callAction(TestAction::make('confirmarCompletas')->table(), ['avisar' => false])
+        ->assertHasNoActionErrors()
+        ->assertNotified('2 parejas confirmadas');
+
+    expect(Inscripcion::query()->where('estado', EstadoInscripcion::Confirmada->value)->count())->toBe(4)
+        ->and(Inscripcion::query()->where('estado', EstadoInscripcion::Pendiente->value)->count())->toBe(1);
+});
+
+test('al importar desde el panel sin tocar nada, las parejas completas entran confirmadas', function () {
+    Storage::fake('local');
+    Filament::setCurrentPanel('panel');
+    $this->actingAs($this->propietario);
+
+    Livewire::test(EditTorneo::class, ['record' => $this->torneo->getRouteKey()])
+        ->callAction('importar', [
+            'archivo' => UploadedFile::fake()->createWithContent('Rally2026_parejas_padel.xlsx', (string) file_get_contents(excelDelRally())),
+        ])
+        ->assertHasNoActionErrors();
+
+    expect(Inscripcion::query()->where('estado', EstadoInscripcion::Confirmada->value)->count())->toBe(4);
 });

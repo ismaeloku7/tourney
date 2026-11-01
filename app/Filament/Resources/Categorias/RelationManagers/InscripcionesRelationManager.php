@@ -12,9 +12,11 @@ use App\Enums\EstadoInscripcion;
 use App\Enums\Genero;
 use App\Enums\OrigenInscripcion;
 use App\Filament\Avisos;
+use App\Filament\ConfirmarCompletas;
 use App\Models\Categoria;
 use App\Models\Inscripcion;
 use App\Models\Jugador;
+use App\Models\Torneo;
 use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
@@ -74,6 +76,7 @@ class InscripcionesRelationManager extends RelationManager
                 SelectFilter::make('estado')->label('Estado')->options(EstadoInscripcion::opciones()),
             ])
             ->headerActions([
+                ConfirmarCompletas::accion(fn (): Torneo => $this->categoria()->torneo, fn (): Categoria => $this->categoria()),
                 Action::make('inscribir')
                     ->label('Inscribir pareja')
                     ->icon(Heroicon::OutlinedUserPlus)

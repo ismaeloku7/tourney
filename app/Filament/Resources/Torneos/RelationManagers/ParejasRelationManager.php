@@ -3,7 +3,9 @@
 namespace App\Filament\Resources\Torneos\RelationManagers;
 
 use App\Enums\EstadoInscripcion;
+use App\Filament\ConfirmarCompletas;
 use App\Filament\Resources\Categorias\CategoriaResource;
+use App\Models\Categoria;
 use App\Models\Inscripcion;
 use App\Models\Jugador;
 use App\Models\Torneo;
@@ -70,6 +72,9 @@ class ParejasRelationManager extends RelationManager
                     ->query(fn (Builder $query, array $data): Builder => filled($data['value'] ?? null) ? $query->where('inscripciones.categoria_id', (int) $data['value']) : $query),
                 SelectFilter::make('estado')->label('Estado')->options(EstadoInscripcion::opciones())
                     ->query(fn (Builder $query, array $data): Builder => filled($data['value'] ?? null) ? $query->where('inscripciones.estado', (string) $data['value']) : $query),
+            ])
+            ->headerActions([
+                ConfirmarCompletas::accion(fn (): Torneo => $this->torneo(), fn (): ?Categoria => null),
             ])
             ->recordActions([
                 Action::make('gestionar')->label('Gestionar')->icon(Heroicon::OutlinedArrowTopRightOnSquare)

@@ -18,7 +18,7 @@ use Illuminate\Support\Facades\DB;
  */
 final class CambiarEstadoDeInscripcion
 {
-    public function handle(Inscripcion $inscripcion, EstadoInscripcion $estado, ?User $usuario = null): Inscripcion
+    public function handle(Inscripcion $inscripcion, EstadoInscripcion $estado, ?User $usuario = null, bool $avisar = true): Inscripcion
     {
         $anterior = $inscripcion->estado;
 
@@ -49,7 +49,7 @@ final class CambiarEstadoDeInscripcion
             return $inscripcion->refresh();
         });
 
-        if ($estado === EstadoInscripcion::Confirmada) {
+        if ($avisar && $estado === EstadoInscripcion::Confirmada) {
             app(Avisos::class)->inscripcionConfirmada($resultado, desdeEspera: $anterior === EstadoInscripcion::ListaDeEspera);
         }
 
