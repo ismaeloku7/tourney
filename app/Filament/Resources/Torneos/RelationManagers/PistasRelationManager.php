@@ -7,18 +7,23 @@ use App\Competicion\Datos\TramoDeDisponibilidad;
 use App\Competicion\Errores\ConfiguracionInvalida;
 use App\Filament\Avisos;
 use App\Models\Pista;
+use App\Models\Sede;
 use App\Models\Torneo;
 use App\Models\TorneoPista;
 use Filament\Actions\Action;
+use Filament\Actions\BulkAction;
 use Filament\Actions\CreateAction;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
+use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\TimePicker;
 use Filament\Resources\RelationManagers\RelationManager;
+use Filament\Schemas\Components\Utilities\Get;
+use Filament\Schemas\Components\Utilities\Set;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
@@ -53,18 +58,7 @@ class PistasRelationManager extends RelationManager
                         ->mapWithKeys(fn (Pista $pista): array => [$pista->id => ($pista->sede?->nombre !== null ? $pista->sede->nombre.' · ' : '').$pista->nombre])->all()),
                 TextInput::make('orden')->label('Orden')->integer()->minValue(0)->default(fn (): int => $this->torneo()->torneoPistas()->count() + 1)
                     ->helperText('Las primeras se llenan antes al planificar.'),
-                Repeater::make('disponibilidad')->label('Disponibilidad')
-                    ->addActionLabel('Añadir tramo')
-                    ->columns(3)
-                    ->default(fn (): array => self::disponibilidadPorDefecto($this->torneo()))
-                    ->schema([
-                        DatePicker::make('fecha')->label('Día')->required()->native(false)->displayFormat('d/m/Y')
-                            ->minDate(fn (): string => $this->torneo()->fecha_inicio->toDateString())
-                            ->maxDate(fn (): string => $this->torneo()->fecha_fin->toDateString()),
-                        TimePicker::make('desde')->label('Desde')->required()->seconds(false),
-                        TimePicker::make('hasta')->label('Hasta')->required()->seconds(false),
-                    ])
-                    ->helperText('Un tramo por día y pista. Dos tramos el mismo día dejan un hueco entre ellos (comida, por ejemplo).'),
+                $this->campoDeDisponibilidad(),
             ]);
     }
 
@@ -87,23 +81,36 @@ class PistasRelationManager extends RelationManager
                     ->label('Añadir pista')
                     ->modalHeading('Pista del torneo')
                     ->using(fn (array $data, Action $action): Model => $this->getRelationship()->create(self::comprobar($data, $action))),
-                Action::make('anadirLasDeLaSede')
-                    ->label('Añadir todas las de la sede')
+                Action::make('anadirVarias')
+                    ->label('Añadir varias')
                     ->icon(Heroicon::OutlinedSquares2x2)
                     ->color('gray')
-                    ->visible(fn (): bool => $this->pistasDeLaSedeQueFaltan()->isNotEmpty())
-                    ->requiresConfirmation()
-                    ->modalDescription(fn (): string => 'Se añaden las pistas activas de la sede que aún no están en el torneo, disponibles de 09:00 a 22:00 cada día del torneo. Luego se ajusta cada una.')
-                    ->action(function (): void {
+                    ->visible(fn (): bool => $this->pistasQueFaltan(null)->isNotEmpty())
+                    ->modalHeading('Añadir varias pistas con la misma disponibilidad')
+                    ->modalDescription('Marca las pistas y pon una sola vez cuándo están libres: todas quedan igual. Luego puedes ajustar cada una.')
+                    ->modalSubmitActionLabel('Añadir')
+                    ->schema([
+                        Select::make('sede_id')->label('Sede')->placeholder('Todas las sedes')
+                            ->options(fn (): array => Sede::query()->orderBy('nombre')->pluck('nombre', 'id')->all())
+                            ->default(fn (): ?int => $this->torneo()->sede_id)
+                            ->live()
+                            ->afterStateUpdated(fn (Set $set, mixed $state) => $set('pistas', $this->pistasQueFaltan(filled($state) ? (int) $state : null)->modelKeys())),
+                        CheckboxList::make('pistas')->label('Pistas')->required()->columns(3)->bulkToggleable()
+                            ->options(fn (Get $get): array => $this->opcionesDePistas($this->pistasQueFaltan(filled($get('sede_id')) ? (int) $get('sede_id') : null)))
+                            ->default(fn (): array => $this->pistasQueFaltan($this->torneo()->sede_id)->modelKeys()),
+                        $this->campoDeDisponibilidad(),
+                    ])
+                    ->action(function (array $data, Action $action): void {
+                        $disponibilidad = self::comprobar($data, $action)['disponibilidad'];
                         $torneo = $this->torneo();
-                        $orden = $torneo->torneoPistas()->count();
-                        $faltan = $this->pistasDeLaSedeQueFaltan();
+                        $orden = (int) $torneo->torneoPistas()->max('orden');
+                        $pistas = $this->pistasQueFaltan(null)->whereIn('id', array_map('intval', (array) ($data['pistas'] ?? [])));
 
-                        foreach ($faltan as $pista) {
-                            $torneo->torneoPistas()->create(['pista_id' => $pista->id, 'orden' => ++$orden, 'disponibilidad' => self::disponibilidadPorDefecto($torneo)]);
+                        foreach ($pistas as $pista) {
+                            $torneo->torneoPistas()->create(['pista_id' => $pista->id, 'orden' => ++$orden, 'disponibilidad' => $disponibilidad]);
                         }
 
-                        Avisos::hecho($faltan->count() === 1 ? 'Una pista añadida' : "{$faltan->count()} pistas añadidas");
+                        Avisos::hecho($pistas->count() === 1 ? 'Una pista añadida' : "{$pistas->count()} pistas añadidas");
                     }),
             ])
             ->recordActions([
@@ -114,7 +121,41 @@ class PistasRelationManager extends RelationManager
                         return $record;
                     }),
                 DeleteAction::make()->label('Quitar'),
+            ])
+            ->toolbarActions([
+                BulkAction::make('disponibilidad')
+                    ->label('Poner la misma disponibilidad')
+                    ->icon(Heroicon::OutlinedClock)
+                    ->modalHeading('Misma disponibilidad para las pistas marcadas')
+                    ->modalSubmitActionLabel('Guardar')
+                    ->schema([$this->campoDeDisponibilidad()])
+                    ->action(function (Collection $records, array $data, Action $action): void {
+                        $disponibilidad = self::comprobar($data, $action)['disponibilidad'];
+                        foreach ($records as $record) {
+                            $record->update(['disponibilidad' => $disponibilidad]);
+                        }
+
+                        Avisos::hecho($records->count() === 1 ? 'Disponibilidad guardada' : "Disponibilidad guardada en {$records->count()} pistas");
+                    })
+                    ->deselectRecordsAfterCompletion(),
             ]);
+    }
+
+    /** Los tramos (día, de–a) en que la pista está libre, dentro de las fechas del torneo. */
+    private function campoDeDisponibilidad(): Repeater
+    {
+        return Repeater::make('disponibilidad')->label('Disponibilidad')
+            ->addActionLabel('Añadir tramo')
+            ->columns(3)
+            ->default(fn (): array => self::disponibilidadPorDefecto($this->torneo()))
+            ->schema([
+                DatePicker::make('fecha')->label('Día')->required()->native(false)->displayFormat('d/m/Y')
+                    ->minDate(fn (): string => $this->torneo()->fecha_inicio->toDateString())
+                    ->maxDate(fn (): string => $this->torneo()->fecha_fin->toDateString()),
+                TimePicker::make('desde')->label('Desde')->required()->seconds(false),
+                TimePicker::make('hasta')->label('Hasta')->required()->seconds(false),
+            ])
+            ->helperText('Un tramo por día y pista. Dos tramos el mismo día dejan un hueco entre ellos (comida, por ejemplo).');
     }
 
     /**
@@ -179,18 +220,26 @@ class PistasRelationManager extends RelationManager
         return $h * 60 + $m;
     }
 
-    /** @return Collection<int, Pista> */
-    private function pistasDeLaSedeQueFaltan(): Collection
+    /**
+     * Las pistas activas que aún no están en el torneo, de una sede o de todas.
+     *
+     * @return Collection<int, Pista>
+     */
+    private function pistasQueFaltan(?int $sedeId): Collection
     {
-        $torneo = $this->torneo();
+        return Pista::query()->with('sede')->where('activa', true)
+            ->when($sedeId !== null, fn (Builder $q) => $q->where('sede_id', $sedeId))
+            ->whereNotIn('id', $this->torneo()->torneoPistas()->pluck('pista_id'))
+            ->orderBy('sede_id')->orderBy('orden')->orderBy('nombre')->get();
+    }
 
-        if ($torneo->sede_id === null) {
-            return new Collection;
-        }
-
-        return Pista::query()->where('sede_id', $torneo->sede_id)->where('activa', true)
-            ->whereNotIn('id', $torneo->torneoPistas()->pluck('pista_id'))
-            ->orderBy('orden')->orderBy('nombre')->get();
+    /**
+     * @param  Collection<int, Pista>  $pistas
+     * @return array<int, string>
+     */
+    private function opcionesDePistas(Collection $pistas): array
+    {
+        return $pistas->mapWithKeys(fn (Pista $pista): array => [$pista->id => ($pista->sede?->nombre !== null ? $pista->sede->nombre.' · ' : '').$pista->nombre])->all();
     }
 
     private function torneo(): Torneo
