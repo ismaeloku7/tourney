@@ -18,6 +18,7 @@ class OrganizadorDePruebasSeeder extends Seeder
             EquipoSeeder::class,
             InstalacionesSeeder::class,
             JugadoresSeeder::class,
+            TorneosSeeder::class,
         ]);
     }
 }

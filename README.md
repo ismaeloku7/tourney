@@ -107,8 +107,20 @@ vez. `php artisan organizadores:destruir ceas --confirmar` lo borra con
 su base. El primer usuario de la plataforma se crea con
 `php artisan plataforma:administrador`.
 
-El motor de competición vivirá en `app/Competicion`: clases puras, sin
-Eloquent, con cobertura total en `tests/Unit/Competicion`.
+El motor de competición vive en `app/Competicion`: clases puras, sin
+Eloquent, que reciben y devuelven DTOs de `app/Competicion/Datos`
+(validador de resultados, reparto de grupos, round robin,
+clasificación, clasificados, cuadro, consolación, avance y
+planificador), con sus pruebas en `tests/Unit/Competicion`. Las acciones
+de `app/Actions/Competicion` (sortear, generar partidos y franjas,
+planificar, registrar, validar y anular resultados, cerrar fase, cambiar
+el estado del torneo) unen el motor con los modelos dentro de una
+transacción y dejan rastro en `registro_de_cambios`.
+
+`php artisan db:seed` deja además en `demo` un torneo por estado:
+`open-demo-sorteo` (sorteado y planificado), `open-demo-en-juego` (con
+resultados a medias) y `open-demo-finalizado` (cuadro de 8 con mejores
+terceros, tercer puesto y consolación, todo jugado).
 
 ## Despliegue
 
@@ -120,7 +132,13 @@ Los pasos, las variables de entorno y el script de despliegue
 
 ## Estado
 
-Fase 1, commit 2 de 6 ([orden de commits](docs/propuesta-fase-1.md#orden-de-commits)):
-proyecto base y base central con tenancy. Los commits 1 y 2 se han
-escrito sin poder ejecutar Pint, PHPStan ni Pest: la primera
-`composer ci:check` en verde está pendiente.
+Fase 1 completa en código ([orden de commits](docs/propuesta-fase-1.md#orden-de-commits)):
+proyecto base, base central con tenancy, modelo de dominio del
+organizador, DTOs, los nueve servicios del motor de competición y las
+acciones que unen motor y modelos, con el seeder de un torneo por estado.
+
+Las 90 pruebas del motor (`tests/Unit/Competicion`) se han ejecutado en
+verde con PHP a secas. El resto de pruebas (tenancy, modelo, acciones,
+seeders) y Pint y PHPStan están escritos pero sin ejecutar: la primera
+`composer ci:check` en verde está pendiente de un entorno con PHP 8.4 y
+acceso a los paquetes. No hay interfaz todavía: es la fase 2.

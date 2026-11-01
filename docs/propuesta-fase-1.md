@@ -517,3 +517,39 @@ Cada commit pasa `vendor/bin/pint`, `vendor/bin/phpstan` y
    con pista opcional) en lugar de uno solo con rol.
 6. Nombres: `Participante` para la entidad que compite (pareja), con
    «pareja» solo en textos de interfaz.
+
+
+## Lo que cambió al escribir el código
+
+Anotado al cerrar la fase 1, como pide el briefing.
+
+- El motor devuelve en `RepartoDeGrupos` la semilla que ha usado, para
+  que la acción la persista sin tener que generarla ella.
+- Los cuadros recién construidos llevan ids provisionales (1, 2, 3… por
+  ronda y posición) en los orígenes; `Actions\Competicion\Cuadros` los
+  reescribe por los reales al persistir. Un bye de primera ronda cierra su
+  partido como walkover sin resultado y avanza al participante.
+- `Set` lleva `esSuperTieBreak`: en un super tie-break los «juegos» son
+  los puntos y no cuentan como juegos en la clasificación.
+- `Puntuacion` lleva también cómo cuenta un walkover (sets y juegos por
+  set), en lugar de fijarlo en el calculador.
+- El `GeneradorRoundRobin` reparte las localías para que nadie sea
+  siempre visitante y, con número fijo de partidos y grupo impar, usa un
+  circulante (cada uno contra los k/2 siguientes y anteriores).
+- Con tres o más empatados, la línea que la mini-liga separa de la
+  siguiente se anota con el criterio `enfrentamiento_directo`, aunque
+  dentro de la mini-liga lo decidiera la diferencia de sets.
+- El `Planificador` solo recibe partidos con los dos participantes
+  conocidos; la dependencia entre rondas solo se declara si el partido
+  del que depende no está cerrado.
+- `GenerarFranjas` usa la duración más larga de los formatos efectivos de
+  las categorías del torneo más el margen, y no toca franjas existentes.
+- `users` del organizador ya se creó en el commit 2 (la base central lo
+  necesitaba para el propietario); el resto de tablas del organizador en
+  el commit 3. `BaseDelOrganizadorSeeder` (formatos por defecto y nombre
+  público) corre al dar de alta cualquier organizador.
+- El seeder de torneos deja un torneo por estado, pero el «triple empate
+  preparado» del de en juego no está garantizado: los resultados alternan
+  ganadores.
+- La verificación: las pruebas del motor se ejecutaron con un arnés local
+  que imita a Pest (sin Laravel); las de feature quedan por ejecutar.
