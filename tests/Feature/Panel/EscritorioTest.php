@@ -31,7 +31,7 @@ beforeEach(function () {
     ]);
     $this->categoria = Categoria::factory()->create(['torneo_id' => $this->torneo->id, 'nombre' => 'Iniciación', 'cupo' => 16]);
     $this->pendiente = Inscripcion::factory()->create([
-        'participante_id' => Participante::factory()->create(['categoria_id' => $this->categoria->id, 'nombre' => 'Hernandez / Hernandez'])->id,
+        'participante_id' => Participante::factory()->create(['categoria_id' => $this->categoria->id])->id,
         'estado' => EstadoInscripcion::Pendiente,
     ]);
     Inscripcion::factory()->create(['participante_id' => Participante::factory()->create(['categoria_id' => $this->categoria->id])->id]);
@@ -48,7 +48,7 @@ test('el inicio enseña los torneos, el próximo, las plazas y lo que hay por re
         ->assertSee('Con la inscripción abierta')
         ->assertSee('1 pareja pendiente de confirmar')
         ->assertSee('Por revisar')
-        ->assertSee('Hernandez / Hernandez')
+        ->assertSee($this->pendiente->participante->nombre)
         ->assertSee('pide plaza en')
         ->assertSee('1/16')
         ->assertSee('Crear torneo');
@@ -92,7 +92,7 @@ test('un administrador solo ve y toca lo de sus torneos', function () {
 
     Livewire::test(Panel::class)
         ->assertSee('Open de Otoño')
-        ->assertDontSee('Hernandez / Hernandez')
+        ->assertDontSee($this->pendiente->participante->nombre)
         ->assertDontSee('Crear torneo');
 
     Livewire::test(Panel::class)->call('confirmarInscripcion', $this->pendiente->id)->assertNotFound();
