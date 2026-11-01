@@ -60,6 +60,6 @@ class Grupo extends Model
     /** El grupo tal y como lo ve el motor, con sus participantes en orden de sorteo. */
     public function aDto(): GrupoDto
     {
-        return new GrupoDto($this->nombre, $this->orden, $this->participantes->pluck('id')->map(fn (mixed $id): int => (int) $id)->values()->all(), $this->id);
+        return new GrupoDto($this->nombre, $this->orden, array_values($this->participantes->pluck('id')->map(fn (mixed $id): int => (int) $id)->all()), $this->id);
     }
 }

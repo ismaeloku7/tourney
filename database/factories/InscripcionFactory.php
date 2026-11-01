@@ -20,7 +20,7 @@ class InscripcionFactory extends Factory
     {
         return [
             'participante_id' => Participante::factory(),
-            'categoria_id' => fn (array $atributos): int => (int) Participante::query()->findOrFail($atributos['participante_id'])->categoria_id,
+            'categoria_id' => fn (array $atributos): int => (int) Participante::query()->findOrFail((int) $atributos['participante_id'])->categoria_id,
             'estado' => EstadoInscripcion::Confirmada,
             'origen' => OrigenInscripcion::Manual,
             'confirmada_en' => now(),

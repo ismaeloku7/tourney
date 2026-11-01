@@ -50,8 +50,7 @@ final readonly class RepartidorDeGrupos
             $this->colocarCabezas($participantes, $tamanos, $grupos, $colocados);
         }
 
-        $resto = array_values(array_filter($ids, fn (int $id): bool => ! in_array($id, $colocados, true)));
-        $this->barajar($resto, $semilla);
+        $resto = $this->barajar(array_values(array_filter($ids, fn (int $id): bool => ! in_array($id, $colocados, true))), $semilla);
 
         foreach ($resto as $id) {
             foreach ($grupos as $i => $grupo) {
@@ -70,12 +69,12 @@ final readonly class RepartidorDeGrupos
         if (count($distintos) > 1) {
             $avisos[] = 'Quedan grupos de distinto tamaño: de '.implode(' y de ', $distintos).'.';
         }
-        if (min($tamanos) < 3) {
+        if ($tamanos !== [] && min($tamanos) < 3) {
             $avisos[] = 'Hay grupos de menos de 3 participantes.';
         }
 
         return new RepartoDeGrupos(
-            array_map(fn (int $i, array $miembros): Grupo => new Grupo(Grupo::nombrePorOrden($i + 1), $i + 1, array_values($miembros)), array_keys($grupos), $grupos),
+            array_map(fn (int $i, array $miembros): Grupo => new Grupo(Grupo::nombrePorOrden($i + 1), $i + 1, $miembros), array_keys($grupos), $grupos),
             $avisos,
             $semilla,
         );
@@ -138,8 +137,9 @@ final readonly class RepartidorDeGrupos
      * Fisher-Yates con mt_rand sembrado: el mismo orden para la misma semilla.
      *
      * @param  list<int>  $valores
+     * @return list<int>
      */
-    private function barajar(array &$valores, int $semilla): void
+    private function barajar(array $valores, int $semilla): array
     {
         mt_srand($semilla);
 
@@ -147,6 +147,8 @@ final readonly class RepartidorDeGrupos
             $j = mt_rand(0, $i);
             [$valores[$i], $valores[$j]] = [$valores[$j], $valores[$i]];
         }
+
+        return $valores;
     }
 
     /**
@@ -158,7 +160,7 @@ final readonly class RepartidorDeGrupos
         $vistos = [];
         $grupos = [];
 
-        foreach (array_values($manuales) as $i => $miembros) {
+        foreach ($manuales as $i => $miembros) {
             foreach ($miembros as $id) {
                 if (! in_array($id, $ids, true)) {
                     throw new ConfiguracionInvalida(["El participante {$id} no está en esta fase."]);
@@ -169,7 +171,7 @@ final readonly class RepartidorDeGrupos
                 $vistos[] = $id;
             }
 
-            $grupos[] = new Grupo(Grupo::nombrePorOrden($i + 1), $i + 1, array_values($miembros));
+            $grupos[] = new Grupo(Grupo::nombrePorOrden($i + 1), $i + 1, $miembros);
         }
 
         $avisos = [];

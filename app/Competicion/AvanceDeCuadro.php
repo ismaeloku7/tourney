@@ -152,6 +152,6 @@ final readonly class AvanceDeCuadro
             $partidos[] = $nuevo;
         }
 
-        return array_values($partidos);
+        return $partidos;
     }
 }

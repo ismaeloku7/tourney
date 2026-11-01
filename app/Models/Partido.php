@@ -148,13 +148,13 @@ class Partido extends Model
     /** Los sets guardados como resultado del motor; nulo si no hay. */
     public function resultadoDto(): ?Resultado
     {
-        $sets = $this->sets->map(fn (Set $set): SetDto => new SetDto(
+        $sets = array_values($this->sets->map(fn (Set $set): SetDto => new SetDto(
             $set->juegos_local,
             $set->juegos_visitante,
             $set->tie_break_local,
             $set->tie_break_visitante,
             $set->es_super_tie_break,
-        ))->values()->all();
+        ))->all());
 
         if ($sets === [] && $this->especial === null) {
             return null;

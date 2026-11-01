@@ -26,8 +26,8 @@ use App\Models\Partido;
 use App\Models\Pista;
 use App\Models\Torneo;
 use App\Models\User;
+use Carbon\CarbonInterface;
 use Illuminate\Database\Seeder;
-use Illuminate\Support\Carbon;
 
 /**
  * Un torneo por estado, identificado por su slug (repetir no duplica):
@@ -129,7 +129,7 @@ class TorneosSeeder extends Seeder
         $torneo->fill(['finalizado_en' => now()->subDays(29)])->save();
     }
 
-    private function torneo(string $nombre, string $slug, EstadoTorneo $estado, Carbon $inicio): Torneo
+    private function torneo(string $nombre, string $slug, EstadoTorneo $estado, CarbonInterface $inicio): Torneo
     {
         $torneo = Torneo::factory()->enEstado($estado)->create([
             'nombre' => $nombre,

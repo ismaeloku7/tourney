@@ -89,6 +89,6 @@ class Participante extends Model
      */
     public function idsDeJugadores(): array
     {
-        return $this->participanteJugadores->pluck('jugador_id')->map(fn (mixed $id): int => (int) $id)->values()->all();
+        return array_values($this->participanteJugadores->pluck('jugador_id')->map(fn (mixed $id): int => (int) $id)->all());
     }
 }

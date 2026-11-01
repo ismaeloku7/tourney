@@ -20,8 +20,8 @@ class PartidoFactory extends Factory
     {
         return [
             'fase_id' => Fase::factory(),
-            'local_id' => fn (array $atributos): int => Participante::factory()->create(['categoria_id' => Fase::query()->findOrFail($atributos['fase_id'])->categoria_id])->id,
-            'visitante_id' => fn (array $atributos): int => Participante::factory()->create(['categoria_id' => Fase::query()->findOrFail($atributos['fase_id'])->categoria_id])->id,
+            'local_id' => fn (array $atributos): int => Participante::factory()->create(['categoria_id' => Fase::query()->findOrFail((int) $atributos['fase_id'])->categoria_id])->id,
+            'visitante_id' => fn (array $atributos): int => Participante::factory()->create(['categoria_id' => Fase::query()->findOrFail((int) $atributos['fase_id'])->categoria_id])->id,
             'estado' => EstadoPartido::Pendiente,
             'es_tercer_puesto' => false,
         ];
@@ -40,7 +40,7 @@ class PartidoFactory extends Factory
                 $setsLocal = 0;
                 $setsVisitante = 0;
 
-                foreach (array_values($sets) as $i => [$local, $visitante]) {
+                foreach ($sets as $i => [$local, $visitante]) {
                     $partido->sets()->create(['numero' => $i + 1, 'juegos_local' => $local, 'juegos_visitante' => $visitante]);
                     $local > $visitante ? $setsLocal++ : $setsVisitante++;
                 }

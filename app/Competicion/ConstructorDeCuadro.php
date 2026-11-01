@@ -113,7 +113,7 @@ final readonly class ConstructorDeCuadro
                 $actual[$p] = $id++;
             }
 
-            if ($ronda === $rondas && $configuracion->tercerYCuartoPuesto && $rondas >= 2) {
+            if ($ronda === $rondas && $configuracion->tercerYCuartoPuesto) {
                 $partidos[] = new Partido(
                     id: $id++,
                     ronda: $ronda,
@@ -183,7 +183,6 @@ final readonly class ConstructorDeCuadro
     }
 
     /**
-     * @param  list<Clasificado>  $clasificados  Ordenados por `orden`.
      * @param  array<int, Clasificado|null>  $porCabeza  Cabeza (desde 1) → clasificado o nulo (bye).
      * @return list<int|null>
      */
@@ -304,7 +303,7 @@ final readonly class ConstructorDeCuadro
     private function cabezasPorOrden(array $clasificados, int $tamano): array
     {
         $porCabeza = [];
-        foreach (array_values($clasificados) as $i => $clasificado) {
+        foreach ($clasificados as $i => $clasificado) {
             $porCabeza[$i + 1] = $clasificado;
         }
         for ($cabeza = count($clasificados) + 1; $cabeza <= $tamano; $cabeza++) {

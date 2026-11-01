@@ -71,7 +71,7 @@ final class Cuadros
             $partidos = $partidos->merge($consolacion->partidos()->with('sets')->get());
         }
 
-        return new Cuadro(max($tamano, 2), max($rondas, 1), $partidos->map(fn (Partido $p): PartidoDto => $p->aDto())->values()->all());
+        return new Cuadro(max($tamano, 2), max($rondas, 1), array_values($partidos->map(fn (Partido $p): PartidoDto => $p->aDto())->all()));
     }
 
     /**

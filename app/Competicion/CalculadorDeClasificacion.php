@@ -59,9 +59,10 @@ final readonly class CalculadorDeClasificacion
      */
     private function lineas(array $participantes, array $partidos, Puntuacion $puntuacion): array
     {
+        /** @var array<int, AcumuladoDeLinea> $acumulado */
         $acumulado = [];
         foreach ($participantes as $id) {
-            $acumulado[$id] = ['puntos' => 0, 'pj' => 0, 'pg' => 0, 'pp' => 0, 'sf' => 0, 'sc' => 0, 'jf' => 0, 'jc' => 0];
+            $acumulado[$id] = new AcumuladoDeLinea($id);
         }
 
         foreach ($partidos as $partido) {
@@ -74,34 +75,34 @@ final readonly class CalculadorDeClasificacion
             assert($local !== null && $visitante !== null);
             $especial = $partido->resultado?->especial;
 
-            $acumulado[$local]['pj']++;
-            $acumulado[$visitante]['pj']++;
+            $acumulado[$local]->pj++;
+            $acumulado[$visitante]->pj++;
 
             if ($especial === ResultadoEspecial::NoPresentado || $partido->ganador === null) {
-                $acumulado[$local]['puntos'] += $puntuacion->noJugado;
-                $acumulado[$visitante]['puntos'] += $puntuacion->noJugado;
+                $acumulado[$local]->puntos += $puntuacion->noJugado;
+                $acumulado[$visitante]->puntos += $puntuacion->noJugado;
 
                 continue;
             }
 
-            $ganador = $partido->ganador;
-            $perdedor = $ganador === $local ? $visitante : $local;
-            $acumulado[$ganador]['pg']++;
-            $acumulado[$perdedor]['pp']++;
+            $ganador = $acumulado[$partido->ganador];
+            $perdedor = $acumulado[$partido->ganador === $local ? $visitante : $local];
+            $ganador->pg++;
+            $perdedor->pp++;
 
             if ($especial === ResultadoEspecial::Walkover || $partido->estado === EstadoPartido::Walkover) {
-                $acumulado[$ganador]['puntos'] += $puntuacion->walkoverFavor;
-                $acumulado[$perdedor]['puntos'] += $puntuacion->walkoverContra;
-                $acumulado[$ganador]['sf'] += $puntuacion->walkoverSets;
-                $acumulado[$perdedor]['sc'] += $puntuacion->walkoverSets;
-                $acumulado[$ganador]['jf'] += $puntuacion->walkoverSets * $puntuacion->walkoverJuegosPorSet;
-                $acumulado[$perdedor]['jc'] += $puntuacion->walkoverSets * $puntuacion->walkoverJuegosPorSet;
+                $ganador->puntos += $puntuacion->walkoverFavor;
+                $perdedor->puntos += $puntuacion->walkoverContra;
+                $ganador->setsFavor += $puntuacion->walkoverSets;
+                $perdedor->setsContra += $puntuacion->walkoverSets;
+                $ganador->juegosFavor += $puntuacion->walkoverSets * $puntuacion->walkoverJuegosPorSet;
+                $perdedor->juegosContra += $puntuacion->walkoverSets * $puntuacion->walkoverJuegosPorSet;
 
                 continue;
             }
 
-            $acumulado[$ganador]['puntos'] += $puntuacion->victoria;
-            $acumulado[$perdedor]['puntos'] += $puntuacion->derrota;
+            $ganador->puntos += $puntuacion->victoria;
+            $perdedor->puntos += $puntuacion->derrota;
 
             $resultado = $partido->resultado;
             $setsLocal = $resultado?->setsGanadosPorLocal() ?? 0;
@@ -109,24 +110,26 @@ final readonly class CalculadorDeClasificacion
             $juegosLocal = $resultado?->juegosDeLocal() ?? 0;
             $juegosVisitante = $resultado?->juegosDeVisitante() ?? 0;
 
-            $acumulado[$local]['sf'] += $setsLocal;
-            $acumulado[$local]['sc'] += $setsVisitante;
-            $acumulado[$visitante]['sf'] += $setsVisitante;
-            $acumulado[$visitante]['sc'] += $setsLocal;
-            $acumulado[$local]['jf'] += $juegosLocal;
-            $acumulado[$local]['jc'] += $juegosVisitante;
-            $acumulado[$visitante]['jf'] += $juegosVisitante;
-            $acumulado[$visitante]['jc'] += $juegosLocal;
+            $deLocal = $acumulado[$local];
+            $deVisitante = $acumulado[$visitante];
+            $deLocal->setsFavor += $setsLocal;
+            $deLocal->setsContra += $setsVisitante;
+            $deVisitante->setsFavor += $setsVisitante;
+            $deVisitante->setsContra += $setsLocal;
+            $deLocal->juegosFavor += $juegosLocal;
+            $deLocal->juegosContra += $juegosVisitante;
+            $deVisitante->juegosFavor += $juegosVisitante;
+            $deVisitante->juegosContra += $juegosLocal;
 
             if ($puntuacion->porSetGanado !== null) {
-                $acumulado[$local]['puntos'] += $puntuacion->porSetGanado * $setsLocal;
-                $acumulado[$visitante]['puntos'] += $puntuacion->porSetGanado * $setsVisitante;
+                $deLocal->puntos += $puntuacion->porSetGanado * $setsLocal;
+                $deVisitante->puntos += $puntuacion->porSetGanado * $setsVisitante;
             }
         }
 
         $lineas = [];
-        foreach ($acumulado as $id => $a) {
-            $lineas[$id] = new LineaDeClasificacion($id, 0, $a['puntos'], $a['pj'], $a['pg'], $a['pp'], $a['sf'], $a['sc'], $a['jf'], $a['jc']);
+        foreach ($acumulado as $id => $cuentas) {
+            $lineas[$id] = $cuentas->linea();
         }
 
         return $lineas;

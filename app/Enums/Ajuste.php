@@ -22,7 +22,7 @@ enum Ajuste: string
     case ContactoEmail = 'contacto_email';
     case ContactoTelefono = 'contacto_telefono';
 
-    public function porDefecto(): bool|int|string|null
+    public function porDefecto(): bool|string|null
     {
         return match ($this) {
             self::ZonaHoraria => 'Europe/Madrid',
