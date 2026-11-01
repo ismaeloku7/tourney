@@ -149,8 +149,14 @@ fases con el cuadro, y la clasificación y el cuadro a la vista. Los
 ajustes de marca (nombre, logotipo, colores, contacto y textos legales),
 las exportaciones (categoría y horarios en PDF, inscritos en CSV) y el
 alta self-service en el dominio de la plataforma, con verificación por
-correo, cierran la fase 2. Lo siguiente es la fase 3: las páginas
-públicas del torneo.
+correo, cierran la fase 2.
+
+Fase 3 en marcha: la web pública de cada organizador ya tiene su portada
+con los torneos publicados, la ficha de cada torneo (datos, categorías
+con plazas, inscritos, grupos, cuadro y horarios, con alias si el torneo
+lo pide), el tablero para la tele y la página de cada pista con su QR. Se
+refrescan solas mientras el torneo está en juego. Faltan la inscripción
+online, el portal del jugador, la mesa de árbitros, la PWA y los avisos.
 
 `composer ci:check` (Pint, PHPStan nivel 7 y Pest) corre en GitHub
 Actions en cada pull request y en `main`.

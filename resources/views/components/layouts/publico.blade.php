@@ -7,6 +7,8 @@
 @php($color = $organizador ? \App\Filament\ColorDelPanel::hex() : '#1d4ed8')
 @php($logo = $organizador ? \App\Filament\MarcaDelOrganizador::urlDelLogo() : null)
 @php($nombre = $organizador ? \App\Filament\MarcaDelOrganizador::nombre() : config('app.name'))
+@php($torneoDeLaRuta = request()->route('torneo'))
+@php($titulo = $titulo ?? $title ?? ($torneoDeLaRuta instanceof \App\Models\Torneo ? $torneoDeLaRuta->nombre : null))
 <!DOCTYPE html>
 <html lang="{{ str_replace('_', '-', app()->getLocale()) }}">
     <head>

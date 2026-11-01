@@ -58,6 +58,6 @@ class FichaDelTorneo extends Component
                 'horarios' => $datos->horarios(),
                 default => null,
             },
-        ])->title($this->torneo->nombre);
+        ]);
     }
 }

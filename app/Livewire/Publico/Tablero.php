@@ -44,6 +44,6 @@ class Tablero extends Component
             'enPista' => $enPista->map(fn (Partido $p): array => $datos->partido($p) + ['pista' => $p->pista?->nombre, 'categoria' => $p->fase->categoria->nombre])->all(),
             'proximos' => $proximos->map(fn (Partido $p): array => $datos->partido($p) + ['pista' => $p->pista?->nombre, 'categoria' => $p->fase->categoria->nombre, 'horaCorta' => $p->franja->inicio->format('H:i')])->all(),
             'ultimos' => $ultimos->map(fn (Partido $p): array => $datos->partido($p) + ['categoria' => $p->fase->categoria->nombre])->all(),
-        ])->title('Tablero · '.$this->torneo->nombre);
+        ]);
     }
 }

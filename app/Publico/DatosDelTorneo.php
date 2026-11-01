@@ -6,6 +6,7 @@ use App\Enums\EstadoInscripcion;
 use App\Enums\EstadoPartido;
 use App\Filament\Competicion\Marcador;
 use App\Models\Categoria;
+use App\Models\Clasificacion;
 use App\Models\Fase;
 use App\Models\Grupo;
 use App\Models\Inscripcion;
@@ -39,7 +40,7 @@ final class DatosDelTorneo
 
             $salida[] = [
                 'categoria' => $categoria,
-                'confirmadas' => $confirmadas->map(fn (Inscripcion $i): string => (string) NombrePublico::participante($i->participante, $this->torneo))->values()->all(),
+                'confirmadas' => array_values($confirmadas->map(fn (Inscripcion $i): string => (string) NombrePublico::participante($i->participante, $this->torneo))->all()),
                 'espera' => $inscripciones->where('estado', EstadoInscripcion::ListaDeEspera)->count(),
                 'plazas' => $categoria->cupo === null ? null : max(0, $categoria->cupo - $confirmadas->count()),
             ];
@@ -49,7 +50,7 @@ final class DatosDelTorneo
     }
 
     /**
-     * @return list<array{categoria: Categoria, fase: Fase, grupos: list<array{grupo: Grupo, lineas: list<array{posicion: int, nombre: string, puntos: int, pj: int, pg: int, pp: int, sets: string, juegos: string, clasificado: bool}>, partidos: list<array{partido: string, resultado: string, hora: string|null}>}>}>
+     * @return list<array{categoria: Categoria, fase: Fase, grupos: list<array{grupo: Grupo, lineas: list<array{posicion: int, nombre: string, puntos: int, pj: int, pg: int, pp: int, sets: string, juegos: string, clasificado: bool}>, partidos: list<array{partido: string, resultado: string, hora: string|null, ganaLocal: bool|null}>}>}>
      */
     public function grupos(): array
     {
@@ -64,15 +65,15 @@ final class DatosDelTorneo
             foreach ($fase->grupos as $grupo) {
                 $grupos[] = [
                     'grupo' => $grupo,
-                    'lineas' => $grupo->clasificaciones->map(fn ($linea): array => [
+                    'lineas' => array_values($grupo->clasificaciones->map(fn (Clasificacion $linea): array => [
                         'posicion' => $linea->posicion,
                         'nombre' => (string) NombrePublico::participante($linea->participante, $this->torneo),
                         'puntos' => $linea->puntos, 'pj' => $linea->pj, 'pg' => $linea->pg, 'pp' => $linea->pp,
                         'sets' => "{$linea->sets_favor}-{$linea->sets_contra}",
                         'juegos' => "{$linea->juegos_favor}-{$linea->juegos_contra}",
                         'clasificado' => $linea->clasificado_como !== null,
-                    ])->values()->all(),
-                    'partidos' => $grupo->partidos->map(fn (Partido $p): array => $this->partido($p))->values()->all(),
+                    ])->all()),
+                    'partidos' => array_values($grupo->partidos->map(fn (Partido $p): array => $this->partido($p))->all()),
                 ];
             }
 
@@ -83,7 +84,7 @@ final class DatosDelTorneo
     }
 
     /**
-     * @return list<array{categoria: Categoria, fase: Fase, rondas: list<array{nombre: string, partidos: list<array{partido: string, resultado: string, hora: string|null}>}>}>
+     * @return list<array{categoria: Categoria, fase: Fase, rondas: list<array{nombre: string, partidos: list<array{partido: string, resultado: string, hora: string|null, ganaLocal: bool|null}>}>}>
      */
     public function cuadros(): array
     {
@@ -99,7 +100,7 @@ final class DatosDelTorneo
             $lista = [];
 
             foreach ($partidos->where('es_tercer_puesto', false)->groupBy('ronda') as $ronda => $delaRonda) {
-                $lista[] = ['nombre' => Marcador::ronda((int) $ronda, $rondas), 'partidos' => $delaRonda->map(fn (Partido $p): array => $this->partido($p))->values()->all()];
+                $lista[] = ['nombre' => Marcador::ronda((int) $ronda, $rondas), 'partidos' => array_values($delaRonda->map(fn (Partido $p): array => $this->partido($p))->all())];
             }
 
             $tercero = $partidos->firstWhere('es_tercer_puesto', true);
@@ -130,7 +131,7 @@ final class DatosDelTorneo
             $dia = $p->franja->inicio->translatedFormat('l j \d\e F');
             $salida[$dia][] = [
                 'hora' => $p->franja->inicio->format('H:i'),
-                'pista' => $p->pista?->nombre ?? '',
+                'pista' => $p->pista->nombre ?? '',
                 'categoria' => $p->fase->categoria->nombre,
                 'partido' => $this->partido($p)['partido'],
                 'resultado' => $p->cerrado() ? Marcador::resultado($p) : '',

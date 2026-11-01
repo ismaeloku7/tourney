@@ -50,7 +50,7 @@ class PartidosDePista extends Component
             'dia' => CarbonImmutable::parse($dia)->translatedFormat('l j \d\e F'),
             'partidos' => $partidos->all(),
             'qr' => $this->qr(),
-        ])->title($this->pista->nombre.' · '.$this->torneo->nombre);
+        ]);
     }
 
     /** El QR de esta misma página, como imagen SVG en data URI; nulo si no se puede. */
