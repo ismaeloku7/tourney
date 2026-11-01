@@ -33,7 +33,11 @@ final class TorneosPublicos
         return self::consulta()->where('estado', EstadoTorneo::EnJuego->value)->orderBy('fecha_inicio')->get();
     }
 
-    /** Publicados, con la inscripción cerrada o en sorteo: ya vienen. @return Collection<int, Torneo> */
+    /**
+     * Publicados, con la inscripción cerrada o en sorteo: ya vienen.
+     *
+     * @return Collection<int, Torneo>
+     */
     public static function proximos(): Collection
     {
         return self::consulta()->whereIn('estado', [EstadoTorneo::InscripcionCerrada->value, EstadoTorneo::Sorteo->value])->orderBy('fecha_inicio')->get();
