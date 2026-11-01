@@ -37,7 +37,12 @@
                 </a>
                 <nav class="flex items-center gap-2 text-sm font-medium">
                     @if ($organizador)
-                        <a href="{{ url('/panel') }}" class="rounded-lg px-3 py-2 text-neutral-600 hover:bg-neutral-100">Entrar</a>
+                        @if (\Illuminate\Support\Facades\Auth::guard('jugador')->check())
+                            <a href="{{ route('jugador.portal') }}" class="rounded-lg px-3 py-2 text-white" style="background: var(--acento)">Mis torneos</a>
+                        @else
+                            <a href="{{ route('jugador.acceso') }}" class="rounded-lg px-3 py-2 text-neutral-600 hover:bg-neutral-100">Soy jugador</a>
+                        @endif
+                        <a href="{{ url('/panel') }}" class="rounded-lg px-3 py-2 text-neutral-400 hover:bg-neutral-100">Equipo</a>
                     @else
                         <a href="{{ route('alta') }}" class="rounded-lg px-3 py-2 text-white" style="background: var(--acento)">Crear mi organización</a>
                     @endif

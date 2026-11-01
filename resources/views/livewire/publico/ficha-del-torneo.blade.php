@@ -6,6 +6,9 @@
         @if ($torneo->sede) · {{ $torneo->sede->nombre }} @endif
         · <span class="font-medium">{{ $torneo->estado->etiqueta() }}</span>
     </p>
+    @if ($torneo->inscripcionAbierta())
+        <a href="{{ route('torneo.inscripcion', $torneo) }}" class="mt-4 inline-block rounded-lg px-5 py-2.5 font-medium text-white" style="background: var(--acento)">Inscribirnos</a>
+    @endif
 
     <nav class="mt-6 flex gap-1 overflow-x-auto border-b border-neutral-200" aria-label="Secciones del torneo">
         @foreach (\App\Livewire\Publico\FichaDelTorneo::PESTANAS as $clave => $nombre)
@@ -46,7 +49,7 @@
                         @endforeach
                     </ul>
                     @if ($torneo->inscripcionAbierta())
-                        <p class="mt-4 text-sm text-neutral-600">La inscripción está abierta. Escribe a la organización para apuntarte.</p>
+                        <a href="{{ route('torneo.inscripcion', $torneo) }}" class="mt-4 block rounded-lg px-4 py-2.5 text-center font-medium text-white" style="background: var(--acento)">Inscribirnos</a>
                     @endif
                 </div>
             </div>

@@ -1,4 +1,6 @@
 <?php
 
-// Las tareas programadas (limpieza de enlaces, avisos push) se registran
-// aquí con Schedule:: cuando lleguen.
+use Illuminate\Support\Facades\Schedule;
+
+// Los resultados de jugadores sin validar a tiempo cuentan solos.
+Schedule::command('resultados:validar-vencidos')->everyMinute()->withoutOverlapping();

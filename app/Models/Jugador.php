@@ -99,6 +99,12 @@ class Jugador extends Authenticatable
         return $this->belongsToMany(Participante::class, 'participante_jugadores')->withPivot(['orden', 'confirmado_en'])->withTimestamps();
     }
 
+    /** @return HasMany<EnlaceMagico, $this> */
+    public function enlacesMagicos(): HasMany
+    {
+        return $this->hasMany(EnlaceMagico::class);
+    }
+
     /** @return HasMany<Disponibilidad, $this> */
     public function disponibilidades(): HasMany
     {
