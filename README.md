@@ -155,8 +155,17 @@ Fase 3 en marcha: la web pública de cada organizador ya tiene su portada
 con los torneos publicados, la ficha de cada torneo (datos, categorías
 con plazas, inscritos, grupos, cuadro y horarios, con alias si el torneo
 lo pide), el tablero para la tele y la página de cada pista con su QR. Se
-refrescan solas mientras el torneo está en juego. Faltan la inscripción
-online, el portal del jugador, la mesa de árbitros, la PWA y los avisos.
+refrescan solas mientras el torneo está en juego.
+
+Los jugadores se inscriben solos desde la ficha del torneo: cuenta ligera
+o enlace de acceso por correo (15 minutos, un solo uso), y el compañero
+confirma desde su invitación (48 horas). En su portal (/jugador) ven sus
+inscripciones y partidos, se dan de baja mientras la inscripción está
+abierta, anotan y validan resultados si el torneo lo permite, dicen
+cuándo no pueden jugar y pueden borrar sus datos. Los árbitros anotan
+desde /mesa los partidos de sus pistas, y los resultados sin validar
+cuentan solos al vencer el plazo (resultados:validar-vencidos, cada
+minuto). Faltan la PWA y los avisos por push y correo.
 
 `composer ci:check` (Pint, PHPStan nivel 7 y Pest) corre en GitHub
 Actions en cada pull request y en `main`.

@@ -19,7 +19,8 @@ final class ValidarResultado
 {
     public function __construct(private readonly ConsolidarPartidoCerrado $consolidar = new ConsolidarPartidoCerrado) {}
 
-    public function handle(Partido $partido, User|Jugador $quien): Partido
+    /** Sin `$quien`, la valida el sistema al vencer el plazo (resultados:validar-vencidos). */
+    public function handle(Partido $partido, User|Jugador|null $quien): Partido
     {
         if ($partido->estado !== EstadoPartido::PendienteValidacion) {
             throw new OperacionNoPermitida('El partido no está pendiente de validación.');
