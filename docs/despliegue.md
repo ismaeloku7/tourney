@@ -119,10 +119,15 @@ SESSION_SECURE_COOKIE=true
 CACHE_STORE=database
 QUEUE_CONNECTION=database
 
+# El alta self-service manda el correo de verificación con este remitente.
 MAIL_MAILER=resend
 RESEND_API_KEY=
 MAIL_FROM_ADDRESS=hola@clubceas.es
 MAIL_FROM_NAME="${APP_NAME}"
+
+# Los logotipos de los organizadores van al disco público:
+# storage/app/public, servido en /storage (el script hace storage:link).
+FILESYSTEM_DISK=local
 
 # php artisan push:claves, una vez, cuando llegue la PWA.
 WEBPUSH_VAPID_PUBLIC_KEY=

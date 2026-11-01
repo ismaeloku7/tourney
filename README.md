@@ -145,8 +145,12 @@ pistas del torneo con su disponibilidad y las inscripciones a mano
 bajas, pago y cabezas de serie). La competición se lleva desde el panel:
 estado del torneo, sorteo de grupos, planificación de horarios, mesa de
 partidos con resultados, validación, anulación y hora a mano, cierre de
-fases con el cuadro, y la clasificación y el cuadro a la vista. Faltan
-las exportaciones y el alta self-service.
+fases con el cuadro, y la clasificación y el cuadro a la vista. Los
+ajustes de marca (nombre, logotipo, colores, contacto y textos legales),
+las exportaciones (categoría y horarios en PDF, inscritos en CSV) y el
+alta self-service en el dominio de la plataforma, con verificación por
+correo, cierran la fase 2. Lo siguiente es la fase 3: las páginas
+públicas del torneo.
 
 `composer ci:check` (Pint, PHPStan nivel 7 y Pest) corre en GitHub
 Actions en cada pull request y en `main`.

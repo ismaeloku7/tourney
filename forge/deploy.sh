@@ -30,6 +30,10 @@ npm run build
 # modo sin caída corre antes de que la versión nueva esté publicada.
 "$FORGE_PHP" artisan actualizar
 
+# public/storage → storage/app/public (logotipos de los organizadores). En
+# el modo sin caída, storage es el compartido que enlaza Forge.
+"$FORGE_PHP" artisan storage:link --force
+
 # Cachés de configuración, rutas, vistas y eventos.
 "$FORGE_PHP" artisan optimize
 

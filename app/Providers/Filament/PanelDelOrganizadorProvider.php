@@ -4,12 +4,12 @@ namespace App\Providers\Filament;
 
 use App\Filament\Avatares\AvatarDeIniciales;
 use App\Filament\ColorDelPanel;
+use App\Filament\MarcaDelOrganizador;
 use App\Filament\Pages\Auth\EditarPerfil;
 use App\Filament\Pages\Auth\Login;
 use App\Filament\Pages\Panel as PanelDelOrganizador;
 use App\Http\Middleware\ExigirOrganizador;
 use App\Http\Middleware\ResolverOrganizadorPorHost;
-use App\Tenancy\OrganizadorActual;
 use Filament\Http\Middleware\Authenticate;
 use Filament\Http\Middleware\AuthenticateSession;
 use Filament\Http\Middleware\DisableBladeIconComponents;
@@ -45,7 +45,9 @@ class PanelDelOrganizadorProvider extends PanelProvider
             ->login(Login::class)
             ->passwordReset()
             ->profile(EditarPerfil::class, isSimple: false)
-            ->brandName(fn (): string => self::nombreDelOrganizador())
+            ->brandName(fn (): string => MarcaDelOrganizador::nombre())
+            ->brandLogo(fn (): ?string => MarcaDelOrganizador::urlDelLogo())
+            ->brandLogoHeight('2.25rem')
             // Sin llamadas a ui-avatars.com con el nombre de cada persona.
             ->defaultAvatarProvider(AvatarDeIniciales::class)
             ->colors(fn (): array => [
@@ -96,12 +98,5 @@ class PanelDelOrganizadorProvider extends PanelProvider
         }
 
         return $panel;
-    }
-
-    private static function nombreDelOrganizador(): string
-    {
-        $actual = app(OrganizadorActual::class);
-
-        return $actual->hay() ? $actual->organizador()->nombre : config()->string('app.name');
     }
 }
