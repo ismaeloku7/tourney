@@ -6,6 +6,7 @@ use App\Actions\Competicion\RegistrarResultado;
 use App\Actions\Competicion\ValidarResultado;
 use App\Actions\Jugadores\AnonimizarJugador;
 use App\Actions\Jugadores\AnotarNoDisponibilidad;
+use App\Actions\Jugadores\CambiarNivel;
 use App\Actions\Jugadores\DarseDeBaja;
 use App\Competicion\Errores\ErrorDeCompeticion;
 use App\Competicion\Errores\ResultadoInvalido;
@@ -50,6 +51,11 @@ class PortalDelJugador extends Component
 
     public string $alias = '';
 
+    public string $nivel = '';
+
+    /** @var array<int, string> jugador => nivel, de los compañeros de las parejas que capitanea */
+    public array $nivelesDeCompaneros = [];
+
     /** @var array<int, array{dia: string, desde: string, hasta: string}> torneo => intervalo nuevo */
     public array $noDisponible = [];
 
@@ -68,6 +74,10 @@ class PortalDelJugador extends Component
         $this->apellidos = $yo->apellidos;
         $this->telefono = (string) $yo->getAttribute('telefono');
         $this->alias = (string) $yo->alias;
+        $this->nivel = (string) $yo->nivel_declarado;
+        foreach (CambiarNivel::companeros($yo) as $companero) {
+            $this->nivelesDeCompaneros[$companero->id] = (string) $companero->nivel_declarado;
+        }
         $this->avisosCorreo = (bool) ($yo->avisos['correo'] ?? true);
         $this->avisosPush = (bool) ($yo->avisos['push'] ?? true);
     }
@@ -157,8 +167,37 @@ class PortalDelJugador extends Component
             'alias' => ['nullable', 'string', 'max:60'],
         ]);
 
+        // El nivel solo se comprueba si lo cambia: uno antiguo («4ª») no le impide guardar lo demás.
+        if (trim($this->nivel) !== (string) $this->yo()->nivel_declarado) {
+            try {
+                app(CambiarNivel::class)->handle($this->yo(), $this->yo(), $this->nivel);
+            } catch (ErrorDeCompeticion $e) {
+                $this->addError('nivel', $e->getMessage());
+
+                return;
+            }
+        }
+
         $this->yo()->update(array_map(fn (mixed $v): ?string => is_string($v) && trim($v) !== '' ? trim($v) : null, $datos));
         $this->aviso = 'Datos guardados.';
+    }
+
+    public function guardarNivelDeCompanero(int $jugador, CambiarNivel $cambiar): void
+    {
+        $companero = Jugador::query()->find($jugador);
+        abort_if($companero === null, 404);
+
+        try {
+            $cambiar->handle($this->yo(), $companero, $this->nivelesDeCompaneros[$jugador] ?? null);
+        } catch (ErrorDeCompeticion $e) {
+            $this->aviso = null;
+            $this->addError('nivel.'.$jugador, $e->getMessage());
+
+            return;
+        }
+
+        $this->resetErrorBag();
+        $this->aviso = "Nivel de {$companero->nombre} guardado.";
     }
 
     public function borrarMisDatos(AnonimizarJugador $anonimizar): void

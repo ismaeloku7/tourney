@@ -27,6 +27,22 @@
                         <span class="rounded-full bg-neutral-100 px-2 py-0.5 text-xs font-medium">{{ $inscripcion->estado->etiqueta() }}@if ($inscripcion->posicion_espera) (#{{ $inscripcion->posicion_espera }})@endif</span>
                     </div>
                     <p class="mt-1 text-sm text-neutral-600">{{ $inscripcion->categoria->nombre }} · {{ $inscripcion->participante->nombre }}</p>
+                    <p class="mt-1 text-sm text-neutral-600">Nivel:
+                        @foreach ($inscripcion->participante->participanteJugadores as $fila)
+                            {{ $fila->jugador->is($yo) ? 'tú' : $fila->jugador->nombre }} {{ $fila->jugador->nivel_declarado ?? '—' }}@if (! $loop->last) · @endif
+                        @endforeach
+                    </p>
+                    @foreach ($inscripcion->participante->participanteJugadores as $fila)
+                        @if ($inscripcion->estado !== \App\Enums\EstadoInscripcion::Baja && array_key_exists($fila->jugador_id, $nivelesDeCompaneros) && $inscripcion->participante->participanteJugadores->first()?->jugador_id === $yo->id)
+                            <form wire:submit="guardarNivelDeCompanero({{ $fila->jugador_id }})" class="mt-2 flex flex-wrap items-end gap-2 text-sm">
+                                <label>Nivel de {{ $fila->jugador->nombre }} <span class="text-neutral-500">(eres el capitán)</span>
+                                    <input type="text" inputmode="decimal" wire:model="nivelesDeCompaneros.{{ $fila->jugador_id }}" placeholder="3 o 2,5" class="mt-1 block w-28 rounded border border-neutral-300 px-2 py-1">
+                                </label>
+                                <button type="submit" class="rounded-lg border border-neutral-300 px-3 py-1.5 font-medium">Guardar</button>
+                            </form>
+                            @error('nivel.'.$fila->jugador_id) <p class="mt-1 text-sm text-red-700">{{ $message }}</p> @enderror
+                        @endif
+                    @endforeach
                     @if ($pendiente && $inscripcion->estado === \App\Enums\EstadoInscripcion::Pendiente)
                         <p class="mt-1 text-sm text-amber-700">Falta que {{ $pendiente->jugador->nombre }} confirme desde su correo.</p>
                     @endif
@@ -139,6 +155,7 @@
             <label class="block text-sm"><span class="font-medium">Nombre</span><input type="text" wire:model="nombre" class="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2">@error('nombre') <span class="text-red-700">{{ $message }}</span> @enderror</label>
             <label class="block text-sm"><span class="font-medium">Apellidos</span><input type="text" wire:model="apellidos" class="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2">@error('apellidos') <span class="text-red-700">{{ $message }}</span> @enderror</label>
             <label class="block text-sm"><span class="font-medium">Teléfono</span><input type="tel" wire:model="telefono" class="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2"></label>
+            <label class="block text-sm"><span class="font-medium">Nivel</span><input type="text" inputmode="decimal" wire:model="nivel" placeholder="3 o 2,5" class="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2">@error('nivel') <span class="text-red-700">{{ $message }}</span> @enderror<span class="text-neutral-500">Un número del 0 al 10. Si eres el capitán de tu pareja, el de tu compañero lo cambias en la inscripción.</span></label>
             <label class="block text-sm"><span class="font-medium">Alias</span><input type="text" wire:model="alias" class="mt-1 w-full rounded-lg border border-neutral-300 px-3 py-2"><span class="text-neutral-500">Lo que se enseña en los torneos con privacidad.</span></label>
             <p class="text-sm text-neutral-500 sm:col-span-2">Tu correo: {{ $yo->getAttribute('email') }}. Para cambiarlo, escribe a la organización.</p>
             <div><button type="submit" class="rounded-lg px-4 py-2 text-sm font-medium text-white" style="background: var(--acento)">Guardar</button></div>
