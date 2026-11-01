@@ -48,7 +48,7 @@ class FaseForm
                 Select::make('formato_partido_id')->label('Formato de partido')->relationship('formatoPartido', 'nombre')->placeholder('El de la categoría'),
                 Select::make('fase_origen_id')->label('Toma a las parejas de')
                     ->options(fn (RelationManager $livewire, ?Fase $record): array => self::categoria($livewire)->fases()
-                        ->whereKeyNot($record?->id ?? 0)
+                        ->whereKeyNot($record->id ?? 0)
                         ->orderBy('orden')->pluck('nombre', 'id')->all())
                     ->visible(fn (Get $get): bool => self::tipo($get('tipo')) === TipoDeFase::Consolacion)
                     ->required(fn (Get $get): bool => self::tipo($get('tipo')) === TipoDeFase::Consolacion)

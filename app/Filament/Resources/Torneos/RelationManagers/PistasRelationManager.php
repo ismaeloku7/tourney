@@ -48,7 +48,7 @@ class PistasRelationManager extends RelationManager
             ->components([
                 Select::make('pista_id')->label('Pista')->required()->searchable()->preload()
                     ->options(fn (?TorneoPista $record): array => Pista::query()->with('sede')->where('activa', true)
-                        ->whereNotIn('id', $this->torneo()->torneoPistas()->whereKeyNot($record?->id ?? 0)->pluck('pista_id'))
+                        ->whereNotIn('id', $this->torneo()->torneoPistas()->whereKeyNot($record->id ?? 0)->pluck('pista_id'))
                         ->orderBy('sede_id')->orderBy('orden')->orderBy('nombre')->get()
                         ->mapWithKeys(fn (Pista $pista): array => [$pista->id => ($pista->sede?->nombre !== null ? $pista->sede->nombre.' · ' : '').$pista->nombre])->all()),
                 TextInput::make('orden')->label('Orden')->integer()->minValue(0)->default(fn (): int => $this->torneo()->torneoPistas()->count() + 1)
