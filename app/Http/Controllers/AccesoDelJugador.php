@@ -24,8 +24,9 @@ class AccesoDelJugador
         self::iniciarSesion($request, $jugador);
 
         $destino = $request->query('destino');
+        $destino = is_string($destino) && MandarEnlaceDeAcceso::destinoValido($destino) ? $destino : route('jugador.portal');
 
-        return redirect(MandarEnlaceDeAcceso::destinoValido(is_string($destino) ? $destino : null) ? (string) $destino : route('jugador.portal'));
+        return redirect()->to($destino);
     }
 
     public function salir(Request $request): RedirectResponse

@@ -26,6 +26,7 @@ class ValidarResultadosVencidos extends Command
         $total = 0;
 
         foreach (Organizador::query()->where('estado', EstadoOrganizador::Activo->value)->get() as $organizador) {
+            assert($organizador instanceof Organizador);
             $total += (int) $organizador->run(function () use ($validar): int {
                 $validados = 0;
 

@@ -92,7 +92,7 @@ class MesaDeArbitro extends Component
                 $dias[$d->toDateString()] = $d->translatedFormat('l j');
             }
             if ($this->dia === null || ! array_key_exists($this->dia, $dias)) {
-                $this->dia = array_key_exists(now()->toDateString(), $dias) ? now()->toDateString() : array_key_first($dias);
+                $this->dia = array_key_exists(now()->toDateString(), $dias) ? now()->toDateString() : (string) array_key_first($dias);
             }
 
             $permitidas = PermisosDeMesa::pistas($usuario, $torneo);
