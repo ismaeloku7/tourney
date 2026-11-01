@@ -159,13 +159,6 @@ class FasesRelationManager extends RelationManager
             ]);
     }
 
-    /**
-     * El DTO del motor valida; si no pasa, el aviso enseña sus frases y el
-     * formulario sigue abierto.
-     *
-     * @param  array<string, mixed>  $data
-     * @return array<string, mixed>
-     */
     private function usuario(): User
     {
         $usuario = Filament::auth()->user();
@@ -182,6 +175,13 @@ class FasesRelationManager extends RelationManager
         return $categoria;
     }
 
+    /**
+     * El DTO del motor valida; si no pasa, el aviso enseña sus frases y el
+     * formulario sigue abierto.
+     *
+     * @param  array<string, mixed>  $data
+     * @return array<string, mixed>
+     */
     private static function comprobar(array $data, Action $action): array
     {
         try {

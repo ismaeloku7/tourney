@@ -104,7 +104,7 @@ class PartidosDelTorneo extends Page implements HasTable
                 SelectFilter::make('pista_id')->label('Pista')
                     ->options(fn (): array => Pista::query()->whereIn('id', $this->torneo()->torneoPistas()->pluck('pista_id'))->orderBy('orden')->pluck('nombre', 'id')->all()),
                 SelectFilter::make('dia')->label('Día')
-                    ->options(fn (): array => collect($this->torneo()->fecha_inicio->toPeriod($this->torneo()->fecha_fin))->mapWithKeys(fn ($dia): array => [$dia->toDateString() => $dia->translatedFormat('l j \d\e F')])->all())
+                    ->options(fn (): array => $this->dias())
                     ->query(fn (Builder $query, array $data): Builder => filled($data['value'] ?? null) ? $query->whereHas('franja', fn (Builder $q) => $q->whereDate('inicio', (string) $data['value'])) : $query),
                 SelectFilter::make('estado')->label('Estado')->options(EstadoPartido::opciones()),
                 TernaryFilter::make('con_hora')->label('Hora')
@@ -122,6 +122,22 @@ class PartidosDelTorneo extends Page implements HasTable
                     AccionesDePartido::anular(),
                 ]),
             ]);
+    }
+
+    /**
+     * Los días del torneo, para el filtro.
+     *
+     * @return array<string, string>
+     */
+    private function dias(): array
+    {
+        $dias = [];
+
+        foreach ($this->torneo()->fecha_inicio->toPeriod($this->torneo()->fecha_fin) as $dia) {
+            $dias[$dia->toDateString()] = $dia->translatedFormat('l j \d\e F');
+        }
+
+        return $dias;
     }
 
     /** «Grupo A · jornada 2» o «Cuartos de final». */

@@ -172,7 +172,7 @@ final class AccionesDePartido
     public static function resultadoDesde(array $data): Resultado
     {
         $especial = filled($data['especial'] ?? null) ? ResultadoEspecial::from((string) $data['especial']) : null;
-        $ganaLocal = isset($data['gana_local']) && $data['gana_local'] !== null && $data['gana_local'] !== '' ? (bool) (int) $data['gana_local'] : null;
+        $ganaLocal = isset($data['gana_local']) && $data['gana_local'] !== '' ? (bool) (int) $data['gana_local'] : null;
 
         $sets = [];
         if ($especial === null) {
