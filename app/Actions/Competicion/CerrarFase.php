@@ -2,6 +2,7 @@
 
 namespace App\Actions\Competicion;
 
+use App\Avisos\Avisos;
 use App\Competicion\ConstructorDeConsolacion;
 use App\Competicion\ConstructorDeCuadro;
 use App\Competicion\Datos\Clasificacion as ClasificacionDto;
@@ -19,7 +20,6 @@ use App\Models\Partido;
 use App\Models\RegistroDeCambio;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
-use App\Avisos\Avisos;
 
 /**
  * Cierra una fase con todos sus partidos jugados. En una fase de grupos,

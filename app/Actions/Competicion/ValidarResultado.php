@@ -2,6 +2,7 @@
 
 namespace App\Actions\Competicion;
 
+use App\Avisos\Avisos;
 use App\Competicion\Errores\OperacionNoPermitida;
 use App\Enums\EstadoPartido;
 use App\Models\Jugador;
@@ -9,7 +10,6 @@ use App\Models\Partido;
 use App\Models\RegistroDeCambio;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
-use App\Avisos\Avisos;
 
 /**
  * Da por bueno un resultado pendiente de validación: lo hace el rival

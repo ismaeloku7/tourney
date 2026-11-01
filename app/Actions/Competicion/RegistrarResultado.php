@@ -2,6 +2,7 @@
 
 namespace App\Actions\Competicion;
 
+use App\Avisos\Avisos;
 use App\Competicion\Datos\Resultado;
 use App\Competicion\Errores\OperacionNoPermitida;
 use App\Competicion\Errores\ResultadoInvalido;
@@ -13,7 +14,6 @@ use App\Models\Partido;
 use App\Models\RegistroDeCambio;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
-use App\Avisos\Avisos;
 
 /**
  * Guarda el resultado de un partido tras validarlo contra su formato:

@@ -2,6 +2,7 @@
 
 namespace App\Actions\Inscripciones;
 
+use App\Avisos\Avisos;
 use App\Competicion\Errores\OperacionNoPermitida;
 use App\Enums\EstadoInscripcion;
 use App\Enums\EstadoParticipante;
@@ -9,7 +10,6 @@ use App\Models\Inscripcion;
 use App\Models\RegistroDeCambio;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
-use App\Avisos\Avisos;
 
 /**
  * Confirmar (respetando el cupo), mover a lista de espera o dar de baja.
