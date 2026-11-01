@@ -9,6 +9,7 @@ use App\Enums\Rol;
 use App\Filament\Resources\Categorias\Pages\EditCategoria;
 use App\Filament\Resources\Categorias\RelationManagers\InscripcionesRelationManager;
 use App\Filament\Resources\Torneos\Pages\EditTorneo;
+use App\Filament\Resources\Torneos\RelationManagers\ParejasRelationManager;
 use App\Models\Categoria;
 use App\Models\Inscripcion;
 use App\Models\Jugador;
@@ -165,8 +166,42 @@ test('desde la ficha del torneo se sube el Excel y se importa', function () {
             'avisar' => false,
         ])
         ->assertHasNoActionErrors()
-        ->assertNotified('Importación hecha');
+        ->assertNotified('Importación hecha')
+        ->assertRedirect(EditTorneo::getUrl(['record' => $this->torneo, 'relation' => '1']));
 
     expect(Inscripcion::query()->count())->toBe(5)
         ->and(Storage::disk('local')->allFiles('importaciones'))->toBe([]);
+});
+
+test('las parejas van a la categoría que ya había aunque se llame algo distinto', function () {
+    $iniciacion = Categoria::factory()->create(['torneo_id' => $this->torneo->id, 'nombre' => 'Nivel Iniciación', 'nivel' => null]);
+    $avanzado = Categoria::factory()->create(['torneo_id' => $this->torneo->id, 'nombre' => 'Mixto', 'nivel' => 'Avanzado']);
+
+    $informe = app(ImportarParejas::class)->handle($this->torneo, excelDelRally(), 'xlsx', $this->propietario);
+
+    expect($informe->categoriasNuevas)->toBe([])
+        ->and($this->torneo->categorias()->count())->toBe(3)
+        ->and($iniciacion->inscripciones()->count())->toBe(2)
+        ->and($avanzado->inscripciones()->count())->toBe(1)
+        ->and($this->intermedio->inscripciones()->count())->toBe(2);
+});
+
+test('la pestaña Parejas del torneo enseña todas las parejas con su categoría', function () {
+    app(ImportarParejas::class)->handle($this->torneo, excelDelRally(), 'xlsx', $this->propietario);
+    Filament::setCurrentPanel('panel');
+    $this->actingAs($this->propietario);
+
+    expect(ParejasRelationManager::getBadge($this->torneo, EditTorneo::class))->toBe('5');
+
+    $todas = Inscripcion::query()->get();
+    $sinCompanero = Inscripcion::query()->where('estado', EstadoInscripcion::Pendiente->value)->sole();
+
+    Livewire::test(ParejasRelationManager::class, ['ownerRecord' => $this->torneo, 'pageClass' => EditTorneo::class])
+        ->assertCanSeeTableRecords($todas)
+        ->assertSee('Adrianna Hernandez - Ester Hernandez')
+        ->assertSee('Iniciación')
+        ->assertSee('falta compañero')
+        ->filterTable('categoria', $this->intermedio->id)
+        ->assertCanSeeTableRecords($this->intermedio->inscripciones()->get())
+        ->assertCanNotSeeTableRecords([$sinCompanero]);
 });

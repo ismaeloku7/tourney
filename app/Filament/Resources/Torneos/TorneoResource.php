@@ -9,6 +9,7 @@ use App\Filament\Resources\Torneos\Pages\ListTorneos;
 use App\Filament\Resources\Torneos\Pages\PartidosDelTorneo;
 use App\Filament\Resources\Torneos\RelationManagers\ArbitrosRelationManager;
 use App\Filament\Resources\Torneos\RelationManagers\CategoriasRelationManager;
+use App\Filament\Resources\Torneos\RelationManagers\ParejasRelationManager;
 use App\Filament\Resources\Torneos\RelationManagers\PistasRelationManager;
 use App\Filament\Resources\Torneos\Schemas\TorneoForm;
 use App\Filament\Resources\Torneos\Tables\TorneosTable;
@@ -68,6 +69,7 @@ class TorneoResource extends Resource
     {
         return [
             CategoriasRelationManager::class,
+            ParejasRelationManager::class,
             PistasRelationManager::class,
             ArbitrosRelationManager::class,
         ];

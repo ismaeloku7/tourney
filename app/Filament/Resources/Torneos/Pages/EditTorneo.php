@@ -39,6 +39,9 @@ class EditTorneo extends EditRecord
 {
     protected static string $resource = TorneoResource::class;
 
+    /** La pestaña «Parejas» (su posición en TorneoResource::getRelations). */
+    private const PESTANA_PAREJAS = '1';
+
     protected function getHeaderActions(): array
     {
         return [
@@ -113,13 +116,16 @@ class EditTorneo extends EditRecord
                         return;
                     }
 
-                    Avisos::hecho('Importación hecha', $informe->resumen());
+                    Avisos::hecho('Importación hecha', $informe->resumen().' Las tienes en la pestaña «Parejas»; cada categoría, en «Categorías».');
                     if ($incidencias !== []) {
-                        Avisos::error(count($incidencias).' cosas que revisar', [
+                        Avisos::aviso(count($incidencias).' cosas que revisar (lo demás se ha importado)', [
                             ...array_slice($incidencias, 0, 12),
-                            ...(count($incidencias) > 12 ? ['Y '.(count($incidencias) - 12).' más en el registro de cambios.'] : []),
+                            ...(count($incidencias) > 12 ? ['Y '.(count($incidencias) - 12).' más.'] : []),
                         ]);
                     }
+
+                    // Se recarga la ficha para que las categorías y parejas nuevas se vean ya.
+                    $this->redirect(static::getUrl(['record' => $this->torneo(), 'relation' => self::PESTANA_PAREJAS]));
                 }),
             Action::make('aviso')
                 ->label('Enviar aviso')

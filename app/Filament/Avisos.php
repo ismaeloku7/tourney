@@ -18,6 +18,21 @@ final class Avisos
             ->send();
     }
 
+    /**
+     * Algo que revisar, sin que nada haya fallado: en ámbar y fijo hasta cerrarlo.
+     *
+     * @param  list<string>  $lineas
+     */
+    public static function aviso(string $titulo, array $lineas = []): void
+    {
+        Notification::make()
+            ->warning()
+            ->title($titulo)
+            ->body($lineas === [] ? null : implode(' ', $lineas))
+            ->persistent()
+            ->send();
+    }
+
     public static function hecho(string $titulo, ?string $cuerpo = null): void
     {
         Notification::make()->success()->title($titulo)->body($cuerpo)->send();

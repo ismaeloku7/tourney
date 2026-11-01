@@ -148,8 +148,7 @@ final class ImportarParejas
 
     private function categoria(Torneo $torneo, string $nombre, InformeDeImportacion $informe): Categoria
     {
-        $existente = Categoria::query()->where('torneo_id', $torneo->id)->get()
-            ->first(fn (Categoria $c): bool => LectorDeHoja::normalizar($c->nombre) === LectorDeHoja::normalizar($nombre));
+        $existente = self::categoriaDelTorneo($torneo, $nombre);
 
         if ($existente !== null) {
             return $existente;
@@ -166,6 +165,31 @@ final class ImportarParejas
             'minimo_participantes' => 0,
             'orden' => (int) Categoria::query()->where('torneo_id', $torneo->id)->max('orden') + 1,
         ]);
+    }
+
+    /**
+     * La categoría del torneo que corresponde a lo que pone el archivo: la
+     * que se llama igual, la de ese nivel, o la única cuyo nombre lo
+     * contiene («Iniciación» → «Nivel Iniciación» o «Iniciación mixta»).
+     */
+    public static function categoriaDelTorneo(Torneo $torneo, string $nombre): ?Categoria
+    {
+        $buscado = LectorDeHoja::normalizar($nombre);
+        $categorias = Categoria::query()->where('torneo_id', $torneo->id)->orderBy('orden')->get();
+
+        $igual = $categorias->first(fn (Categoria $c): bool => LectorDeHoja::normalizar($c->nombre) === $buscado);
+        if ($igual !== null) {
+            return $igual;
+        }
+
+        $mismoNivel = $categorias->filter(fn (Categoria $c): bool => $c->nivel !== null && LectorDeHoja::normalizar($c->nivel) === $buscado);
+        if ($mismoNivel->count() === 1) {
+            return $mismoNivel->first();
+        }
+
+        $contiene = $categorias->filter(fn (Categoria $c): bool => preg_match('/\b'.preg_quote($buscado, '/').'\b/u', LectorDeHoja::normalizar($c->nombre)) === 1);
+
+        return $contiene->count() === 1 ? $contiene->first() : null;
     }
 
     private function jugador(string $nombreCompleto, string $email, string $telefono, string $nivel, int $numero, InformeDeImportacion $informe): Jugador

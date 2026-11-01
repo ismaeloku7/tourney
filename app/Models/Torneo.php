@@ -14,6 +14,7 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
 /**
  * Un torneo del organizador, con sus categorías, su equipo, sus pistas y
@@ -92,6 +93,16 @@ class Torneo extends Model
     public function categorias(): HasMany
     {
         return $this->hasMany(Categoria::class)->orderBy('orden');
+    }
+
+    /**
+     * Las inscripciones de todas sus categorías.
+     *
+     * @return HasManyThrough<Inscripcion, Categoria, $this>
+     */
+    public function inscripciones(): HasManyThrough
+    {
+        return $this->hasManyThrough(Inscripcion::class, Categoria::class);
     }
 
     /** @return BelongsToMany<User, $this> */

@@ -159,10 +159,13 @@ refrescan solas mientras el torneo está en juego.
 
 Las parejas también se importan de un Excel o CSV desde la ficha del
 torneo («Importar parejas»): una fila por pareja con su categoría o nivel,
-el nombre del equipo y los dos jugadores con su correo y su teléfono. Las
-categorías que faltan se crean, las parejas sin compañero entran
-pendientes y se completan después con «Añadir compañero», y reimportar el
-mismo archivo no duplica nada.
+el nombre del equipo y los dos jugadores con su correo y su teléfono. Cada
+fila va a la categoría que se llama igual, a la de ese nivel o a la única
+que lo contiene en el nombre («Iniciación» → «Nivel Iniciación»); las que
+no existen se crean. Las parejas sin compañero entran pendientes y se
+completan después con «Añadir compañero», y reimportar el mismo archivo
+no duplica nada. Todas las parejas del torneo se ven en su pestaña
+«Parejas»; se gestionan dentro de cada categoría.
 
 Cada torneo decide si tiene inscripción online. Sin ella, solo inscribe
 la organización desde el panel y la web no deja crear cuentas; los
