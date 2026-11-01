@@ -6,7 +6,6 @@ use DateTimeInterface;
 use OpenSpout\Common\Entity\Row;
 use OpenSpout\Reader\CSV\Options as OpcionesCsv;
 use OpenSpout\Reader\CSV\Reader as LectorCsv;
-use OpenSpout\Reader\ReaderInterface;
 use OpenSpout\Reader\XLSX\Reader as LectorXlsx;
 use RuntimeException;
 
@@ -77,7 +76,7 @@ final class LectorDeHoja
         return trim((string) preg_replace('/\s+/u', ' ', $texto));
     }
 
-    private static function lector(string $ruta, string $extension): ReaderInterface
+    private static function lector(string $ruta, string $extension): LectorXlsx|LectorCsv
     {
         if (! is_file($ruta)) {
             throw new RuntimeException('No se encuentra el archivo subido.');
@@ -106,9 +105,13 @@ final class LectorDeHoja
     }
 
     /** @return list<string> */
-    private static function valores(Row $fila): array
+    private static function valores(?Row $fila): array
     {
-        return array_values(array_map(function (mixed $valor): string {
+        if ($fila === null) {
+            return [];
+        }
+
+        return array_map(function (mixed $valor): string {
             if ($valor === null) {
                 return '';
             }
@@ -120,6 +123,6 @@ final class LectorDeHoja
             }
 
             return trim((string) (is_scalar($valor) ? $valor : ''));
-        }, $fila->toArray()));
+        }, $fila->toArray());
     }
 }
