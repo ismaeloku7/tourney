@@ -1,6 +1,7 @@
 <?php
 
 use App\Actions\Inscripciones\CompletarPareja;
+use App\Actions\Inscripciones\ConfirmarParejasCompletas;
 use App\Actions\Inscripciones\ImportarParejas;
 use App\Competicion\Errores\OperacionNoPermitida;
 use App\Enums\EstadoInscripcion;
@@ -9,6 +10,7 @@ use App\Enums\Rol;
 use App\Filament\Resources\Categorias\Pages\EditCategoria;
 use App\Filament\Resources\Categorias\RelationManagers\InscripcionesRelationManager;
 use App\Filament\Resources\Torneos\Pages\EditTorneo;
+use App\Filament\Resources\Torneos\RelationManagers\ParejasRelationManager;
 use App\Models\Categoria;
 use App\Models\Inscripcion;
 use App\Models\Jugador;
@@ -165,8 +167,99 @@ test('desde la ficha del torneo se sube el Excel y se importa', function () {
             'avisar' => false,
         ])
         ->assertHasNoActionErrors()
-        ->assertNotified('Importación hecha');
+        ->assertNotified('Importación hecha')
+        ->assertRedirect(EditTorneo::getUrl(['record' => $this->torneo, 'relation' => '1']));
 
     expect(Inscripcion::query()->count())->toBe(5)
         ->and(Storage::disk('local')->allFiles('importaciones'))->toBe([]);
+});
+
+test('las parejas van a la categoría que ya había aunque se llame algo distinto', function () {
+    $iniciacion = Categoria::factory()->create(['torneo_id' => $this->torneo->id, 'nombre' => 'Nivel Iniciación', 'nivel' => null]);
+    $avanzado = Categoria::factory()->create(['torneo_id' => $this->torneo->id, 'nombre' => 'Mixto', 'nivel' => 'Avanzado']);
+
+    $informe = app(ImportarParejas::class)->handle($this->torneo, excelDelRally(), 'xlsx', $this->propietario);
+
+    expect($informe->categoriasNuevas)->toBe([])
+        ->and($this->torneo->categorias()->count())->toBe(3)
+        ->and($iniciacion->inscripciones()->count())->toBe(2)
+        ->and($avanzado->inscripciones()->count())->toBe(1)
+        ->and($this->intermedio->inscripciones()->count())->toBe(2);
+});
+
+test('la pestaña Parejas del torneo enseña todas las parejas con su categoría', function () {
+    app(ImportarParejas::class)->handle($this->torneo, excelDelRally(), 'xlsx', $this->propietario);
+    Filament::setCurrentPanel('panel');
+    $this->actingAs($this->propietario);
+
+    expect(ParejasRelationManager::getBadge($this->torneo, EditTorneo::class))->toBe('5');
+
+    $todas = Inscripcion::query()->get();
+    $sinCompanero = Inscripcion::query()->where('estado', EstadoInscripcion::Pendiente->value)->sole();
+
+    Livewire::test(ParejasRelationManager::class, ['ownerRecord' => $this->torneo, 'pageClass' => EditTorneo::class])
+        ->assertCanSeeTableRecords($todas)
+        ->assertSee('Adrianna Hernandez - Ester Hernandez')
+        ->assertSee('Iniciación')
+        ->assertSee('falta compañero')
+        ->assertSee('Media 1,5')
+        ->filterTable('categoria', $this->intermedio->id)
+        ->assertCanSeeTableRecords($this->intermedio->inscripciones()->get())
+        ->assertCanNotSeeTableRecords([$sinCompanero]);
+});
+
+test('«Confirmar las completas» confirma las pendientes con dos jugadores y respeta el cupo', function () {
+    $this->intermedio->update(['cupo' => 1]);
+    app(ImportarParejas::class)->handle($this->torneo, excelDelRally(), 'xlsx', $this->propietario, confirmar: false);
+    expect(Inscripcion::query()->where('estado', EstadoInscripcion::Pendiente->value)->count())->toBe(5);
+
+    $resultado = app(ConfirmarParejasCompletas::class)->handle($this->torneo, usuario: $this->propietario);
+
+    expect($resultado)->toBe(['confirmadas' => 3, 'sin_plaza' => 1, 'sin_companero' => 1])
+        ->and($this->intermedio->inscripciones()->where('estado', EstadoInscripcion::Confirmada->value)->count())->toBe(1)
+        ->and(Inscripcion::query()->where('estado', EstadoInscripcion::Pendiente->value)->count())->toBe(2);
+    Mail::assertNothingSent();
+});
+
+test('el botón está en la pestaña Parejas del torneo y en cada categoría', function () {
+    app(ImportarParejas::class)->handle($this->torneo, excelDelRally(), 'xlsx', $this->propietario, confirmar: false);
+    Filament::setCurrentPanel('panel');
+    $this->actingAs($this->propietario);
+
+    Livewire::test(InscripcionesRelationManager::class, ['ownerRecord' => $this->intermedio, 'pageClass' => EditCategoria::class])
+        ->callAction(TestAction::make('confirmarCompletas')->table(), ['avisar' => false])
+        ->assertHasNoActionErrors()
+        ->assertNotified('2 parejas confirmadas');
+
+    Livewire::test(ParejasRelationManager::class, ['ownerRecord' => $this->torneo, 'pageClass' => EditTorneo::class])
+        ->callAction(TestAction::make('confirmarCompletas')->table(), ['avisar' => false])
+        ->assertHasNoActionErrors()
+        ->assertNotified('2 parejas confirmadas');
+
+    expect(Inscripcion::query()->where('estado', EstadoInscripcion::Confirmada->value)->count())->toBe(4)
+        ->and(Inscripcion::query()->where('estado', EstadoInscripcion::Pendiente->value)->count())->toBe(1);
+});
+
+test('al importar desde el panel sin tocar nada, las parejas completas entran confirmadas', function () {
+    Storage::fake('local');
+    Filament::setCurrentPanel('panel');
+    $this->actingAs($this->propietario);
+
+    Livewire::test(EditTorneo::class, ['record' => $this->torneo->getRouteKey()])
+        ->callAction('importar', [
+            'archivo' => UploadedFile::fake()->createWithContent('Rally2026_parejas_padel.xlsx', (string) file_get_contents(excelDelRally())),
+        ])
+        ->assertHasNoActionErrors();
+
+    expect(Inscripcion::query()->where('estado', EstadoInscripcion::Confirmada->value)->count())->toBe(4);
+});
+
+test('el nivel de la pareja es la media de los niveles numéricos de sus jugadores', function () {
+    $participante = Participante::factory()
+        ->conJugadores(...array_map(fn (?string $nivel): Jugador => Jugador::factory()->create(['nivel_declarado' => $nivel]), ['2,5', '3', null, '4ª']))
+        ->create(['categoria_id' => $this->intermedio->id]);
+
+    expect(Jugador::factory()->make(['nivel_declarado' => 'Iniciación'])->nivelNumerico())->toBeNull()
+        ->and($participante->refresh()->nivelMedio())->toBe(2.75)
+        ->and($participante->nivelMedioTexto())->toBe('Media 2,75');
 });

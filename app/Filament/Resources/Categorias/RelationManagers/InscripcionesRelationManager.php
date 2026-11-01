@@ -12,9 +12,11 @@ use App\Enums\EstadoInscripcion;
 use App\Enums\Genero;
 use App\Enums\OrigenInscripcion;
 use App\Filament\Avisos;
+use App\Filament\ConfirmarCompletas;
 use App\Models\Categoria;
 use App\Models\Inscripcion;
 use App\Models\Jugador;
+use App\Models\Torneo;
 use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
@@ -59,6 +61,10 @@ class InscripcionesRelationManager extends RelationManager
                 TextColumn::make('jugadores')->label('Jugadores')
                     ->state(fn (Inscripcion $record): array => $record->participante->jugadores->map(fn (Jugador $j): string => $j->nombre_completo)->all())
                     ->listWithLineBreaks(),
+                TextColumn::make('niveles')->label('Nivel')
+                    ->state(fn (Inscripcion $record): array => $record->participante->jugadores->map(fn (Jugador $j): string => $j->nivel_declarado ?? '—')->all())
+                    ->listWithLineBreaks()
+                    ->description(fn (Inscripcion $record): ?string => $record->participante->nivelMedioTexto()),
                 TextColumn::make('estado')->label('Estado')->badge()
                     ->formatStateUsing(fn (EstadoInscripcion $state, Inscripcion $record): string => $state->etiqueta().($record->posicion_espera !== null ? " (#{$record->posicion_espera})" : ''))
                     ->color(fn (EstadoInscripcion $state): string => $state->color()),
@@ -74,6 +80,7 @@ class InscripcionesRelationManager extends RelationManager
                 SelectFilter::make('estado')->label('Estado')->options(EstadoInscripcion::opciones()),
             ])
             ->headerActions([
+                ConfirmarCompletas::accion(fn (): Torneo => $this->categoria()->torneo, fn (): Categoria => $this->categoria()),
                 Action::make('inscribir')
                     ->label('Inscribir pareja')
                     ->icon(Heroicon::OutlinedUserPlus)

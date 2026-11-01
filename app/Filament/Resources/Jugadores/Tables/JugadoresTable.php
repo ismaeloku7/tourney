@@ -20,7 +20,7 @@ class JugadoresTable
                 TextColumn::make('email')->label('Correo')->searchable()->placeholder('—'),
                 TextColumn::make('telefono')->label('Teléfono')->placeholder('—'),
                 TextColumn::make('genero')->label('Género')->badge()->formatStateUsing(fn (Genero $state): string => $state->etiqueta())->placeholder('—'),
-                TextColumn::make('nivel_declarado')->label('Nivel')->placeholder('—'),
+                TextColumn::make('nivel_declarado')->label('Nivel')->placeholder('—')->sortable(),
                 TextColumn::make('participantes_count')->label('Torneos')->counts('participantes'),
             ])
             ->filters([

@@ -54,13 +54,20 @@ class CategoriasRelationManager extends RelationManager
         return $table
             ->defaultSort('orden')
             ->recordTitleAttribute('nombre')
-            ->modifyQueryUsing(fn (Builder $query): Builder => $query->withCount(['fases', 'inscripciones as confirmadas_count' => fn (Builder $q) => $q->where('estado', EstadoInscripcion::Confirmada->value)]))
+            ->modifyQueryUsing(fn (Builder $query): Builder => $query->withCount([
+                'fases',
+                'inscripciones as confirmadas_count' => fn (Builder $q) => $q->where('estado', EstadoInscripcion::Confirmada->value),
+                'inscripciones as pendientes_count' => fn (Builder $q) => $q->where('estado', EstadoInscripcion::Pendiente->value),
+            ]))
             ->columns([
                 TextColumn::make('orden')->label('Orden'),
                 TextColumn::make('nombre')->label('Categoría'),
                 TextColumn::make('genero')->label('Género')->badge()->formatStateUsing(fn (Genero $state): string => $state->etiqueta()),
                 TextColumn::make('nivel')->label('Nivel')->placeholder('—'),
-                TextColumn::make('confirmadas_count')->label('Parejas')->state(fn (Categoria $record): string => $record->getAttribute('confirmadas_count').($record->cupo !== null ? ' / '.$record->cupo : '')),
+                TextColumn::make('confirmadas_count')->label('Parejas')
+                    ->state(fn (Categoria $record): string => $record->getAttribute('confirmadas_count').($record->cupo !== null ? ' / '.$record->cupo : '')
+                        .($record->getAttribute('pendientes_count') > 0 ? ' · '.$record->getAttribute('pendientes_count').' pendientes' : ''))
+                    ->tooltip('Confirmadas (y pendientes). Se ven y se gestionan en «Configurar» › Inscripciones.'),
                 TextColumn::make('fases_count')->label('Fases'),
                 TextColumn::make('formatoPartido.nombre')->label('Formato')->placeholder('Predeterminado'),
             ])
