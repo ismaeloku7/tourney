@@ -2,7 +2,10 @@
 
 namespace App\Competicion\Datos;
 
-/** El resultado de repartir: los grupos y lo que conviene que vea el organizador. */
+/**
+ * El resultado de repartir: los grupos, lo que conviene que vea el
+ * organizador y la semilla con la que se hizo (para poder repetirlo).
+ */
 final readonly class RepartoDeGrupos
 {
     /**
@@ -12,5 +15,6 @@ final readonly class RepartoDeGrupos
     public function __construct(
         public array $grupos,
         public array $avisos = [],
+        public ?int $semilla = null,
     ) {}
 }

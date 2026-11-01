@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Competicion\Datos\Grupo as GrupoDto;
 use App\Tenancy\EnLaBaseDelOrganizador;
 use Database\Factories\GrupoFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
@@ -53,15 +54,12 @@ class Grupo extends Model
     /** La letra del grupo a partir de su orden: 1 → A, 27 → AA. */
     public static function nombrePorOrden(int $orden): string
     {
-        $nombre = '';
-        $n = $orden;
+        return GrupoDto::nombrePorOrden($orden);
+    }
 
-        while ($n > 0) {
-            $n--;
-            $nombre = chr(65 + ($n % 26)).$nombre;
-            $n = intdiv($n, 26);
-        }
-
-        return $nombre;
+    /** El grupo tal y como lo ve el motor, con sus participantes en orden de sorteo. */
+    public function aDto(): GrupoDto
+    {
+        return new GrupoDto($this->nombre, $this->orden, $this->participantes->pluck('id')->map(fn (mixed $id): int => (int) $id)->values()->all(), $this->id);
     }
 }
