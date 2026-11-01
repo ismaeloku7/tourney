@@ -2,6 +2,8 @@
 
 namespace App\Enums;
 
+use App\Enums\Concerns\ConEtiqueta;
+
 /**
  * Grupos (round robin con clasificación), eliminatoria (cuadro),
  * consolación (cuadro de quienes no pasaron o perdieron la primera ronda)
@@ -9,6 +11,8 @@ namespace App\Enums;
  */
 enum TipoDeFase: string
 {
+    use ConEtiqueta;
+
     case Grupos = 'grupos';
     case Eliminatoria = 'eliminatoria';
     case Consolacion = 'consolacion';

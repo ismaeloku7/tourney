@@ -2,12 +2,16 @@
 
 namespace App\Enums;
 
+use App\Enums\Concerns\ConEtiqueta;
+
 /**
  * Si los jugadores pueden registrar resultados y si el rival tiene que
  * confirmarlos antes de contar.
  */
 enum ResultadosPorJugadores: string
 {
+    use ConEtiqueta;
+
     case Desactivado = 'desactivado';
     case ConValidacion = 'con_validacion';
     case SinValidacion = 'sin_validacion';

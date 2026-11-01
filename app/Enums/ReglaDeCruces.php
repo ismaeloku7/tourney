@@ -2,8 +2,12 @@
 
 namespace App\Enums;
 
+use App\Enums\Concerns\ConEtiqueta;
+
 enum ReglaDeCruces: string
 {
+    use ConEtiqueta;
+
     case EntreGrupos = 'entre_grupos';
     case Sorteo = 'sorteo';
     case Manual = 'manual';

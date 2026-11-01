@@ -2,6 +2,8 @@
 
 namespace App\Enums;
 
+use App\Enums\Concerns\ConEtiqueta;
+
 /**
  * Lo que la base central cuenta de cada organizador para las métricas de
  * la plataforma. No sirve para aplicar límites de plan: esos se cuentan
@@ -9,6 +11,8 @@ namespace App\Enums;
  */
 enum TipoDeEventoDeUso: string
 {
+    use ConEtiqueta;
+
     case OrganizadorVerificado = 'organizador_verificado';
     case TorneoPublicado = 'torneo_publicado';
     case InscripcionConfirmada = 'inscripcion_confirmada';

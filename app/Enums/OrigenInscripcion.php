@@ -2,8 +2,12 @@
 
 namespace App\Enums;
 
+use App\Enums\Concerns\ConEtiqueta;
+
 enum OrigenInscripcion: string
 {
+    use ConEtiqueta;
+
     case Online = 'online';
     case Manual = 'manual';
     case Importacion = 'importacion';

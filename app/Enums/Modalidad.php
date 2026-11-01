@@ -2,12 +2,16 @@
 
 namespace App\Enums;
 
+use App\Enums\Concerns\ConEtiqueta;
+
 /**
  * Quién compite: una persona, una pareja o un equipo. La v1 solo usa
  * parejas; el modelo queda preparado para las otras dos.
  */
 enum Modalidad: string
 {
+    use ConEtiqueta;
+
     case Individual = 'individual';
     case Parejas = 'parejas';
     case Equipos = 'equipos';

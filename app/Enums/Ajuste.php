@@ -2,6 +2,8 @@
 
 namespace App\Enums;
 
+use App\Enums\Concerns\ConEtiqueta;
+
 /**
  * Las claves de la tabla `ajustes` de la base del organizador: su marca,
  * su zona horaria y sus textos legales. La identidad (slug, nombre,
@@ -9,6 +11,8 @@ namespace App\Enums;
  */
 enum Ajuste: string
 {
+    use ConEtiqueta;
+
     case NombrePublico = 'nombre_publico';
     case LogoPath = 'logo_path';
     case ColorPrimario = 'color_primario';

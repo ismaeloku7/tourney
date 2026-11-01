@@ -2,9 +2,13 @@
 
 namespace App\Enums;
 
+use App\Enums\Concerns\ConEtiqueta;
+
 /** Un participante retirado conserva sus resultados; no se le programan más partidos. */
 enum EstadoParticipante: string
 {
+    use ConEtiqueta;
+
     case Activo = 'activo';
     case Retirado = 'retirado';
 

@@ -2,6 +2,8 @@
 
 namespace App\Enums;
 
+use App\Enums\Concerns\ConEtiqueta;
+
 /**
  * Los roles del equipo de un organizador. El propietario lo puede todo
  * sobre su organización; un administrador de torneo gestiona los torneos
@@ -10,6 +12,8 @@ namespace App\Enums;
  */
 enum Rol: string
 {
+    use ConEtiqueta;
+
     case Propietario = 'propietario';
     case Administrador = 'administrador';
     case Arbitro = 'arbitro';
