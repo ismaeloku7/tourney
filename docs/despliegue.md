@@ -1,8 +1,8 @@
 # Despliegue en Laravel Forge
 
-Un servidor con Forge, un sitio para el dominio de la plataforma y sus
-subdominios comodín, una base MySQL central y una base por organizador
-que la aplicación crea sola. Misma pauta que CEAS. Lo que va en el
+Un servidor con Forge, un sitio con el dominio de la plataforma y los
+dominios propios de los organizadores, una base MySQL central y una base
+por organizador que la aplicación crea sola. Misma pauta que CEAS. Lo que va en el
 repositorio ya está: [`forge/deploy.sh`](../forge/deploy.sh) es el script
 de despliegue y `php artisan actualizar` lo que se ejecuta tras cada uno.
 
@@ -17,63 +17,57 @@ de despliegue y `php artisan actualizar` lo que se ejecuta tras cada uno.
 - Node 22 (Forge lo instala con el servidor) para `npm run build`.
 - Un worker de cola y el programador (más abajo).
 
+## Dominios
+
+Dos tipos de host, los dos en el mismo sitio de Forge:
+
+| Host | Qué es | Certificado |
+| --- | --- | --- |
+| `tourney.on-forge.com` | La plataforma: landing, registro, `/plataforma`. Es `SAAS_DOMINIO` | El que Forge da al dominio gratuito |
+| `tourney.clubceas.es` | Un organizador concreto (el CEAS) por su dominio propio | LetsEncrypt normal, validado por HTTP |
+
+Cada organizador se resuelve por el host (`ResolverOrganizadorPorHost`):
+un dominio propio se busca en la tabla `domains` de la base central. La
+pantalla para que un organizador configure su dominio es de la fase 4;
+hasta entonces la fila la pone el seeder o el comando
+`organizadores:crear … --dominio=`.
+
+Con este modelo no hace falta ningún registro DNS comodín ni certificado
+comodín. Lo que no da es el alta self-service con subdominio automático
+(`{slug}.tourney.on-forge.com`), porque el DNS de `on-forge.com` lo lleva
+Forge y no admite comodín. Cuando se abra el registro público, la
+plataforma pasará a un dominio propio con `*.dominio` (DNS en Cloudflare
+u otro proveedor con API, para que Forge emita el certificado comodín);
+`SAAS_DOMINIO` admite varios dominios separados por comas, así que
+`tourney.on-forge.com` puede seguir funcionando a la vez.
+
+### Añadir el dominio propio de un organizador
+
+1. En el DNS del organizador, un registro `A` del host (`tourney` en
+   `clubceas.es`) a la IP del servidor. En Cloudflare, proxy desactivado
+   (nube gris).
+2. En Forge, sitio de Tourney, Domains: añadir el host. SSL: certificado
+   LetsEncrypt solo para ese host, que se valida por HTTP, sin
+   credenciales de DNS. Al activarlo Forge escribe el bloque de nginx con
+   `listen 443 ssl`.
+3. La fila en `domains`, con el comando de crear organizador o, para uno
+   que ya existe, desde el panel de plataforma (fase 4).
+
+Un host sin certificado activo en nuestro sitio lo captura cualquier otro
+sitio del servidor con un comodín que lo cubra (el del CEAS tiene
+`server_name .clubceas.es`): el síntoma es un 404 de la otra aplicación.
+
 ## Sitio
 
 | Campo de Forge | Valor |
 | --- | --- |
-| Root domain | El dominio de la plataforma, `SAAS_DOMINIO` (por ejemplo `tourney.clubceas.es`) |
-| Aliases | `*.tourney.clubceas.es` (y `tourney.on-forge.com` como alias), o la opción «Wildcard sub-domains» del sitio |
+| Root domain | `tourney.on-forge.com` |
+| Domains | `tourney.clubceas.es` y los dominios propios de cada organizador |
 | Project type | Laravel (`public` como web directory) |
 | PHP version | 8.4 |
-| Repository | `ismaeloku7/tourney`, rama `main`, sin «Install composer dependencies» (lo hace el script) |
-| Quick deploy | Activado en `main` |
-
-Dominio propio de un organizador (fase 4): se añade como alias del mismo
-sitio y se emite su certificado; el host resuelve al organizador por su
-fila en `domains`.
-
-## Con el dominio gratuito `on-forge.com`
-
-Forge da a cada sitio un dominio `tourney.on-forge.com` con certificado
-automático. Sirve para la plataforma (landing, `/plataforma`) y para
-desplegar desde el primer día, pero **no para los organizadores**: sus
-subdominios `{slug}.tourney.on-forge.com` necesitan un registro DNS
-comodín y un certificado comodín, y el DNS de `on-forge.com` lo lleva
-Forge, sin comodín para un sitio ni credenciales de DNS que darle.
-
-Mientras se use solo ese dominio:
-
-- `SAAS_DOMINIO=tourney.on-forge.com`, `APP_URL=https://tourney.on-forge.com`
-  y `SESSION_DOMAIN=null`.
-- Las páginas de un organizador no se pueden abrir desde fuera. La fase 1
-  no tiene interfaz, así que no bloquea nada; en la fase 2 (inscripción
-  pública y panel del organizador) hace falta el dominio propio de abajo.
-
-Cuando llegue ese momento: un dominio de la plataforma con el DNS en
-Cloudflare (gratis) u otro proveedor con API, los registros `A` del
-dominio y de `*.dominio` a la IP del servidor, el dominio y `*.dominio`
-como dominios del sitio, y el certificado comodín del apartado siguiente.
-El sitio `on-forge.com` puede seguir como alias.
-
-## Certificado
-
-Comodín para `tourney.clubceas.es` y `*.tourney.clubceas.es` con LetsEncrypt. Forge
-necesita validar por DNS, así que el DNS del dominio tiene que estar en
-un proveedor con API que Forge conozca (Cloudflare, DigitalOcean, Route53,
-Linode, OVH…) y hay que darle sus credenciales en el apartado SSL del
-sitio. Si el DNS está en otro sitio, se mueve a Cloudflare (gratis) o se
-sube un certificado comodín propio.
-
-DNS: un registro `A` para `tourney.clubceas.es` y otro `A` para `*.tourney.clubceas.es`,
-los dos a la IP del servidor.
-
-El dominio de la plataforma es un subdominio de uno que ya existe:
-`tourney.clubceas.es` y `*.tourney.clubceas.es`. En Cloudflare, los dos registros con el proxy
-**desactivado** (nube gris, «DNS only»): el certificado universal de
-Cloudflare solo cubre un nivel de subdominio, así que con el proxy
-activado `demo.tourney.clubceas.es` daría error de certificado aunque el
-de Forge esté bien. El certificado lo pone Forge en el servidor con la
-API de Cloudflare (un token con permiso de edición de DNS en esa zona).
+| Repository | `ismaeloku7/tourney`, rama `main` (hasta el primer pull request, `claude/amazing-darwin-w4lzfs`) |
+| Deployment | Sin caída (zero downtime); el script de abajo vale para los dos modos |
+| Quick deploy | Activado |
 
 ## Variables de entorno
 
@@ -85,9 +79,9 @@ APP_NAME=Tourney
 APP_ENV=production
 APP_KEY=                        # php artisan key:generate --show
 APP_DEBUG=false
-APP_URL=https://tourney.clubceas.es
+APP_URL=https://tourney.on-forge.com
 
-SAAS_DOMINIO=tourney.clubceas.es
+SAAS_DOMINIO=tourney.on-forge.com
 SAAS_TITULAR_NOMBRE=
 SAAS_TITULAR_NIF=
 SAAS_TITULAR_DOMICILIO=
@@ -108,7 +102,7 @@ DB_USERNAME=forge
 DB_PASSWORD=
 
 SESSION_DRIVER=database
-SESSION_DOMAIN=.tourney.clubceas.es     # la sesión vale en el dominio y sus subdominios
+SESSION_DOMAIN=null             # cookie de cada host: hay dominios propios de organizadores
 SESSION_SECURE_COOKIE=true
 CACHE_STORE=database
 QUEUE_CONNECTION=database
