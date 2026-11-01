@@ -157,6 +157,13 @@ con plazas, inscritos, grupos, cuadro y horarios, con alias si el torneo
 lo pide), el tablero para la tele y la página de cada pista con su QR. Se
 refrescan solas mientras el torneo está en juego.
 
+Las parejas también se importan de un Excel o CSV desde la ficha del
+torneo («Importar parejas»): una fila por pareja con su categoría o nivel,
+el nombre del equipo y los dos jugadores con su correo y su teléfono. Las
+categorías que faltan se crean, las parejas sin compañero entran
+pendientes y se completan después con «Añadir compañero», y reimportar el
+mismo archivo no duplica nada.
+
 Cada torneo decide si tiene inscripción online. Sin ella, solo inscribe
 la organización desde el panel y la web no deja crear cuentas; los
 jugadores añadidos con su correo entran en su portal con el enlace de

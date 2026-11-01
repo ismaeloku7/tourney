@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Categorias\RelationManagers;
 
 use App\Actions\Inscripciones\CambiarEstadoDeInscripcion;
+use App\Actions\Inscripciones\CompletarPareja;
 use App\Actions\Inscripciones\FijarCabezaDeSerie;
 use App\Actions\Inscripciones\InscribirPareja;
 use App\Actions\Inscripciones\MarcarPago;
@@ -79,8 +80,8 @@ class InscripcionesRelationManager extends RelationManager
                     ->modalHeading('Inscribir una pareja')
                     ->modalSubmitActionLabel('Inscribir')
                     ->schema([
-                        self::selectorDeJugador('jugador_1_id', 'Jugador 1'),
-                        self::selectorDeJugador('jugador_2_id', 'Jugador 2'),
+                        self::selectorDeJugador('jugador_1_id', 'Jugador 1', 'jugador_2_id'),
+                        self::selectorDeJugador('jugador_2_id', 'Jugador 2', 'jugador_1_id'),
                         Toggle::make('confirmada')->label('Confirmada')->default(true)->inline(false)
                             ->helperText('Desactivada, queda pendiente hasta que la confirme. Si la categoría está al cupo, va a la lista de espera.'),
                         Textarea::make('notas')->label('Notas')->rows(2)->maxLength(2000),
@@ -106,6 +107,27 @@ class InscripcionesRelationManager extends RelationManager
                     }),
             ])
             ->recordActions([
+                Action::make('companero')->label('Añadir compañero')->icon(Heroicon::OutlinedUserPlus)->color('warning')
+                    ->visible(fn (Inscripcion $record): bool => $record->participante->jugadores->count() < 2)
+                    ->modalHeading(fn (Inscripcion $record): string => 'Compañero de '.$record->participante->nombre)
+                    ->modalSubmitActionLabel('Añadir')
+                    ->schema([
+                        self::selectorDeJugador('companero_id', 'Compañero'),
+                        Toggle::make('confirmar')->label('Confirmar la inscripción')->default(true)->inline(false)
+                            ->helperText('Si la categoría está al cupo, va a la lista de espera.'),
+                    ])
+                    ->action(function (Inscripcion $record, array $data, Action $action): void {
+                        try {
+                            app(CompletarPareja::class)->handle($record, Jugador::query()->findOrFail((int) $data['companero_id']), (bool) ($data['confirmar'] ?? true), $this->usuario());
+                        } catch (ErrorDeCompeticion $e) {
+                            Avisos::error('No se ha podido completar la pareja', [$e->getMessage()]);
+                            $action->halt();
+
+                            return;
+                        }
+
+                        Avisos::hecho('Pareja completa');
+                    }),
                 ActionGroup::make([
                     Action::make('confirmar')->label('Confirmar')->icon(Heroicon::OutlinedCheck)->color('success')
                         ->visible(fn (Inscripcion $record): bool => in_array($record->estado, [EstadoInscripcion::Pendiente, EstadoInscripcion::ListaDeEspera], true))
@@ -153,9 +175,10 @@ class InscripcionesRelationManager extends RelationManager
             ]);
     }
 
-    private static function selectorDeJugador(string $campo, string $etiqueta): Select
+    private static function selectorDeJugador(string $campo, string $etiqueta, ?string $distintoDe = null): Select
     {
-        return Select::make($campo)->label($etiqueta)->required()->searchable()->different($campo === 'jugador_1_id' ? 'jugador_2_id' : 'jugador_1_id')
+        return Select::make($campo)->label($etiqueta)->required()->searchable()
+            ->when($distintoDe !== null, fn (Select $select): Select => $select->different((string) $distintoDe))
             ->options(fn (): array => Jugador::query()->orderBy('apellidos')->orderBy('nombre')->get()->mapWithKeys(fn (Jugador $j): array => [$j->id => $j->nombre_completo])->all())
             ->createOptionForm([
                 TextInput::make('nombre')->label('Nombre')->required()->maxLength(80),

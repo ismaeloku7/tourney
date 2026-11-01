@@ -24,7 +24,7 @@ use Illuminate\Support\Facades\DB;
  */
 final class InscribirPareja
 {
-    public function handle(Categoria $categoria, Jugador $primero, Jugador $segundo, OrigenInscripcion $origen, ?User $registradaPor = null, bool $confirmada = true, ?string $notas = null): Inscripcion
+    public function handle(Categoria $categoria, Jugador $primero, Jugador $segundo, OrigenInscripcion $origen, ?User $registradaPor = null, bool $confirmada = true, ?string $notas = null, bool $avisar = true): Inscripcion
     {
         if ($primero->is($segundo)) {
             throw new OperacionNoPermitida('Una pareja son dos jugadores distintos.');
@@ -76,7 +76,7 @@ final class InscribirPareja
             return $inscripcion;
         });
 
-        if ($inscripcion->estado === EstadoInscripcion::Confirmada) {
+        if ($avisar && $inscripcion->estado === EstadoInscripcion::Confirmada) {
             app(Avisos::class)->inscripcionConfirmada($inscripcion);
         }
 
