@@ -3,10 +3,10 @@
 namespace App\Models;
 
 use App\Enums\EstadoTorneo;
-use Carbon\CarbonInterface;
 use App\Enums\ResultadosPorJugadores;
 use App\Models\Concerns\VaALaPapelera;
 use App\Tenancy\EnLaBaseDelOrganizador;
+use Carbon\CarbonInterface;
 use Database\Factories\TorneoFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
