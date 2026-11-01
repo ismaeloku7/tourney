@@ -24,7 +24,6 @@ beforeEach(function () {
     $this->categoria = Categoria::factory()->create(['cupo' => 2]);
 });
 
-/** @return Inscripcion */
 function inscribir(Categoria $categoria, ?User $quien = null, bool $confirmada = true): Inscripcion
 {
     [$a, $b] = Jugador::factory()->count(2)->create()->all();

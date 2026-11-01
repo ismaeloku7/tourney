@@ -6,6 +6,7 @@ use App\Enums\Genero;
 use App\Enums\Modalidad;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
+use Filament\Schemas\Components\Component;
 use Filament\Schemas\Schema;
 
 /** Los datos de una categoría: los mismos en la ficha del torneo y en la suya. */
@@ -18,7 +19,7 @@ class CategoriaForm
             ->components(self::campos());
     }
 
-    /** @return list<\Filament\Schemas\Components\Component> */
+    /** @return list<Component> */
     public static function campos(): array
     {
         return [
