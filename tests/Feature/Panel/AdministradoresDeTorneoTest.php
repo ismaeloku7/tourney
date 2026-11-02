@@ -58,6 +58,7 @@ test('al dar de alta a un administrador se le asignan sus torneos', function () 
     Livewire::test(CreateUser::class)
         ->fillForm([
             'nombre' => 'Marta',
+            'apellidos' => 'Ruiz',
             'email' => 'marta@example.com',
             'rol' => Rol::Administrador->value,
             'password' => 'una-clave-larga-2026',

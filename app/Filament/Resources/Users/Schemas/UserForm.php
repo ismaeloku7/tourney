@@ -19,7 +19,7 @@ class UserForm
             ->columns(2)
             ->components([
                 TextInput::make('nombre')->label('Nombre')->required()->maxLength(120),
-                TextInput::make('apellidos')->label('Apellidos')->maxLength(160),
+                TextInput::make('apellidos')->label('Apellidos')->required()->maxLength(160),
                 // autocomplete: que el navegador no tome este alta por el inicio de sesión de quien la hace.
                 TextInput::make('email')->label('Correo electrónico')->email()->required()->maxLength(190)->unique(ignoreRecord: true)->autocomplete('off'),
                 TextInput::make('telefono')->label('Teléfono')->tel()->maxLength(30),

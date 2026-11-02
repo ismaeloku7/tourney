@@ -22,6 +22,9 @@ class AdministradoresRelationManager extends RelationManager
 {
     protected static string $relationship = 'administradores';
 
+    /** La relación de vuelta en User: para no ofrecer a quien ya está. */
+    protected static ?string $inverseRelationship = 'torneosQueAdministra';
+
     protected static ?string $title = 'Administradores';
 
     protected static ?string $modelLabel = 'administrador';
