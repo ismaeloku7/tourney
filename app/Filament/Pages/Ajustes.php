@@ -31,7 +31,6 @@ use Filament\Schemas\Components\Text;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
-use Illuminate\Mail\MailManager;
 use Illuminate\Support\Facades\Crypt;
 use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
@@ -276,10 +275,7 @@ class Ajustes extends Page
 
         // Lo recién guardado: el organizador se preparó al empezar la petición, con lo de antes.
         config(['mail.mailers.'.CorreoDelOrganizador::MAILER => $servidor['mailer']]);
-        $correo = app('mail.manager');
-        if ($correo instanceof MailManager) {
-            $correo->forgetMailers();
-        }
+        Mail::forgetMailers();
 
         try {
             Mail::mailer(CorreoDelOrganizador::MAILER)
