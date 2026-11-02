@@ -5,8 +5,8 @@ namespace App\Tenancy;
 use App\Enums\Ajuste;
 use App\Models\ValorDeAjuste;
 use Illuminate\Contracts\Encryption\DecryptException;
-use Illuminate\Mail\MailManager;
 use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Mail;
 use Stancl\Tenancy\Contracts\TenancyBootstrapper;
 use Stancl\Tenancy\Contracts\Tenant;
 use Throwable;
@@ -25,8 +25,6 @@ final class CorreoDelOrganizador implements TenancyBootstrapper
     /** @var array{default: mixed, from: mixed}|null */
     private ?array $original = null;
 
-    public function __construct(private readonly MailManager $correo) {}
-
     public function bootstrap(Tenant $tenant): void
     {
         $servidor = self::servidor();
@@ -43,7 +41,7 @@ final class CorreoDelOrganizador implements TenancyBootstrapper
             'mail.from' => $servidor['from'],
         ]);
 
-        $this->correo->forgetMailers();
+        Mail::forgetMailers();
     }
 
     public function revert(): void
@@ -59,7 +57,7 @@ final class CorreoDelOrganizador implements TenancyBootstrapper
         ]);
         $this->original = null;
 
-        $this->correo->forgetMailers();
+        Mail::forgetMailers();
     }
 
     /**
