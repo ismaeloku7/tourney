@@ -5,10 +5,12 @@ namespace App\Filament\Pages;
 use App\Enums\Ajuste;
 use App\Filament\Avisos;
 use App\Filament\MarcaDelOrganizador;
+use App\Mail\CorreoDePrueba;
 use App\Models\Organizador;
 use App\Models\RegistroDeCambio;
 use App\Models\User;
 use App\Models\ValorDeAjuste;
+use App\Tenancy\CorreoDelOrganizador;
 use App\Tenancy\OrganizadorActual;
 use BackedEnum;
 use DateTimeZone;
@@ -26,9 +28,14 @@ use Filament\Schemas\Components\EmbeddedSchema;
 use Filament\Schemas\Components\Form;
 use Filament\Schemas\Components\Section;
 use Filament\Schemas\Components\Text;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Support\Facades\Crypt;
+use Illuminate\Support\Facades\Mail;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
+use Throwable;
 use UnitEnum;
 
 /**
@@ -55,6 +62,8 @@ class Ajustes extends Page
         Ajuste::NombrePublico, Ajuste::LogoPath, Ajuste::ColorPrimario, Ajuste::ColorSecundario, Ajuste::ZonaHoraria,
         Ajuste::ContactoEmail, Ajuste::ContactoTelefono, Ajuste::PrivacidadAliasPorDefecto,
         Ajuste::TextoLegalAviso, Ajuste::TextoLegalPrivacidad, Ajuste::TextoLegalCondiciones,
+        Ajuste::CorreoPropio, Ajuste::CorreoServidor, Ajuste::CorreoPuerto, Ajuste::CorreoCifrado, Ajuste::CorreoUsuario,
+        Ajuste::CorreoClave, Ajuste::CorreoRemitente, Ajuste::CorreoRemitenteNombre,
     ];
 
     /** @var array<string, mixed>|null */
@@ -69,8 +78,9 @@ class Ajustes extends Page
 
     public function mount(): void
     {
+        // La contraseña del correo no vuelve nunca al navegador.
         $this->form->fill(collect(self::AJUSTES)
-            ->mapWithKeys(fn (Ajuste $ajuste): array => [$ajuste->value => ValorDeAjuste::obtener($ajuste)])
+            ->mapWithKeys(fn (Ajuste $ajuste): array => [$ajuste->value => $ajuste === Ajuste::CorreoClave ? null : ValorDeAjuste::obtener($ajuste)])
             ->all());
     }
 
@@ -119,6 +129,39 @@ class Ajustes extends Page
                             ->options(fn (): array => array_combine(DateTimeZone::listIdentifiers(DateTimeZone::EUROPE), DateTimeZone::listIdentifiers(DateTimeZone::EUROPE)) + ['Atlantic/Canary' => 'Atlantic/Canary'])
                             ->helperText('La de las horas de los partidos.'),
                     ]),
+                Section::make('Correo')
+                    ->description('Por defecto, los correos a los jugadores salen por el servidor de la plataforma. Con el suyo propio salen desde su dirección (y su dominio), con sus datos de SMTP.')
+                    ->columns(3)
+                    ->components([
+                        Toggle::make(Ajuste::CorreoPropio->value)->label('Enviar por mi propio servidor (SMTP)')->live()->columnSpanFull(),
+                        TextInput::make(Ajuste::CorreoServidor->value)->label('Servidor SMTP')->placeholder('smtp.suclub.es')->maxLength(190)
+                            ->required(fn (Get $get): bool => (bool) $get(Ajuste::CorreoPropio->value))
+                            ->visible(fn (Get $get): bool => (bool) $get(Ajuste::CorreoPropio->value)),
+                        Select::make(Ajuste::CorreoCifrado->value)->label('Cifrado')->required()
+                            ->options(['tls' => 'STARTTLS (normalmente el 587)', 'ssl' => 'SSL/TLS (normalmente el 465)', 'ninguno' => 'Sin cifrar'])
+                            ->visible(fn (Get $get): bool => (bool) $get(Ajuste::CorreoPropio->value)),
+                        TextInput::make(Ajuste::CorreoPuerto->value)->label('Puerto')->integer()->minValue(1)->maxValue(65535)->placeholder('587')
+                            ->visible(fn (Get $get): bool => (bool) $get(Ajuste::CorreoPropio->value)),
+                        TextInput::make(Ajuste::CorreoUsuario->value)->label('Usuario')->maxLength(190)->autocomplete('off')
+                            ->helperText('Casi siempre, la dirección de correo completa.')
+                            ->visible(fn (Get $get): bool => (bool) $get(Ajuste::CorreoPropio->value)),
+                        TextInput::make(Ajuste::CorreoClave->value)->label('Contraseña')->password()->revealable()->maxLength(190)->autocomplete('new-password')
+                            ->placeholder(fn (): string => filled(ValorDeAjuste::obtener(Ajuste::CorreoClave)) ? '•••••••• (guardada)' : '')
+                            ->helperText('Se guarda cifrada y no se vuelve a enseñar. En blanco, se queda la que hay.')
+                            ->visible(fn (Get $get): bool => (bool) $get(Ajuste::CorreoPropio->value)),
+                        TextInput::make(Ajuste::CorreoRemitente->value)->label('Correo del remitente')->email()->maxLength(190)->placeholder('torneos@suclub.es')
+                            ->required(fn (Get $get): bool => (bool) $get(Ajuste::CorreoPropio->value))
+                            ->helperText('Desde el que salen los correos; el servidor tiene que dejar mandar con él.')
+                            ->visible(fn (Get $get): bool => (bool) $get(Ajuste::CorreoPropio->value)),
+                        TextInput::make(Ajuste::CorreoRemitenteNombre->value)->label('Nombre del remitente')->maxLength(120)
+                            ->placeholder(fn (): string => MarcaDelOrganizador::nombre())
+                            ->visible(fn (Get $get): bool => (bool) $get(Ajuste::CorreoPropio->value)),
+                        Actions::make([
+                            Action::make('probarCorreo')->label('Guardar y enviarme un correo de prueba')->icon(Heroicon::OutlinedPaperAirplane)->color('gray')
+                                ->action(fn () => $this->probarCorreo()),
+                        ])->columnSpanFull()
+                            ->visible(fn (Get $get): bool => (bool) $get(Ajuste::CorreoPropio->value)),
+                    ]),
                 Section::make('Privacidad')
                     ->components([
                         Toggle::make(Ajuste::PrivacidadAliasPorDefecto->value)->label('Enseñar el alias de los jugadores en público')
@@ -164,12 +207,28 @@ class Ajustes extends Page
         $estado = $this->form->getState();
         $antes = collect(self::AJUSTES)->mapWithKeys(fn (Ajuste $a): array => [$a->value => ValorDeAjuste::obtener($a)])->all();
 
-        /** @var array<string, bool|string|null> $valores */
+        /** @var array<string, bool|int|string|null> $valores */
         $valores = [];
         foreach (self::AJUSTES as $ajuste) {
-            $valor = $estado[$ajuste->value] ?? null;
+            // Lo que no se envía (los datos del servidor con el interruptor apagado) se queda como está.
+            if (! array_key_exists($ajuste->value, $estado)) {
+                continue;
+            }
+
+            $valor = $estado[$ajuste->value];
+            if ($ajuste === Ajuste::CorreoClave) {
+                // En blanco, se queda la guardada; si no, se guarda cifrada.
+                if (is_string($valor) && $valor !== '') {
+                    $valores[$ajuste->value] = Crypt::encryptString($valor);
+                }
+
+                continue;
+            }
+
             $valores[$ajuste->value] = match (true) {
-                $ajuste === Ajuste::PrivacidadAliasPorDefecto => (bool) $valor,
+                $ajuste === Ajuste::PrivacidadAliasPorDefecto, $ajuste === Ajuste::CorreoPropio => (bool) $valor,
+                $ajuste === Ajuste::CorreoPuerto => filled($valor) ? (int) $valor : null,
+                $ajuste === Ajuste::CorreoCifrado => in_array($valor, ['tls', 'ssl', 'ninguno'], true) ? (string) $valor : 'tls',
                 $ajuste === Ajuste::ColorPrimario, $ajuste === Ajuste::ColorSecundario => is_string($valor) && $valor !== '' ? strtolower($valor) : null,
                 is_string($valor) => trim($valor) === '' ? null : trim($valor),
                 default => null,
@@ -185,12 +244,50 @@ class Ajustes extends Page
 
         // El sujeto del registro es quien los cambia: los ajustes no tienen id numérico.
         $cambios = array_filter($valores, fn (mixed $valor, string $clave): bool => $valor !== ($antes[$clave] ?? null), ARRAY_FILTER_USE_BOTH);
+        if (array_key_exists(Ajuste::CorreoClave->value, $cambios)) {
+            // Ni cifrada va al registro.
+            $cambios[Ajuste::CorreoClave->value] = 'cambiada';
+            $antes[Ajuste::CorreoClave->value] = null;
+        }
         $usuario = Filament::auth()->user();
         if ($cambios !== [] && $usuario instanceof User) {
             RegistroDeCambio::anotar('ajustes', $usuario, $usuario, array_intersect_key($antes, $cambios), $cambios);
         }
 
+        $this->data[Ajuste::CorreoClave->value] = null;
+
         Avisos::hecho('Ajustes guardados');
+    }
+
+    /** Guarda y manda un correo al propietario por el servidor que ha puesto. */
+    public function probarCorreo(): void
+    {
+        $this->guardar();
+
+        $servidor = CorreoDelOrganizador::servidor();
+        $usuario = Filament::auth()->user();
+
+        if ($servidor === null || ! $usuario instanceof User) {
+            Avisos::error('Falta el servidor o el remitente', ['Rellene al menos el servidor SMTP y el correo del remitente.']);
+
+            return;
+        }
+
+        // Lo recién guardado: el organizador se preparó al empezar la petición, con lo de antes.
+        config(['mail.mailers.'.CorreoDelOrganizador::MAILER => $servidor['mailer']]);
+        Mail::forgetMailers();
+
+        try {
+            Mail::mailer(CorreoDelOrganizador::MAILER)
+                ->to($usuario->email)
+                ->send(new CorreoDePrueba((string) $servidor['mailer']['host'], $servidor['from']['address'], $servidor['from']['name']));
+        } catch (Throwable $e) {
+            Avisos::error('No se ha podido enviar', ['El servidor ha respondido: '.Str::limit($e->getMessage(), 300)]);
+
+            return;
+        }
+
+        Avisos::hecho('Correo de prueba enviado', "Mire la bandeja de {$usuario->email}.");
     }
 
     private static function limites(Organizador $organizador): string

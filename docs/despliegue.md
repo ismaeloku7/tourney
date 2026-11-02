@@ -135,6 +135,11 @@ WEBPUSH_VAPID_PRIVATE_KEY=
 WEBPUSH_VAPID_SUBJECT=mailto:hola@clubceas.es
 ```
 
+Ese es el correo de la plataforma. Cada organizador puede mandar el suyo
+por su propio servidor SMTP desde Ajustes › Correo (servidor, puerto,
+cifrado, usuario, contraseña y remitente); la contraseña se guarda cifrada
+con `APP_KEY`, así que cambiar la `APP_KEY` obliga a volver a escribirla.
+
 La base central `tourney` se crea desde el apartado Database de Forge.
 Las de los organizadores no: las crea la aplicación.
 
