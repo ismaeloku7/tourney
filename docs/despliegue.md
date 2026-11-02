@@ -211,3 +211,18 @@ sesiones de Claude el token vive en la variable de entorno
 `forge.laravel.com`. Con eso se crea el sitio, se sube el `.env`, el
 script de despliegue, el certificado, el worker y el programador, y se
 lanzan despliegues.
+
+## Si alguien del equipo no puede entrar
+
+Si el correo de restablecer la contraseña no le llega (por ejemplo, porque
+el servidor de correo propio del organizador está mal configurado), en
+Forge › Commands del sitio, desde la carpeta de la versión publicada:
+
+```bash
+php artisan equipo:recuperar-acceso ceas padel@clubceas.es --sin-correo-propio
+```
+
+Enseña una contraseña nueva una sola vez, activa la cuenta y quita los
+bloqueos por intentos fallidos. Con `--sin-correo-propio`, el organizador
+vuelve a mandar por el correo de la plataforma hasta que lo reactive en
+Ajustes › Correo. La contraseña se cambia luego desde el perfil.
