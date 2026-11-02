@@ -45,9 +45,9 @@
                         @endforeach
                     </p>
                     @foreach ($inscripcion->participante->participanteJugadores as $fila)
-                        @if ($inscripcion->estado !== \App\Enums\EstadoInscripcion::Baja && array_key_exists($fila->jugador_id, $nivelesDeCompaneros) && $inscripcion->participante->participanteJugadores->first()?->jugador_id === $yo->id)
+                        @if ($inscripcion->estado !== \App\Enums\EstadoInscripcion::Baja && $fila->jugador_id !== $yo->id && array_key_exists($fila->jugador_id, $nivelesDeCompaneros) && ($losDosEditan || $inscripcion->participante->participanteJugadores->first()?->jugador_id === $yo->id))
                             <form wire:submit="guardarNivelDeCompanero({{ $fila->jugador_id }})" class="mt-2 flex flex-wrap items-end gap-2 text-sm">
-                                <label>Nivel de {{ $fila->jugador->nombre }} <span class="text-tema-suave">(eres el capitán)</span>
+                                <label>Nivel de {{ $fila->jugador->nombre }} @unless ($losDosEditan)<span class="text-tema-suave">(eres el capitán)</span>@endunless
                                     <input type="text" inputmode="decimal" wire:model="nivelesDeCompaneros.{{ $fila->jugador_id }}" placeholder="3 o 2,5" class="mt-1 block w-28 campo px-2 py-1">
                                 </label>
                                 <button type="submit" class="boton-claro px-4 py-1.5">Guardar</button>
@@ -168,7 +168,7 @@
             <label class="block text-sm"><span class="font-medium">Nombre</span><input type="text" wire:model="nombre" class="mt-1 w-full campo">@error('nombre') <span class="text-red-700">{{ $message }}</span> @enderror</label>
             <label class="block text-sm"><span class="font-medium">Apellidos</span><input type="text" wire:model="apellidos" class="mt-1 w-full campo">@error('apellidos') <span class="text-red-700">{{ $message }}</span> @enderror</label>
             <label class="block text-sm"><span class="font-medium">Teléfono</span><input type="tel" wire:model="telefono" class="mt-1 w-full campo"></label>
-            <label class="block text-sm"><span class="font-medium">Nivel</span><input type="text" inputmode="decimal" wire:model="nivel" placeholder="3 o 2,5" class="mt-1 w-full campo">@error('nivel') <span class="text-red-700">{{ $message }}</span> @enderror<span class="text-tema-suave">Un número del 0 al 10. Si eres el capitán de tu pareja, el de tu compañero lo cambias en la inscripción.</span></label>
+            <label class="block text-sm"><span class="font-medium">Nivel</span><input type="text" inputmode="decimal" wire:model="nivel" placeholder="3 o 2,5" class="mt-1 w-full campo">@error('nivel') <span class="text-red-700">{{ $message }}</span> @enderror<span class="text-tema-suave">Un número del 0 al 10. {{ $losDosEditan ? 'El de tu compañero lo cambias en la inscripción.' : 'Si eres el capitán de tu pareja, el de tu compañero lo cambias en la inscripción.' }}</span></label>
             <label class="block text-sm"><span class="font-medium">Alias</span><input type="text" wire:model="alias" class="mt-1 w-full campo"><span class="text-tema-suave">Lo que se enseña en los torneos con privacidad.</span></label>
             <p class="text-sm text-tema-suave sm:col-span-2">Tu correo: {{ $yo->getAttribute('email') }}. Para cambiarlo, escribe a la organización.</p>
             <div><button type="submit" class="boton">Guardar</button></div>

@@ -25,6 +25,8 @@ enum Ajuste: string
     case PrivacidadAliasPorDefecto = 'privacidad_alias_por_defecto';
     case ContactoEmail = 'contacto_email';
     case ContactoTelefono = 'contacto_telefono';
+    /** Si cualquiera de la pareja edita los datos del otro desde su portal (si no, solo el capitán). */
+    case ParejaEditaAlCompanero = 'pareja_edita_al_companero';
     /** Si el correo sale por el servidor SMTP del organizador (los de abajo) en vez del de la plataforma. */
     case CorreoPropio = 'correo_propio';
     case CorreoServidor = 'correo_servidor';
@@ -44,6 +46,7 @@ enum Ajuste: string
             self::ColorPrimario => '#4cc17d',
             self::PrivacidadAliasPorDefecto => false,
             self::CorreoPropio => false,
+            self::ParejaEditaAlCompanero => false,
             self::CorreoCifrado => 'tls',
             default => null,
         };
@@ -63,6 +66,7 @@ enum Ajuste: string
             self::PrivacidadAliasPorDefecto => 'Mostrar alias en público',
             self::ContactoEmail => 'Correo de contacto',
             self::ContactoTelefono => 'Teléfono de contacto',
+            self::ParejaEditaAlCompanero => 'Los dos jugadores editan los datos del otro',
             self::CorreoPropio => 'Servidor de correo propio',
             self::CorreoServidor => 'Servidor SMTP',
             self::CorreoPuerto => 'Puerto',

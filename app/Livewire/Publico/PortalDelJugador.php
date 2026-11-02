@@ -243,6 +243,7 @@ class PortalDelJugador extends Component
             'torneosConHuecos' => $torneosAbiertosAlHorario,
             'noDisponibilidades' => Disponibilidad::query()->where('jugador_id', $yo->id)->orderBy('desde')->get()->groupBy('torneo_id'),
             'historial' => $yo->notifications()->latest()->limit(15)->get(),
+            'losDosEditan' => CambiarNivel::losDosEditan(),
         ]);
     }
 

@@ -60,7 +60,7 @@ class Ajustes extends Page
     /** Las claves que lleva esta pantalla. */
     private const AJUSTES = [
         Ajuste::NombrePublico, Ajuste::LogoPath, Ajuste::ColorPrimario, Ajuste::ColorSecundario, Ajuste::ZonaHoraria,
-        Ajuste::ContactoEmail, Ajuste::ContactoTelefono, Ajuste::PrivacidadAliasPorDefecto,
+        Ajuste::ContactoEmail, Ajuste::ContactoTelefono, Ajuste::PrivacidadAliasPorDefecto, Ajuste::ParejaEditaAlCompanero,
         Ajuste::TextoLegalAviso, Ajuste::TextoLegalPrivacidad, Ajuste::TextoLegalCondiciones,
         Ajuste::CorreoPropio, Ajuste::CorreoServidor, Ajuste::CorreoPuerto, Ajuste::CorreoCifrado, Ajuste::CorreoUsuario,
         Ajuste::CorreoClave, Ajuste::CorreoRemitente, Ajuste::CorreoRemitenteNombre,
@@ -162,6 +162,11 @@ class Ajustes extends Page
                         ])->columnSpanFull()
                             ->visible(fn (Get $get): bool => (bool) $get(Ajuste::CorreoPropio->value)),
                     ]),
+                Section::make('Parejas')
+                    ->components([
+                        Toggle::make(Ajuste::ParejaEditaAlCompanero->value)->label('Cualquiera de la pareja puede editar los datos de su compañero')
+                            ->helperText('Desde su portal, el nivel del otro. Apagado, solo el capitán (el jugador 1: quien inscribió la pareja o el «Participante 1» del Excel).'),
+                    ]),
                 Section::make('Privacidad')
                     ->components([
                         Toggle::make(Ajuste::PrivacidadAliasPorDefecto->value)->label('Enseñar el alias de los jugadores en público')
@@ -226,7 +231,7 @@ class Ajustes extends Page
             }
 
             $valores[$ajuste->value] = match (true) {
-                $ajuste === Ajuste::PrivacidadAliasPorDefecto, $ajuste === Ajuste::CorreoPropio => (bool) $valor,
+                $ajuste === Ajuste::PrivacidadAliasPorDefecto, $ajuste === Ajuste::CorreoPropio, $ajuste === Ajuste::ParejaEditaAlCompanero => (bool) $valor,
                 $ajuste === Ajuste::CorreoPuerto => filled($valor) ? (int) $valor : null,
                 $ajuste === Ajuste::CorreoCifrado => in_array($valor, ['tls', 'ssl', 'ninguno'], true) ? (string) $valor : 'tls',
                 $ajuste === Ajuste::ColorPrimario, $ajuste === Ajuste::ColorSecundario => is_string($valor) && $valor !== '' ? strtolower($valor) : null,

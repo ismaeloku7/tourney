@@ -5,14 +5,13 @@ namespace App\Filament\Resources\Torneos\RelationManagers;
 use App\Enums\EstadoInscripcion;
 use App\Filament\ConfirmarCompletas;
 use App\Filament\Resources\Categorias\CategoriaResource;
+use App\Filament\Resources\Parejas\ColumnasDePareja;
 use App\Models\Categoria;
 use App\Models\Inscripcion;
-use App\Models\Jugador;
 use App\Models\Torneo;
 use Filament\Actions\Action;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Support\Icons\Heroicon;
-use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
@@ -54,21 +53,11 @@ class ParejasRelationManager extends RelationManager
             ->emptyStateDescription('Se apuntan dentro de cada categoría (pestaña Categorías › Configurar › Inscripciones), con «Importar parejas» desde un Excel o, si la inscripción online está abierta, las propias parejas.')
             ->columns([
                 TextColumn::make('categoria.nombre')->label('Categoría')->badge()->color('gray'),
-                TextColumn::make('participante.nombre')->label('Pareja')->searchable()->weight('bold'),
-                TextColumn::make('jugadores')->label('Jugadores')
-                    ->state(fn (Inscripcion $record): array => $record->participante->jugadores->map(fn (Jugador $j): string => $j->nombre_completo)->all())
-                    ->listWithLineBreaks(),
-                TextColumn::make('niveles')->label('Nivel')
-                    ->state(fn (Inscripcion $record): array => $record->participante->jugadores->map(fn (Jugador $j): string => $j->nivel_declarado ?? '—')->all())
-                    ->listWithLineBreaks()
-                    ->description(fn (Inscripcion $record): ?string => $record->participante->nivelMedioTexto()),
-                TextColumn::make('estado')->label('Estado')->badge()
-                    ->formatStateUsing(fn (EstadoInscripcion $state, Inscripcion $record): string => $state->etiqueta()
-                        .($record->participante->jugadores->count() < 2 ? ' · falta compañero' : '')
-                        .($record->posicion_espera !== null ? " (#{$record->posicion_espera})" : ''))
-                    ->color(fn (EstadoInscripcion $state): string => $state->color()),
-                IconColumn::make('pago_marcado_en')->label('Pago')->boolean()->trueIcon(Heroicon::OutlinedBanknotes)->falseIcon(Heroicon::OutlinedMinus)
-                    ->state(fn (Inscripcion $record): bool => $record->pago_marcado_en !== null),
+                ColumnasDePareja::nombre(),
+                ColumnasDePareja::jugadores(),
+                ColumnasDePareja::niveles(),
+                ColumnasDePareja::estado(),
+                ColumnasDePareja::pago(),
             ])
             ->filters([
                 SelectFilter::make('categoria')->label('Categoría')
