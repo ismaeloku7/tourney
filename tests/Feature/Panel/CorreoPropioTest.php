@@ -34,30 +34,47 @@ function servidorDelClub(): array
         Ajuste::CorreoCifrado->value => 'ssl',
         Ajuste::CorreoPuerto->value => '465',
         Ajuste::CorreoUsuario->value => 'torneos@padelnorte.es',
-        Ajuste::CorreoClave->value => 'clave-secreta',
         Ajuste::CorreoRemitente->value => 'torneos@padelnorte.es',
         Ajuste::CorreoRemitenteNombre->value => 'Torneos Pádel Norte',
     ];
 }
 
-test('la contraseña se guarda cifrada, no vuelve al formulario ni al registro, y en blanco se queda', function () {
+/** Guarda el servidor del club y le pone la contraseña desde su ventana. */
+function configurarServidorDelClub(): void
+{
+    Livewire::test(Ajustes::class)->fillForm(servidorDelClub())->call('guardar')->assertHasNoFormErrors();
+    Livewire::test(Ajustes::class)->callAction('claveCorreo', ['clave' => 'clave-secreta'])->assertHasNoActionErrors();
+}
+
+test('la contraseña va en su propia ventana: se guarda cifrada, no está en el formulario ni en el registro', function () {
+    // Sin servidor propio no hay botón de contraseña.
+    Livewire::test(Ajustes::class)->assertActionHidden('claveCorreo');
+
     Livewire::test(Ajustes::class)
         ->fillForm(servidorDelClub())
         ->call('guardar')
         ->assertHasNoFormErrors()
         ->assertNotified('Ajustes guardados')
-        ->assertSet('data.'.Ajuste::CorreoClave->value, null);
+        ->assertSee('Contraseña: sin poner');
+
+    // El formulario no lleva ningún campo de contraseña que el navegador pueda rellenar.
+    Livewire::test(Ajustes::class)
+        ->assertDontSeeHtml('type="password"')
+        ->assertActionVisible('claveCorreo')
+        ->callAction('claveCorreo', ['clave' => 'clave-secreta'])
+        ->assertHasNoActionErrors()
+        ->assertNotified('Contraseña del correo guardada');
 
     $guardada = ValorDeAjuste::obtener(Ajuste::CorreoClave);
     expect($guardada)->toBeString()->not->toBe('clave-secreta')
         ->and(Crypt::decryptString((string) $guardada))->toBe('clave-secreta')
         ->and(ValorDeAjuste::obtener(Ajuste::CorreoPuerto))->toBe(465)
-        ->and(json_encode(RegistroDeCambio::query()->where('accion', 'ajustes')->sole()->getAttributes()))->not->toContain('clave-secreta')
-        ->and(RegistroDeCambio::query()->where('accion', 'ajustes')->sole()->despues[Ajuste::CorreoClave->value])->toBe('cambiada');
+        ->and(RegistroDeCambio::query()->where('accion', 'ajustes')->get()->map(fn (RegistroDeCambio $r): string => (string) json_encode($r->getAttributes()))->implode(' '))->not->toContain('clave-secreta')
+        ->and(RegistroDeCambio::query()->where('accion', 'ajustes')->latest('id')->first()?->despues)->toBe([Ajuste::CorreoClave->value => 'cambiada']);
 
-    // Al volver a la pantalla no está, y guardar sin tocarla la conserva.
+    // Guardar el resto de ajustes no la toca.
     Livewire::test(Ajustes::class)
-        ->assertSet('data.'.Ajuste::CorreoClave->value, null)
+        ->assertSee('Contraseña: guardada')
         ->assertDontSee('clave-secreta')
         ->fillForm([Ajuste::CorreoServidor->value => 'mail.padelnorte.es'])
         ->call('guardar')
@@ -88,7 +105,7 @@ test('dentro del organizador el correo sale por su servidor, y al salir vuelve e
     tenancy()->initialize($this->organizador);
     expect(config('mail.default'))->toBe($dePlataforma);
 
-    Livewire::test(Ajustes::class)->fillForm(servidorDelClub())->call('guardar')->assertHasNoFormErrors();
+    configurarServidorDelClub();
 
     tenancy()->end();
     tenancy()->initialize($this->organizador);

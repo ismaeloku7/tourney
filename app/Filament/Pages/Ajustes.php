@@ -63,7 +63,7 @@ class Ajustes extends Page
         Ajuste::ContactoEmail, Ajuste::ContactoTelefono, Ajuste::PrivacidadAliasPorDefecto, Ajuste::ParejaEditaAlCompanero,
         Ajuste::TextoLegalAviso, Ajuste::TextoLegalPrivacidad, Ajuste::TextoLegalCondiciones,
         Ajuste::CorreoPropio, Ajuste::CorreoServidor, Ajuste::CorreoPuerto, Ajuste::CorreoCifrado, Ajuste::CorreoUsuario,
-        Ajuste::CorreoClave, Ajuste::CorreoRemitente, Ajuste::CorreoRemitenteNombre,
+        Ajuste::CorreoRemitente, Ajuste::CorreoRemitenteNombre,
     ];
 
     /** @var array<string, mixed>|null */
@@ -78,9 +78,8 @@ class Ajustes extends Page
 
     public function mount(): void
     {
-        // La contraseña del correo no vuelve nunca al navegador.
         $this->form->fill(collect(self::AJUSTES)
-            ->mapWithKeys(fn (Ajuste $ajuste): array => [$ajuste->value => $ajuste === Ajuste::CorreoClave ? null : ValorDeAjuste::obtener($ajuste)])
+            ->mapWithKeys(fn (Ajuste $ajuste): array => [$ajuste->value => ValorDeAjuste::obtener($ajuste)])
             ->all());
     }
 
@@ -92,7 +91,43 @@ class Ajustes extends Page
                 ->icon(Heroicon::OutlinedArrowTopRightOnSquare)
                 ->color('gray')
                 ->url(fn (): string => url('/'), shouldOpenInNewTab: true),
+            $this->claveDelCorreo(),
         ];
+    }
+
+    /**
+     * La contraseña del servidor de correo, en su propia ventana: en el
+     * formulario, el navegador la confundía con la del panel y la rellenaba
+     * él solo al guardar, pisando la buena.
+     */
+    private function claveDelCorreo(): Action
+    {
+        return Action::make('claveCorreo')
+            ->label('Contraseña del correo')
+            ->icon(Heroicon::OutlinedKey)
+            ->color('gray')
+            ->visible(fn (): bool => ValorDeAjuste::obtener(Ajuste::CorreoPropio) === true)
+            ->modalHeading('Contraseña del servidor de correo')
+            ->modalDescription(fn (): string => (filled(ValorDeAjuste::obtener(Ajuste::CorreoClave)) ? 'Hay una guardada. ' : 'Aún no hay ninguna. ').'Se guarda cifrada y no se vuelve a enseñar.')
+            ->modalSubmitActionLabel('Guardar contraseña')
+            ->schema([
+                TextInput::make('clave')->label('Contraseña')->password()->revealable()->required()->maxLength(190)
+                    ->autocomplete('new-password')
+                    ->extraInputAttributes(['data-1p-ignore' => 'true', 'data-lpignore' => 'true']),
+            ])
+            ->action(function (array $data): void {
+                abort_unless(self::canAccess(), 403);
+
+                ValorDeAjuste::fijar([Ajuste::CorreoClave->value => Crypt::encryptString((string) $data['clave'])]);
+
+                $usuario = Filament::auth()->user();
+                if ($usuario instanceof User) {
+                    // Ni cifrada va al registro.
+                    RegistroDeCambio::anotar('ajustes', $usuario, $usuario, null, [Ajuste::CorreoClave->value => 'cambiada']);
+                }
+
+                Avisos::hecho('Contraseña del correo guardada', 'Pruébela con «Guardar y enviarme un correo de prueba».');
+            });
     }
 
     public function form(Schema $schema): Schema
@@ -143,11 +178,10 @@ class Ajustes extends Page
                         TextInput::make(Ajuste::CorreoPuerto->value)->label('Puerto')->integer()->minValue(1)->maxValue(65535)->placeholder('587')
                             ->visible(fn (Get $get): bool => (bool) $get(Ajuste::CorreoPropio->value)),
                         TextInput::make(Ajuste::CorreoUsuario->value)->label('Usuario')->maxLength(190)->autocomplete('off')
+                            ->extraInputAttributes(['data-1p-ignore' => 'true', 'data-lpignore' => 'true'])
                             ->helperText('Casi siempre, la dirección de correo completa.')
                             ->visible(fn (Get $get): bool => (bool) $get(Ajuste::CorreoPropio->value)),
-                        TextInput::make(Ajuste::CorreoClave->value)->label('Contraseña')->password()->revealable()->maxLength(190)->autocomplete('new-password')
-                            ->placeholder(fn (): string => filled(ValorDeAjuste::obtener(Ajuste::CorreoClave)) ? '•••••••• (guardada)' : '')
-                            ->helperText('Se guarda cifrada y no se vuelve a enseñar. En blanco, se queda la que hay.')
+                        Text::make(fn (): string => 'Contraseña: '.(filled(ValorDeAjuste::obtener(Ajuste::CorreoClave)) ? 'guardada' : 'sin poner').'. Se pone y se cambia con el botón «Contraseña del correo» de arriba.')
                             ->visible(fn (Get $get): bool => (bool) $get(Ajuste::CorreoPropio->value)),
                         TextInput::make(Ajuste::CorreoRemitente->value)->label('Correo del remitente')->email()->maxLength(190)->placeholder('torneos@suclub.es')
                             ->required(fn (Get $get): bool => (bool) $get(Ajuste::CorreoPropio->value))
@@ -221,14 +255,6 @@ class Ajustes extends Page
             }
 
             $valor = $estado[$ajuste->value];
-            if ($ajuste === Ajuste::CorreoClave) {
-                // En blanco, se queda la guardada; si no, se guarda cifrada.
-                if (is_string($valor) && $valor !== '') {
-                    $valores[$ajuste->value] = Crypt::encryptString($valor);
-                }
-
-                continue;
-            }
 
             $valores[$ajuste->value] = match (true) {
                 $ajuste === Ajuste::PrivacidadAliasPorDefecto, $ajuste === Ajuste::CorreoPropio, $ajuste === Ajuste::ParejaEditaAlCompanero => (bool) $valor,
@@ -249,17 +275,10 @@ class Ajustes extends Page
 
         // El sujeto del registro es quien los cambia: los ajustes no tienen id numérico.
         $cambios = array_filter($valores, fn (mixed $valor, string $clave): bool => $valor !== ($antes[$clave] ?? null), ARRAY_FILTER_USE_BOTH);
-        if (array_key_exists(Ajuste::CorreoClave->value, $cambios)) {
-            // Ni cifrada va al registro.
-            $cambios[Ajuste::CorreoClave->value] = 'cambiada';
-            $antes[Ajuste::CorreoClave->value] = null;
-        }
         $usuario = Filament::auth()->user();
         if ($cambios !== [] && $usuario instanceof User) {
             RegistroDeCambio::anotar('ajustes', $usuario, $usuario, array_intersect_key($antes, $cambios), $cambios);
         }
-
-        $this->data[Ajuste::CorreoClave->value] = null;
 
         Avisos::hecho('Ajustes guardados');
     }
