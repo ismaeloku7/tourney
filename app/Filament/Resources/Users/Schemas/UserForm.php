@@ -7,6 +7,7 @@ use App\Models\User;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
+use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Schema;
 use Illuminate\Validation\Rules\Password;
 
@@ -19,13 +20,20 @@ class UserForm
             ->components([
                 TextInput::make('nombre')->label('Nombre')->required()->maxLength(120),
                 TextInput::make('apellidos')->label('Apellidos')->maxLength(160),
-                TextInput::make('email')->label('Correo electrónico')->email()->required()->maxLength(190)->unique(ignoreRecord: true),
+                // autocomplete: que el navegador no tome este alta por el inicio de sesión de quien la hace.
+                TextInput::make('email')->label('Correo electrónico')->email()->required()->maxLength(190)->unique(ignoreRecord: true)->autocomplete('off'),
                 TextInput::make('telefono')->label('Teléfono')->tel()->maxLength(30),
-                Select::make('rol')->label('Rol')->options(Rol::opciones())->default(Rol::Administrador->value)->required()
+                Select::make('rol')->label('Rol')->options(Rol::opciones())->default(Rol::Administrador->value)->required()->live()
                     ->helperText('El propietario lo puede todo; un administrador gestiona los torneos que se le asignen; un árbitro solo introduce resultados desde la mesa.'),
+                Select::make('torneosQueAdministra')->label('Torneos que administra')
+                    ->relationship('torneosQueAdministra', 'nombre')->multiple()->preload()->searchable()
+                    ->visible(fn (Get $get): bool => self::esAdministrador($get('rol')))
+                    ->helperText('Solo ve y gestiona estos torneos. También se asignan desde cada torneo, en su pestaña Administradores.')
+                    ->columnSpanFull(),
                 TextInput::make('password')
                     ->label('Contraseña')
                     ->password()
+                    ->autocomplete('new-password')
                     ->revealable()
                     ->rule(Password::default())
                     ->required(fn (string $operation): bool => $operation === 'create')
@@ -34,5 +42,10 @@ class UserForm
                 Toggle::make('activo')->label('Activo')->default(true)
                     ->disabled(fn (?User $record): bool => $record !== null && $record->is(auth()->user())),
             ]);
+    }
+
+    private static function esAdministrador(mixed $rol): bool
+    {
+        return $rol === Rol::Administrador || $rol === Rol::Administrador->value;
     }
 }
