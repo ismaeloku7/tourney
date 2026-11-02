@@ -39,3 +39,20 @@ test('sin --sin-correo-propio el correo se queda como estaba, y con datos que no
     $this->artisan('equipo:recuperar-acceso', ['organizador' => 'sur', 'email' => 'duena@padelnorte.es'])->assertFailed();
     $this->artisan('equipo:recuperar-acceso', ['organizador' => 'norte', 'email' => 'nadie@padelnorte.es'])->assertFailed();
 });
+
+test('con --clave pone la que se le dé, para no depender de leer la salida', function () {
+    $this->artisan('equipo:recuperar-acceso', ['organizador' => 'norte', 'email' => 'duena@padelnorte.es', '--clave' => 'corta'])->assertFailed();
+
+    $this->artisan('equipo:recuperar-acceso', ['organizador' => 'norte', 'email' => 'duena@padelnorte.es', '--clave' => 'una-clave-nueva-2026'])
+        ->expectsOutputToContain('Contraseña guardada y cuenta activa.')
+        ->expectsOutputToContain('Listo: ya puede entrar como duena@padelnorte.es')
+        ->doesntExpectOutputToContain('una-clave-nueva-2026')
+        ->assertSuccessful();
+
+    comoOrganizador($this->organizador, function (): void {
+        $usuario = User::query()->where('email', 'duena@padelnorte.es')->sole();
+
+        expect(Hash::check('una-clave-nueva-2026', $usuario->password))->toBeTrue()
+            ->and($usuario->activo)->toBeTrue();
+    });
+});
