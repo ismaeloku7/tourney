@@ -4,6 +4,7 @@ use App\Actions\Competicion\GenerarPartidos;
 use App\Actions\Competicion\SortearGrupos;
 use App\Actions\Jugadores\CambiarNivel;
 use App\Competicion\Errores\OperacionNoPermitida;
+use App\Enums\Ajuste;
 use App\Enums\EstadoInscripcion;
 use App\Enums\EstadoPartido;
 use App\Enums\EstadoTorneo;
@@ -22,6 +23,7 @@ use App\Models\Partido;
 use App\Models\RegistroDeCambio;
 use App\Models\Torneo;
 use App\Models\User;
+use App\Models\ValorDeAjuste;
 use Database\Seeders\PlanesSeeder;
 use Livewire\Livewire;
 
@@ -227,4 +229,24 @@ test('con la pareja de baja o el torneo terminado, la capitana ya no cambia el n
     expect(CambiarNivel::companeros($this->ana))->toHaveCount(0)
         ->and(CambiarNivel::puede($this->ana, $this->eva))->toBeFalse()
         ->and(CambiarNivel::puede($this->ana, $this->ana))->toBeTrue();
+});
+
+test('si el organizador lo deja en sus ajustes, quien no es capitán también cambia el nivel de su compañero', function () {
+    ValorDeAjuste::fijar([Ajuste::ParejaEditaAlCompanero->value => true]);
+    $this->ana->update(['nivel_declarado' => '3']);
+    $this->actingAs($this->eva, 'jugador');
+
+    Livewire::test(PortalDelJugador::class)
+        ->assertSee('Nivel de Ana')
+        ->assertDontSee('(eres el capitán)')
+        ->set("nivelesDeCompaneros.{$this->ana->id}", '2,5')
+        ->call('guardarNivelDeCompanero', $this->ana->id)
+        ->assertHasNoErrors();
+
+    expect($this->ana->refresh()->nivel_declarado)->toBe('2,5');
+
+    // Apagado otra vez, solo la capitana.
+    ValorDeAjuste::fijar([Ajuste::ParejaEditaAlCompanero->value => false]);
+    expect(CambiarNivel::puede($this->eva, $this->ana))->toBeFalse()
+        ->and(CambiarNivel::puede($this->ana, $this->eva))->toBeTrue();
 });
