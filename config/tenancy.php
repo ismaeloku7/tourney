@@ -3,6 +3,7 @@
 declare(strict_types=1);
 
 use App\Models\Organizador;
+use App\Tenancy\CorreoDelOrganizador;
 use Stancl\Tenancy\Bootstrappers\DatabaseTenancyBootstrapper;
 use Stancl\Tenancy\Bootstrappers\QueueTenancyBootstrapper;
 use Stancl\Tenancy\Database\Models\Domain;
@@ -39,6 +40,8 @@ return [
         // la caché y las sesiones van a la base central con el organizador en la
         // clave, y los archivos ya llevan la carpeta del organizador en la ruta.
         QueueTenancyBootstrapper::class,
+        // Detrás de la base: lee los ajustes del organizador.
+        CorreoDelOrganizador::class,
         // Stancl\Tenancy\Bootstrappers\RedisTenancyBootstrapper::class, // Note: phpredis is needed
     ],
 

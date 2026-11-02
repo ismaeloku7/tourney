@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace App\Providers;
 
+use App\Tenancy\CorreoDelOrganizador;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\ServiceProvider;
@@ -94,7 +95,9 @@ class TenancyServiceProvider extends ServiceProvider
 
     public function register(): void
     {
-        //
+        // Guarda la configuración de correo de la plataforma para devolverla al
+        // salir del organizador: tiene que ser la misma instancia en los dos pasos.
+        $this->app->singleton(CorreoDelOrganizador::class);
     }
 
     public function boot(): void

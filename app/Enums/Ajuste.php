@@ -25,6 +25,17 @@ enum Ajuste: string
     case PrivacidadAliasPorDefecto = 'privacidad_alias_por_defecto';
     case ContactoEmail = 'contacto_email';
     case ContactoTelefono = 'contacto_telefono';
+    /** Si el correo sale por el servidor SMTP del organizador (los de abajo) en vez del de la plataforma. */
+    case CorreoPropio = 'correo_propio';
+    case CorreoServidor = 'correo_servidor';
+    case CorreoPuerto = 'correo_puerto';
+    /** ssl (465), tls (STARTTLS, 587) o ninguno. */
+    case CorreoCifrado = 'correo_cifrado';
+    case CorreoUsuario = 'correo_usuario';
+    /** Cifrada con la clave de la aplicación; nunca vuelve al formulario. */
+    case CorreoClave = 'correo_clave';
+    case CorreoRemitente = 'correo_remitente';
+    case CorreoRemitenteNombre = 'correo_remitente_nombre';
 
     public function porDefecto(): bool|string|null
     {
@@ -32,6 +43,8 @@ enum Ajuste: string
             self::ZonaHoraria => 'Europe/Madrid',
             self::ColorPrimario => '#4cc17d',
             self::PrivacidadAliasPorDefecto => false,
+            self::CorreoPropio => false,
+            self::CorreoCifrado => 'tls',
             default => null,
         };
     }
@@ -50,6 +63,14 @@ enum Ajuste: string
             self::PrivacidadAliasPorDefecto => 'Mostrar alias en público',
             self::ContactoEmail => 'Correo de contacto',
             self::ContactoTelefono => 'Teléfono de contacto',
+            self::CorreoPropio => 'Servidor de correo propio',
+            self::CorreoServidor => 'Servidor SMTP',
+            self::CorreoPuerto => 'Puerto',
+            self::CorreoCifrado => 'Cifrado',
+            self::CorreoUsuario => 'Usuario',
+            self::CorreoClave => 'Contraseña',
+            self::CorreoRemitente => 'Correo del remitente',
+            self::CorreoRemitenteNombre => 'Nombre del remitente',
         };
     }
 }
