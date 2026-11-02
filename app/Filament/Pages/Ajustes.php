@@ -280,7 +280,7 @@ class Ajustes extends Page
         try {
             Mail::mailer(CorreoDelOrganizador::MAILER)
                 ->to($usuario->email)
-                ->send((new CorreoDePrueba((string) $servidor['mailer']['host']))->from($servidor['from']['address'], $servidor['from']['name']));
+                ->send(new CorreoDePrueba((string) $servidor['mailer']['host'], $servidor['from']['address'], $servidor['from']['name']));
         } catch (Throwable $e) {
             Avisos::error('No se ha podido enviar', ['El servidor ha respondido: '.Str::limit($e->getMessage(), 300)]);
 
