@@ -28,6 +28,7 @@ beforeEach(function () {
 function servidorDelClub(): array
 {
     return [
+        Ajuste::NombrePublico->value => 'Pádel Norte',
         Ajuste::CorreoPropio->value => true,
         Ajuste::CorreoServidor->value => 'smtp.padelnorte.es',
         Ajuste::CorreoCifrado->value => 'ssl',
@@ -73,7 +74,7 @@ test('la contraseña se guarda cifrada, no vuelve al formulario ni al registro, 
 
 test('con el servidor propio encendido, faltan el servidor y el remitente', function () {
     Livewire::test(Ajustes::class)
-        ->fillForm([Ajuste::CorreoPropio->value => true, Ajuste::CorreoServidor->value => '', Ajuste::CorreoRemitente->value => ''])
+        ->fillForm([Ajuste::NombrePublico->value => 'Pádel Norte', Ajuste::CorreoPropio->value => true, Ajuste::CorreoServidor->value => '', Ajuste::CorreoRemitente->value => ''])
         ->call('guardar')
         ->assertHasFormErrors([Ajuste::CorreoServidor->value => 'required', Ajuste::CorreoRemitente->value => 'required']);
 });
