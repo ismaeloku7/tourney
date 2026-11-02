@@ -22,16 +22,25 @@ class RecuperarAcceso extends Command
     protected $signature = 'equipo:recuperar-acceso
         {organizador : El slug del organizador (ceas, por ejemplo)}
         {email : El correo con el que entra en el panel}
-        {--sin-correo-propio : Desactivar su servidor de correo propio}';
+        {--sin-correo-propio : Desactivar su servidor de correo propio}
+        {--clave= : La contraseña nueva (al menos 12 caracteres); sin ella se genera una}';
 
     protected $description = 'Contraseña nueva para alguien del equipo, sin depender del correo';
 
     public function handle(): int
     {
+        $elegida = $this->option('clave');
+        if (is_string($elegida) && mb_strlen($elegida) < 12) {
+            $this->line('ERROR: la contraseña de --clave tiene que tener al menos 12 caracteres.');
+
+            return self::FAILURE;
+        }
+
+        $this->line('Buscando el organizador '.$this->argument('organizador').'...');
         $organizador = Organizador::query()->find((string) $this->argument('organizador'));
 
         if ($organizador === null) {
-            $this->components->error('No hay ningún organizador con ese slug. Hay: '.Organizador::query()->pluck('id')->implode(', '));
+            $this->line('ERROR: no hay ningún organizador con ese slug. Hay: '.Organizador::query()->pluck('id')->implode(', '));
 
             return self::FAILURE;
         }
@@ -39,21 +48,23 @@ class RecuperarAcceso extends Command
         $email = Str::lower(trim((string) $this->argument('email')));
 
         /** @var string|null $clave */
-        $clave = $organizador->run(function () use ($email): ?string {
+        $clave = $organizador->run(function () use ($email, $elegida): ?string {
             $usuario = User::query()->where('email', $email)->first();
 
             if ($usuario === null) {
-                $this->components->error('No hay nadie en el equipo con ese correo. Hay: '.User::query()->pluck('email')->implode(', '));
+                $this->line('ERROR: no hay nadie en el equipo con ese correo. Hay: '.User::query()->pluck('email')->implode(', '));
 
                 return null;
             }
 
-            $clave = Str::password(16, symbols: false);
+            $this->line("Cambiando la contraseña de {$email}...");
+            $clave = is_string($elegida) ? $elegida : Str::password(16, symbols: false);
             $usuario->forceFill(['password' => $clave, 'activo' => true])->save();
+            $this->line('Contraseña guardada y cuenta activa.');
 
             if ($this->option('sin-correo-propio') && ValorDeAjuste::obtener(Ajuste::CorreoPropio) === true) {
                 ValorDeAjuste::fijar([Ajuste::CorreoPropio->value => false]);
-                $this->components->warn('Servidor de correo propio desactivado: los correos salen por el de la plataforma. Se vuelve a activar en Ajustes › Correo.');
+                $this->line('Servidor de correo propio desactivado: los correos salen por el de la plataforma. Se vuelve a activar en Ajustes › Correo.');
             }
 
             return $clave;
@@ -65,8 +76,10 @@ class RecuperarAcceso extends Command
 
         $bloqueos = $this->quitarBloqueos($email);
 
-        $this->components->info("Contraseña nueva de {$email}: {$clave}");
-        $this->line("  Bloqueos por intentos fallidos quitados: {$bloqueos}. Cámbiela al entrar, desde su perfil.");
+        $this->line("Bloqueos por intentos fallidos quitados: {$bloqueos}.");
+        $this->line(is_string($elegida)
+            ? "Listo: ya puede entrar como {$email} con la contraseña que ha puesto en --clave."
+            : "Contraseña nueva de {$email}: {$clave}  (cámbiela al entrar, desde su perfil)");
 
         return self::SUCCESS;
     }
