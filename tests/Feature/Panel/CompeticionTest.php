@@ -12,6 +12,7 @@ use App\Enums\EstadoTorneo;
 use App\Enums\ModoDeSorteo;
 use App\Enums\Rol;
 use App\Filament\Competicion\Marcador;
+use App\Filament\Competicion\SorteoDeGrupos;
 use App\Filament\Resources\Categorias\Pages\EditCategoria;
 use App\Filament\Resources\Categorias\RelationManagers\FasesRelationManager;
 use App\Filament\Resources\Torneos\Pages\EditTorneo;
@@ -210,9 +211,14 @@ test('al sortear se fijan a mano parejas en sus grupos y el resto sale por sorte
         ->and($grupos->map(fn ($g): int => $g->participantes->count())->all())->toBe([4, 4, 4])
         ->and($this->grupos->configuracionDeGrupos()->gruposManuales)->toBe([[$sinCabeza1, $sinCabeza2], [], [$sinCabeza3]]);
 
-    // Más parejas de las que caben en un grupo: no se sortea.
+    // Al volver a abrirlo salen los grupos tal y como quedaron.
     fasesDe($this->categoria)
-        ->callAction(TestAction::make('sortear')->table($this->grupos), ['grupo_1' => array_map('strval', array_slice($ids, 0, 5))])
+        ->mountAction(TestAction::make('sortear')->table($this->grupos))
+        ->assertActionDataSet(['grupo_0' => $grupos[0]->participantes->map(fn ($p): string => (string) $p->id)->all()]);
+
+    // Más parejas de las que caben en un grupo y huecos por sortear: no se sortea.
+    fasesDe($this->categoria)
+        ->callAction(TestAction::make('sortear')->table($this->grupos), ['grupo_0' => [], 'grupo_1' => array_map('strval', array_slice($ids, 0, 5)), 'grupo_2' => []])
         ->assertNotified('No se ha podido sortear');
 });
 
@@ -263,17 +269,20 @@ test('en el sorteo se pueden hacer todos los grupos a mano', function () {
             'grupo_2' => array_slice($ids, 8, 4),
         ])
         ->assertHasNoActionErrors()
-        ->assertNotified('3 grupos y 18 partidos');
+        ->assertNotified('Grupos guardados');
 
     $grupos = $this->grupos->refresh()->grupos()->with('participantes')->get();
     expect($grupos->map(fn ($g): array => $g->participantes->pluck('id')->sort()->values()->all())->all())
         ->toBe(array_map(fn (array $trozo): array => array_map('intval', $trozo), array_chunk($ids, 4)))
         ->and($this->grupos->configuracionDeGrupos()->modoDeSorteo)->toBe(ModoDeSorteo::Manual);
 
-    // La misma pareja en dos grupos no se sortea.
+    expect($this->grupos->partidos()->count())->toBe(18)
+        ->and($this->grupos->estado)->toBe(EstadoFase::Preparada);
+
+    // Una pareja colocada ya no se puede elegir en otro grupo.
     fasesDe($this->categoria)
-        ->callAction(TestAction::make('sortear')->table($this->grupos), ['modo' => 'manual', 'grupo_0' => [$ids[0]], 'grupo_1' => [$ids[0]]])
-        ->assertNotified('No se ha podido sortear');
+        ->callAction(TestAction::make('sortear')->table($this->grupos), ['grupo_1' => [$ids[0], ...array_slice($ids, 5, 3)]]);
+    expect($this->grupos->grupos()->first()->participantes()->pluck('participantes.id')->all())->toContain((int) $ids[0]);
 });
 
 test('en los buscadores del sorteo salen los jugadores con su nivel', function () {
@@ -282,9 +291,63 @@ test('en los buscadores del sorteo salen los jugadores con su nivel', function (
         ->create(['categoria_id' => $this->categoria->id, 'cabeza_de_serie' => 9]);
     Inscripcion::factory()->pendiente()->create(['participante_id' => $pareja->id]);
 
-    expect(FasesRelationManager::etiquetaDelSorteo($pareja->refresh()))
+    expect(SorteoDeGrupos::etiqueta($pareja->refresh()))
         ->toContain('Ana Gil (3,5)')
         ->toContain('Eva Sanz (sin nivel)')
         ->toContain('CS 9')
         ->toContain('pendiente');
+});
+
+test('después del sorteo se cambian los grupos a mano y solo se rehacen los que cambian', function () {
+    app(SortearGrupos::class)->handle($this->grupos, $this->propietario);
+    app(GenerarPartidos::class)->handle($this->grupos, $this->propietario);
+    $antes = $this->grupos->grupos()->with('participantes')->get();
+    $deA = $antes[0]->partidos()->firstOrFail();
+    app(RegistrarResultado::class)->handle($deA, new Resultado([new Set(6, 1), new Set(6, 1)]), $this->propietario);
+
+    $b = $antes[1]->participantes->pluck('id')->all();
+    $c = $antes[2]->participantes->pluck('id')->all();
+    $partidosDeB = $antes[1]->partidos()->pluck('id')->all();
+
+    // Se cambia una pareja de B por una de C.
+    fasesDe($this->categoria)
+        ->callAction(TestAction::make('sortear')->table($this->grupos), [
+            'grupo_1' => array_map('strval', [$c[0], ...array_slice($b, 1)]),
+            'grupo_2' => array_map('strval', [$b[0], ...array_slice($c, 1)]),
+        ])
+        ->assertHasNoActionErrors()
+        ->assertNotified('Grupos guardados');
+
+    $despues = $this->grupos->refresh()->grupos()->with('participantes')->get();
+    expect($despues[1]->participantes->pluck('id')->all())->toContain($c[0])->not->toContain($b[0])
+        ->and($despues[2]->participantes->pluck('id')->all())->toContain($b[0])
+        ->and($deA->refresh()->estado)->toBe(EstadoPartido::Jugado)
+        ->and($despues[1]->partidos()->pluck('id')->intersect($partidosDeB)->all())->toBe([])
+        ->and($this->grupos->partidos()->count())->toBe(18);
+
+    // Sin tocar nada, no cambia nada.
+    fasesDe($this->categoria)->callAction(TestAction::make('sortear')->table($this->grupos))
+        ->assertNotified('Los grupos no cambian');
+    expect($deA->refresh()->estado)->toBe(EstadoPartido::Jugado);
+});
+
+test('con grupos hechos, una pareja confirmada después entra en un hueco sin rehacer los demás', function () {
+    app(SortearGrupos::class)->handle($this->grupos, $this->propietario);
+    app(GenerarPartidos::class)->handle($this->grupos, $this->propietario);
+    $partidosAntes = $this->grupos->partidos()->pluck('id')->all();
+
+    $nueva = Participante::factory()->create(['categoria_id' => $this->categoria->id]);
+    Inscripcion::factory()->create(['participante_id' => $nueva->id]);
+
+    fasesDe($this->categoria)
+        ->callAction(TestAction::make('sortear')->table($this->grupos))
+        ->assertHasNoActionErrors()
+        ->assertNotified('Grupos guardados');
+
+    $grupos = $this->grupos->refresh()->grupos()->with('participantes')->get();
+    $suyo = $grupos->first(fn ($g): bool => $g->participantes->contains('id', $nueva->id));
+    expect($suyo)->not->toBeNull()
+        ->and($grupos->sum(fn ($g): int => $g->participantes->count()))->toBe(13)
+        // Los partidos de los otros dos grupos siguen siendo los mismos.
+        ->and($this->grupos->partidos()->where('grupo_id', '!=', $suyo->id)->pluck('id')->diff($partidosAntes)->all())->toBe([]);
 });
