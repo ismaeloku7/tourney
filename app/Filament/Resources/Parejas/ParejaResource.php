@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Parejas;
 use App\Enums\EstadoInscripcion;
 use App\Enums\Rol;
 use App\Filament\Resources\Categorias\CategoriaResource;
+use App\Filament\Resources\Parejas\Pages\EditPareja;
 use App\Filament\Resources\Parejas\Pages\ListParejas;
 use App\Models\Categoria;
 use App\Models\Inscripcion;
@@ -95,14 +96,13 @@ class ParejaResource extends Resource
                     ->options(fn (): array => self::categorias()->mapWithKeys(fn (Categoria $c): array => [$c->id => $c->torneo->nombre.' · '.$c->nombre])->all()),
                 SelectFilter::make('estado')->label('Estado')->options(EstadoInscripcion::opciones()),
             ])
-            ->recordAction('niveles')
+            ->recordUrl(fn (Inscripcion $record): string => self::getUrl('edit', ['record' => $record]))
             ->recordActions([
                 CompaneroDePareja::accion(),
                 NivelesDePareja::accion(),
                 MoverParejas::accion(),
-                Action::make('gestionar')->label('Gestionar')->icon(Heroicon::OutlinedArrowTopRightOnSquare)
-                    ->tooltip('Confirmar, añadir compañero, pago, baja… en su categoría')
-                    ->url(fn (Inscripcion $record): string => CategoriaResource::getUrl('edit', ['record' => $record->categoria_id])),
+                Action::make('editar')->label('Editar')->icon(Heroicon::OutlinedPencilSquare)
+                    ->url(fn (Inscripcion $record): string => self::getUrl('edit', ['record' => $record])),
             ])
             ->toolbarActions([
                 MoverParejas::enBloque(),
@@ -113,6 +113,7 @@ class ParejaResource extends Resource
     {
         return [
             'index' => ListParejas::route('/'),
+            'edit' => EditPareja::route('/{record}/editar'),
         ];
     }
 
