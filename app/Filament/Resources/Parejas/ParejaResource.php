@@ -99,9 +99,13 @@ class ParejaResource extends Resource
             ->recordActions([
                 CompaneroDePareja::accion(),
                 NivelesDePareja::accion(),
+                MoverParejas::accion(),
                 Action::make('gestionar')->label('Gestionar')->icon(Heroicon::OutlinedArrowTopRightOnSquare)
                     ->tooltip('Confirmar, añadir compañero, pago, baja… en su categoría')
                     ->url(fn (Inscripcion $record): string => CategoriaResource::getUrl('edit', ['record' => $record->categoria_id])),
+            ])
+            ->toolbarActions([
+                MoverParejas::enBloque(),
             ]);
     }
 
