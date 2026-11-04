@@ -225,7 +225,7 @@ final class SorteoDeGrupos
         $ids = [];
         for ($i = 0; $i < $total; $i++) {
             if ($i !== $grupo) {
-                $ids = [...$ids, ...array_map(fn (mixed $id): string => (string) $id, (array) ($get("grupo_{$i}") ?? []))];
+                $ids = [...$ids, ...array_values(array_map(fn (mixed $id): string => (string) $id, (array) ($get("grupo_{$i}") ?? [])))];
             }
         }
 
