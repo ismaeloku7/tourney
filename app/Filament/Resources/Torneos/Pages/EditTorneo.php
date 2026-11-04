@@ -4,7 +4,6 @@ namespace App\Filament\Resources\Torneos\Pages;
 
 use App\Actions\Avisos\EnviarComunicacion;
 use App\Actions\Competicion\CambiarEstadoDelTorneo;
-use App\Actions\Competicion\GenerarFranjas;
 use App\Actions\Competicion\PlanificarHorarios;
 use App\Actions\Inscripciones\ImportarParejas;
 use App\Competicion\Datos\Conflicto;
@@ -17,6 +16,7 @@ use App\Models\Categoria;
 use App\Models\Fase;
 use App\Models\Torneo;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\DeleteAction;
@@ -56,27 +56,29 @@ class EditTorneo extends EditRecord
                 ->label('Planificar horarios')
                 ->icon(Heroicon::OutlinedCalendarDays)
                 ->visible(fn (): bool => $this->torneo()->torneoPistas()->exists())
-                ->requiresConfirmation()
-                ->modalDescription('Se crean las franjas que falten en las pistas del torneo y se pone hora y pista a los partidos pendientes de todas las categorías, respetando los ya programados, el descanso mínimo y que nadie juegue dos partidos a la vez.')
+                ->modalHeading('Planificar horarios')
+                ->modalDescription(fn (): string => 'Cada partido reserva su pista '.$this->torneo()->margen_entre_partidos_minutos.' minutos para calentar más su duración estimada, y el siguiente entra en cuanto acaba: sin huecos fijos. Se respetan la disponibilidad de las pistas, el descanso mínimo, que nadie juegue dos a la vez y el orden de las rondas, y se busca el plan que acaba antes con menos pista parada.')
+                ->schema([
+                    Toggle::make('rehacer')->label('Rehacer también los ya programados')->default(false)
+                        ->helperText('Los que no han empezado se vuelven a colocar desde ahora. Desmarcado, solo se colocan los que no tienen hora.'),
+                ])
                 ->modalSubmitActionLabel('Planificar')
-                ->action(function (): void {
-                    $torneo = $this->torneo();
-                    $franjas = app(GenerarFranjas::class)->handle($torneo);
-                    $planificacion = app(PlanificarHorarios::class)->handle($torneo, $this->usuario());
+                ->action(function (array $data): void {
+                    $plan = app(PlanificarHorarios::class)->handle($this->torneo(), $this->usuario(), rehacer: (bool) ($data['rehacer'] ?? false));
 
-                    $colocados = count($planificacion->asignaciones);
-                    $conflictos = $planificacion->conflictos;
+                    $colocados = count($plan->colocados);
+                    $resumen = $plan->fin === null ? null : 'Termina '.CarbonImmutable::instance($plan->fin)->translatedFormat('l j \\a \\l\\a\\s H:i').' · pistas ocupadas al '.$plan->ocupacion.' % · '.$plan->minutosMuertos.' min de pista parada.';
 
-                    if ($conflictos === []) {
-                        Avisos::hecho($colocados === 0 ? 'No había partidos que colocar' : "{$colocados} partidos con hora y pista", $franjas > 0 ? "Se han creado {$franjas} franjas nuevas." : null);
+                    if ($plan->conflictos === []) {
+                        Avisos::hecho($colocados === 0 ? 'No había partidos que colocar' : "{$colocados} partidos con hora y pista", $resumen);
 
                         return;
                     }
 
-                    Avisos::error(count($conflictos).' partidos se quedan sin sitio', [
-                        "{$colocados} colocados.",
-                        ...array_map(fn (Conflicto $c): string => "Partido {$c->partido}: {$c->detalle}", array_slice($conflictos, 0, 5)),
-                        count($conflictos) > 5 ? 'Y '.(count($conflictos) - 5).' más.' : '',
+                    Avisos::error(count($plan->conflictos).' partidos se quedan sin sitio', [
+                        "{$colocados} colocados.".($resumen !== null ? ' '.$resumen : ''),
+                        ...array_map(fn (Conflicto $c): string => "Partido {$c->partido}: {$c->detalle}", array_slice($plan->conflictos, 0, 5)),
+                        count($plan->conflictos) > 5 ? 'Y '.(count($plan->conflictos) - 5).' más.' : '',
                     ]);
                 }),
             Action::make('importar')

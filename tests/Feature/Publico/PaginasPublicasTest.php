@@ -1,6 +1,5 @@
 <?php
 
-use App\Actions\Competicion\GenerarFranjas;
 use App\Actions\Competicion\GenerarPartidos;
 use App\Actions\Competicion\PlanificarHorarios;
 use App\Actions\Competicion\RegistrarResultado;
@@ -56,7 +55,6 @@ beforeEach(function () {
         $grupos = Fase::factory()->grupos(['tamano_de_grupo' => 4, 'semilla' => 3])->create(['categoria_id' => $categoria->id, 'nombre' => 'Fase de grupos']);
         app(SortearGrupos::class)->handle($grupos, $usuario);
         app(GenerarPartidos::class)->handle($grupos, $usuario);
-        app(GenerarFranjas::class)->handle($this->torneo);
         app(PlanificarHorarios::class)->handle($this->torneo, $usuario);
         $this->torneo->update(['horarios_publicados_en' => now()]);
 

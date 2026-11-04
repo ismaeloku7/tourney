@@ -2,7 +2,6 @@
 
 use App\Actions\Competicion\CambiarEstadoDelTorneo;
 use App\Actions\Competicion\CerrarFase;
-use App\Actions\Competicion\GenerarFranjas;
 use App\Actions\Competicion\GenerarPartidos;
 use App\Actions\Competicion\PlanificarHorarios;
 use App\Actions\Competicion\RegistrarResultado;
@@ -114,7 +113,6 @@ test('al publicar los horarios cada jugador recibe los suyos y los seguidores de
     $this->torneo->torneoPistas()->create(['pista_id' => Pista::factory()->create(['nombre' => 'Central'])->id, 'orden' => 1, 'disponibilidad' => [
         ['fecha' => $this->torneo->fecha_inicio->toDateString(), 'desde' => '09:00', 'hasta' => '21:00'],
     ]]);
-    app(GenerarFranjas::class)->handle($this->torneo);
     app(PlanificarHorarios::class)->handle($this->torneo, $this->propietario);
 
     $seguidor = suscripcionDe(null);

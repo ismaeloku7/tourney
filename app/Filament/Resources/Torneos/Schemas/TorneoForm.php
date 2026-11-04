@@ -119,10 +119,11 @@ class TorneoForm
                             ->maxValue(600)
                             ->default(30),
                         Select::make('margen_entre_partidos_minutos')
-                            ->label('Margen entre partidos')
-                            ->options([0 => 'Sin margen', 5 => '5 minutos', 10 => '10 minutos'])
-                            ->default(0)
-                            ->required(),
+                            ->label('Calentamiento en pista')
+                            ->options([0 => 'Sin calentamiento', 5 => '5 minutos', 10 => '10 minutos', 15 => '15 minutos'])
+                            ->default(10)
+                            ->required()
+                            ->helperText('Cada partido reserva su pista este tiempo antes de empezar.'),
                     ]),
             ]);
     }

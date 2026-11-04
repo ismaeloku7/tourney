@@ -20,7 +20,6 @@ use App\Filament\Resources\Torneos\Pages\PartidosDelTorneo;
 use App\Models\Categoria;
 use App\Models\Fase;
 use App\Models\FormatoPartido;
-use App\Models\Franja;
 use App\Models\Inscripcion;
 use App\Models\Jugador;
 use App\Models\Organizador;
@@ -155,14 +154,24 @@ test('la mesa de partidos registra, rechaza, anula y programa', function () {
     $mesa->callAction(TestAction::make('resultado')->table($partido), ['especial' => 'walkover', 'gana_local' => '0'])->assertHasNoActionErrors();
     expect($partido->refresh()->estado)->toBe(EstadoPartido::Walkover)->and($partido->ganador_id)->toBe($partido->visitante_id);
 
-    // Programar a mano en una franja libre.
+    // Programar a mano: pista y hora; reserva el calentamiento más la duración.
     $otro = $this->grupos->partidos()->where('estado', EstadoPartido::Pendiente->value)->orderBy('id')->firstOrFail();
-    $franja = Franja::query()->create(['torneo_id' => $this->torneo->id, 'pista_id' => $this->torneo->torneoPistas()->first()->pista_id, 'inicio' => $this->torneo->fecha_inicio->setTime(10, 0), 'fin' => $this->torneo->fecha_inicio->setTime(11, 0)]);
+    $pista = $this->torneo->torneoPistas()->first()->pista_id;
+    $diez = $this->torneo->fecha_inicio->toImmutable()->setTime(10, 0);
 
-    $mesa->callAction(TestAction::make('programar')->table($otro), ['franja_id' => $franja->id])->assertHasNoActionErrors()->assertNotified('Partido programado');
-    expect($otro->refresh()->estado)->toBe(EstadoPartido::Programado)->and($otro->pista_id)->toBe($franja->pista_id);
+    $mesa->callAction(TestAction::make('programar')->table($otro), ['pista_id' => $pista, 'inicio' => $diez->format('Y-m-d H:i:s')])->assertHasNoActionErrors()->assertNotified('Partido programado');
+    expect($otro->refresh()->estado)->toBe(EstadoPartido::Programado)
+        ->and($otro->pista_id)->toBe($pista)
+        ->and($otro->franja->inicio->format('H:i'))->toBe('10:00')
+        ->and($otro->franja->fin->format('H:i'))->toBe($diez->addMinutes($this->torneo->margen_entre_partidos_minutos + 60)->format('H:i'));
 
-    $mesa->callAction(TestAction::make('programar')->table($otro), ['franja_id' => null])->assertHasNoActionErrors();
+    // Otro partido no puede pisar esa pista a esa hora.
+    $tercero = $this->grupos->partidos()->where('estado', EstadoPartido::Pendiente->value)->orderBy('id')->firstOrFail();
+    mesaDe($this->torneo)->callAction(TestAction::make('programar')->table($tercero), ['pista_id' => $pista, 'inicio' => $diez->addMinutes(30)->format('Y-m-d H:i:s')])
+        ->assertNotified('No se ha podido programar');
+    expect($tercero->refresh()->franja_id)->toBeNull();
+
+    mesaDe($this->torneo)->callAction(TestAction::make('programar')->table($otro), ['pista_id' => null, 'inicio' => null])->assertHasNoActionErrors();
     expect($otro->refresh()->franja_id)->toBeNull()->and($otro->estado)->toBe(EstadoPartido::Pendiente);
 });
 
@@ -177,7 +186,7 @@ test('desde la ficha del torneo se planifica y se cambia el estado con sus compr
     $ficha = fichaDe($this->torneo);
     $ficha->callAction('planificar')->assertHasNoActionErrors()->assertNotified('18 partidos con hora y pista');
     expect($this->grupos->partidos()->whereNotNull('franja_id')->count())->toBe(18)
-        ->and($this->torneo->franjas()->count())->toBe(4 * 2 * 12);
+        ->and($this->torneo->franjas()->count())->toBe(18);
 
     $ficha->callAction('estado_siguiente')->assertHasNoActionErrors()->assertNotified('El torneo está en «En juego»');
     expect($this->torneo->refresh()->estado)->toBe(EstadoTorneo::EnJuego)->and($this->torneo->horarios_publicados_en)->not->toBeNull();
