@@ -95,7 +95,9 @@ class ParejaResource extends Resource
                     ->options(fn (): array => self::categorias()->mapWithKeys(fn (Categoria $c): array => [$c->id => $c->torneo->nombre.' · '.$c->nombre])->all()),
                 SelectFilter::make('estado')->label('Estado')->options(EstadoInscripcion::opciones()),
             ])
+            ->recordAction('niveles')
             ->recordActions([
+                NivelesDePareja::accion(),
                 Action::make('gestionar')->label('Gestionar')->icon(Heroicon::OutlinedArrowTopRightOnSquare)
                     ->tooltip('Confirmar, añadir compañero, pago, baja… en su categoría')
                     ->url(fn (Inscripcion $record): string => CategoriaResource::getUrl('edit', ['record' => $record->categoria_id])),

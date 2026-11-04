@@ -6,6 +6,7 @@ use App\Enums\EstadoInscripcion;
 use App\Filament\ConfirmarCompletas;
 use App\Filament\Resources\Categorias\CategoriaResource;
 use App\Filament\Resources\Parejas\ColumnasDePareja;
+use App\Filament\Resources\Parejas\NivelesDePareja;
 use App\Models\Categoria;
 use App\Models\Inscripcion;
 use App\Models\Torneo;
@@ -69,7 +70,9 @@ class ParejasRelationManager extends RelationManager
             ->headerActions([
                 ConfirmarCompletas::accion(fn (): Torneo => $this->torneo(), fn (): ?Categoria => null),
             ])
+            ->recordAction('niveles')
             ->recordActions([
+                NivelesDePareja::accion(),
                 Action::make('gestionar')->label('Gestionar')->icon(Heroicon::OutlinedArrowTopRightOnSquare)
                     ->tooltip('Confirmar, añadir compañero, pago, baja… en su categoría')
                     ->url(fn (Inscripcion $record): string => CategoriaResource::getUrl('edit', ['record' => $record->categoria_id])),

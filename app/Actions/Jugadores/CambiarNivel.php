@@ -8,6 +8,7 @@ use App\Enums\EstadoTorneo;
 use App\Models\Jugador;
 use App\Models\Participante;
 use App\Models\RegistroDeCambio;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 
@@ -24,6 +25,17 @@ final class CambiarNivel
             throw new OperacionNoPermitida('Solo puedes cambiar tu nivel y el de tu compañero de pareja.');
         }
 
+        return $this->aplicar($de, $nivel, $quien);
+    }
+
+    /** La organización, desde el panel: el de cualquier jugador. */
+    public function porLaOrganizacion(Jugador $de, ?string $nivel, ?User $usuario): Jugador
+    {
+        return $this->aplicar($de, $nivel, $usuario);
+    }
+
+    private function aplicar(Jugador $de, ?string $nivel, User|Jugador|null $quien): Jugador
+    {
         $nivel = trim((string) $nivel);
 
         if ($nivel !== '' && (preg_match('/^\d{1,2}([.,]\d{1,2})?$/', $nivel) !== 1 || (float) str_replace(',', '.', $nivel) > 10)) {
