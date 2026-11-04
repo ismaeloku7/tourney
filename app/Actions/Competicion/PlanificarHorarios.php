@@ -7,8 +7,10 @@ use App\Competicion\Datos\Intervalo;
 use App\Competicion\Datos\OcupacionFija;
 use App\Competicion\Datos\PartidoAPlanificar;
 use App\Competicion\Datos\PlanDePistas;
+use App\Competicion\Datos\PropuestaDeHorarios;
 use App\Competicion\Datos\RestriccionesDePlanificacion;
 use App\Competicion\Errores\ConfiguracionInvalida;
+use App\Competicion\Errores\OperacionNoPermitida;
 use App\Competicion\PlanificadorContinuo;
 use App\Enums\EstadoPartido;
 use App\Models\Disponibilidad;
@@ -35,7 +37,17 @@ final class PlanificarHorarios
 {
     public function __construct(private readonly PlanificadorContinuo $planificador = new PlanificadorContinuo) {}
 
+    /** Calcula y guarda en un paso. */
     public function handle(Torneo $torneo, User $usuario, bool $rehacer = false): PlanDePistas
+    {
+        $propuesta = $this->proponer($torneo, $rehacer);
+        $this->aplicar($torneo, $propuesta, $usuario);
+
+        return $propuesta->plan;
+    }
+
+    /** Calcula el plan sin guardar nada. */
+    public function proponer(Torneo $torneo, bool $rehacer = false): PropuestaDeHorarios
     {
         $todos = Partido::query()
             ->whereHas('fase.categoria', fn (Builder $consulta) => $consulta->where('torneo_id', $torneo->id))
@@ -117,15 +129,31 @@ final class PlanificarHorarios
             $fijos,
         );
 
-        DB::transaction(function () use ($torneo, $usuario, $plan, $aPlanificar, $todos): void {
+        return new PropuestaDeHorarios($plan, array_map(fn (PartidoAPlanificar $p): int => $p->id, $aPlanificar), $this->huella($torneo), $rehacer);
+    }
+
+    /**
+     * Guarda un plan calculado: los partidos que se (re)colocan sueltan su
+     * hora de antes y reciben la nueva. Si el torneo ha cambiado desde que
+     * se calculó (un resultado, una hora a mano, las pistas…), no se
+     * aplica.
+     *
+     * @throws OperacionNoPermitida
+     */
+    public function aplicar(Torneo $torneo, PropuestaDeHorarios $propuesta, User $usuario): void
+    {
+        if ($propuesta->huella !== $this->huella($torneo)) {
+            throw new OperacionNoPermitida('El torneo ha cambiado desde que se calculó el plan: vuelve a calcularlo.');
+        }
+
+        $plan = $propuesta->plan;
+
+        DB::transaction(function () use ($torneo, $usuario, $plan, $propuesta): void {
             // Los que se replanifican sueltan su hora de antes; y fuera las franjas vacías.
-            foreach ($aPlanificar as $dto) {
-                $partido = $todos->get($dto->id);
-                if ($partido !== null && $partido->franja_id !== null) {
-                    $franja = $partido->franja_id;
-                    $partido->forceFill(['franja_id' => null, 'pista_id' => null, 'estado' => $partido->estado === EstadoPartido::Programado ? EstadoPartido::Pendiente : $partido->estado])->save();
-                    Franja::query()->whereKey($franja)->delete();
-                }
+            foreach (Partido::query()->whereIn('id', $propuesta->partidos)->whereNotNull('franja_id')->get() as $partido) {
+                $franja = $partido->franja_id;
+                $partido->forceFill(['franja_id' => null, 'pista_id' => null, 'estado' => $partido->estado === EstadoPartido::Programado ? EstadoPartido::Pendiente : $partido->estado])->save();
+                Franja::query()->whereKey($franja)->delete();
             }
             Franja::query()->where('torneo_id', $torneo->id)->where('bloqueada', false)->whereDoesntHave('partido')->delete();
 
@@ -152,8 +180,31 @@ final class PlanificarHorarios
                 'conflictos' => array_map(fn ($c): array => ['partido' => $c->partido, 'tipo' => $c->tipo, 'detalle' => $c->detalle], $plan->conflictos),
             ]);
         });
+    }
 
-        return $plan;
+    /**
+     * Lo que cambia el plan: los partidos (estado, parejas, hora), las
+     * pistas y su disponibilidad, los bloqueos, el calentamiento y el
+     * descanso.
+     */
+    public function huella(Torneo $torneo): string
+    {
+        $partidos = Partido::query()
+            ->whereHas('fase.categoria', fn (Builder $consulta) => $consulta->where('torneo_id', $torneo->id))
+            ->orderBy('id')
+            ->get(['id', 'estado', 'franja_id', 'local_id', 'visitante_id'])
+            ->map(fn (Partido $p): array => [$p->id, $p->estado->value, $p->franja_id, $p->local_id, $p->visitante_id])
+            ->all();
+
+        $fresco = $torneo->fresh() ?? $torneo;
+
+        return md5((string) json_encode([
+            $partidos,
+            $fresco->torneoPistas()->orderBy('pista_id')->get(['pista_id', 'disponibilidad'])->toArray(),
+            Franja::query()->where('torneo_id', $torneo->id)->where('bloqueada', true)->orderBy('id')->get(['pista_id', 'inicio', 'fin'])->toArray(),
+            $fresco->margen_entre_partidos_minutos,
+            $fresco->descanso_minimo_minutos,
+        ]));
     }
 
     /**

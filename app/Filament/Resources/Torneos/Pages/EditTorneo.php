@@ -4,9 +4,7 @@ namespace App\Filament\Resources\Torneos\Pages;
 
 use App\Actions\Avisos\EnviarComunicacion;
 use App\Actions\Competicion\CambiarEstadoDelTorneo;
-use App\Actions\Competicion\PlanificarHorarios;
 use App\Actions\Inscripciones\ImportarParejas;
-use App\Competicion\Datos\Conflicto;
 use App\Competicion\Errores\ErrorDeCompeticion;
 use App\Enums\EstadoTorneo;
 use App\Exportaciones\AccionesDeExportacion;
@@ -16,7 +14,6 @@ use App\Models\Categoria;
 use App\Models\Fase;
 use App\Models\Torneo;
 use App\Models\User;
-use Carbon\CarbonImmutable;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Actions\DeleteAction;
@@ -53,34 +50,11 @@ class EditTorneo extends EditRecord
                 ->color('gray')
                 ->url(fn (): string => PartidosDelTorneo::getUrl(['record' => $this->torneo()])),
             Action::make('planificar')
-                ->label('Planificar horarios')
+                ->label('Horarios')
                 ->icon(Heroicon::OutlinedCalendarDays)
+                ->color('gray')
                 ->visible(fn (): bool => $this->torneo()->torneoPistas()->exists())
-                ->modalHeading('Planificar horarios')
-                ->modalDescription(fn (): string => 'Cada partido reserva su pista '.$this->torneo()->margen_entre_partidos_minutos.' minutos para calentar más su duración estimada, y el siguiente entra en cuanto acaba: sin huecos fijos. Se respetan la disponibilidad de las pistas, el descanso mínimo, que nadie juegue dos a la vez y el orden de las rondas, y se busca el plan que acaba antes con menos pista parada.')
-                ->schema([
-                    Toggle::make('rehacer')->label('Rehacer también los ya programados')->default(false)
-                        ->helperText('Los que no han empezado se vuelven a colocar desde ahora. Desmarcado, solo se colocan los que no tienen hora.'),
-                ])
-                ->modalSubmitActionLabel('Planificar')
-                ->action(function (array $data): void {
-                    $plan = app(PlanificarHorarios::class)->handle($this->torneo(), $this->usuario(), rehacer: (bool) ($data['rehacer'] ?? false));
-
-                    $colocados = count($plan->colocados);
-                    $resumen = $plan->fin === null ? null : 'Termina '.CarbonImmutable::instance($plan->fin)->translatedFormat('l j \\a \\l\\a\\s H:i').' · pistas ocupadas al '.$plan->ocupacion.' % · '.$plan->minutosMuertos.' min de pista parada.';
-
-                    if ($plan->conflictos === []) {
-                        Avisos::hecho($colocados === 0 ? 'No había partidos que colocar' : "{$colocados} partidos con hora y pista", $resumen);
-
-                        return;
-                    }
-
-                    Avisos::error(count($plan->conflictos).' partidos se quedan sin sitio', [
-                        "{$colocados} colocados.".($resumen !== null ? ' '.$resumen : ''),
-                        ...array_map(fn (Conflicto $c): string => "Partido {$c->partido}: {$c->detalle}", array_slice($plan->conflictos, 0, 5)),
-                        count($plan->conflictos) > 5 ? 'Y '.(count($plan->conflictos) - 5).' más.' : '',
-                    ]);
-                }),
+                ->url(fn (): string => HorariosDelTorneo::getUrl(['record' => $this->torneo()])),
             Action::make('importar')
                 ->label('Importar parejas')
                 ->icon(Heroicon::OutlinedArrowUpTray)

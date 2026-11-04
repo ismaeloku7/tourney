@@ -16,6 +16,7 @@ use App\Filament\Competicion\SorteoDeGrupos;
 use App\Filament\Resources\Categorias\Pages\EditCategoria;
 use App\Filament\Resources\Categorias\RelationManagers\FasesRelationManager;
 use App\Filament\Resources\Torneos\Pages\EditTorneo;
+use App\Filament\Resources\Torneos\Pages\HorariosDelTorneo;
 use App\Filament\Resources\Torneos\Pages\PartidosDelTorneo;
 use App\Models\Categoria;
 use App\Models\Fase;
@@ -72,6 +73,11 @@ function fasesDe(Categoria $categoria): Testable
 function mesaDe(Torneo $torneo): Testable
 {
     return Livewire::test(PartidosDelTorneo::class, ['record' => $torneo->getRouteKey()]);
+}
+
+function horariosDe(Torneo $torneo): Testable
+{
+    return Livewire::test(HorariosDelTorneo::class, ['record' => $torneo->getRouteKey()]);
 }
 
 function fichaDe(Torneo $torneo): Testable
@@ -183,10 +189,25 @@ test('desde la ficha del torneo se planifica y se cambia el estado con sus compr
     fichaDe($this->torneo)->assertSuccessful()->callAction('estado_siguiente')->assertNotified('No se ha podido cambiar el estado');
     expect($this->torneo->refresh()->estado)->toBe(EstadoTorneo::Sorteo);
 
-    $ficha = fichaDe($this->torneo);
-    $ficha->callAction('planificar')->assertHasNoActionErrors()->assertNotified('18 partidos con hora y pista');
+    // Calcular enseña el plan sin guardar nada; aplicar lo guarda.
+    $horarios = horariosDe($this->torneo);
+    $horarios->assertSuccessful()->assertActionHidden('aplicar')
+        ->callAction('calcular')->assertHasNoActionErrors()->assertNotified('Plan calculado: revísalo y aplícalo')
+        ->assertSee('Plan propuesto, todavía sin guardar.')
+        ->assertActionVisible('aplicar');
+    expect($this->grupos->partidos()->whereNotNull('franja_id')->count())->toBe(0);
+
+    $horarios->callAction('aplicar')->assertHasNoActionErrors()->assertNotified('18 partidos con hora y pista');
     expect($this->grupos->partidos()->whereNotNull('franja_id')->count())->toBe(18)
         ->and($this->torneo->franjas()->count())->toBe(18);
+    horariosDe($this->torneo)->assertSuccessful()->assertDontSee('Plan propuesto');
+
+    // Un plan calculado no se aplica si el torneo cambia entre medias.
+    $otra = horariosDe($this->torneo)->callAction('calcular', ['rehacer' => true]);
+    $this->torneo->update(['margen_entre_partidos_minutos' => 5]);
+    $otra->callAction('aplicar')->assertNotified('No se ha aplicado');
+
+    $ficha = fichaDe($this->torneo);
 
     $ficha->callAction('estado_siguiente')->assertHasNoActionErrors()->assertNotified('El torneo está en «En juego»');
     expect($this->torneo->refresh()->estado)->toBe(EstadoTorneo::EnJuego)->and($this->torneo->horarios_publicados_en)->not->toBeNull();
