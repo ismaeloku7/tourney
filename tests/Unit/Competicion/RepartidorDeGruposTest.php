@@ -101,3 +101,23 @@ test('más grupos que participantes se reduce a un participante por grupo', func
         ->and($reparto->grupos[0]->orden)->toBe(1)
         ->and(ModoDeSorteo::Aleatorio)->toBe(ModoDeSorteo::Aleatorio);
 });
+
+test('las parejas fijadas a mano van a su grupo y el resto se sortea en los huecos', function () {
+    $reparto = repartir(participantes(12, 3), ['numero_de_grupos' => 3, 'modo_de_sorteo' => 'cabezas_de_serie', 'grupos_manuales' => [[10, 11], [], [12, 1]]]);
+
+    expect($reparto->grupos[0]->participantes)->toContain(10, 11)
+        ->and($reparto->grupos[2]->participantes)->toContain(12, 1)
+        ->and(array_map(fn (Grupo $g): int => $g->tamano(), $reparto->grupos))->toBe([4, 4, 4])
+        ->and(array_merge(...array_map(fn (Grupo $g): array => $g->participantes, $reparto->grupos)))->toEqualCanonicalizing(range(1, 12));
+
+    // Las cabezas que quedan sin fijar (2 y 3) siguen repartiéndose una por grupo.
+    $cabezasPorGrupo = array_map(fn (Grupo $g): int => count(array_intersect($g->participantes, [1, 2, 3])), $reparto->grupos);
+    expect($cabezasPorGrupo)->toBe([1, 1, 1]);
+});
+
+test('fijar más parejas de las que caben, en un grupo que no existe o dos veces la misma lanza', function () {
+    expect(fn () => repartir(participantes(8), ['numero_de_grupos' => 2, 'grupos_manuales' => [[1, 2, 3, 4, 5]]]))->toThrow(ConfiguracionInvalida::class, 'caben 4')
+        ->and(fn () => repartir(participantes(8), ['numero_de_grupos' => 2, 'grupos_manuales' => [[], [], [1]]]))->toThrow(ConfiguracionInvalida::class, 'no hay grupo C')
+        ->and(fn () => repartir(participantes(8), ['numero_de_grupos' => 2, 'grupos_manuales' => [[1], [1]]]))->toThrow(ParticipanteDuplicado::class)
+        ->and(fn () => repartir(participantes(8), ['numero_de_grupos' => 2, 'grupos_manuales' => [[99]]]))->toThrow(ConfiguracionInvalida::class, 'no está');
+});

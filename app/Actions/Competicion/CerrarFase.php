@@ -38,9 +38,12 @@ final class CerrarFase
     ) {}
 
     /**
+     * Por defecto no avisa a nadie: con $avisar, cada pareja que pasa al
+     * cuadro recibe su primer cruce.
+     *
      * @return list<Clasificado>
      */
-    public function handle(Fase $fase, User $usuario): array
+    public function handle(Fase $fase, User $usuario, bool $avisar = false): array
     {
         if ($fase->estado === EstadoFase::Cerrada) {
             throw new OperacionNoPermitida('La fase ya está cerrada.');
@@ -68,7 +71,7 @@ final class CerrarFase
             return $clasificados;
         });
 
-        if ($fase->tipo->esDeGrupos()) {
+        if ($avisar && $fase->tipo->esDeGrupos()) {
             app(Avisos::class)->crucesDe($fase);
         }
 

@@ -5,15 +5,20 @@ namespace App\Filament\Resources\Categorias\RelationManagers;
 use App\Actions\Competicion\CerrarFase;
 use App\Actions\Competicion\GenerarPartidos;
 use App\Actions\Competicion\SortearGrupos;
+use App\Competicion\Datos\Grupo;
 use App\Competicion\Errores\ConfiguracionInvalida;
 use App\Competicion\Errores\ErrorDeCompeticion;
 use App\Enums\EstadoFase;
+use App\Enums\EstadoInscripcion;
+use App\Enums\EstadoParticipante;
+use App\Enums\ModoDeSorteo;
 use App\Enums\TipoDeFase;
 use App\Filament\Avisos;
 use App\Filament\Resources\Categorias\Schemas\FaseForm;
 use App\Filament\Resources\Torneos\Pages\PartidosDelTorneo;
 use App\Models\Categoria;
 use App\Models\Fase;
+use App\Models\Participante;
 use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
@@ -21,10 +26,13 @@ use Filament\Actions\CreateAction;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\Select;
+use Filament\Forms\Components\Toggle;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\ToggleColumn;
 use Filament\Tables\Table;
 use Illuminate\Database\Eloquent\Model;
 
@@ -66,6 +74,8 @@ class FasesRelationManager extends RelationManager
                 TextColumn::make('estado')->label('Estado')->badge()
                     ->formatStateUsing(fn (EstadoFase $state): string => $state->etiqueta())
                     ->color(fn (EstadoFase $state): string => $state->color()),
+                ToggleColumn::make('visible_en_web')->label('En la web')
+                    ->tooltip('Desmarcada, sus grupos, su cuadro y sus partidos no salen en la web, el tablero ni el portal de los jugadores.'),
                 TextColumn::make('partidos_count')->label('Partidos')->counts('partidos')
                     ->description(fn (Fase $record): ?string => $record->estado === EstadoFase::Pendiente ? null : $record->partidos()->whereIn('estado', ['jugado', 'walkover'])->count().' jugados'),
             ])
@@ -81,15 +91,28 @@ class FasesRelationManager extends RelationManager
                     ->icon(Heroicon::OutlinedArrowPathRoundedSquare)
                     ->color(fn (Fase $record): string => $record->estado === EstadoFase::Pendiente ? 'primary' : 'gray')
                     ->visible(fn (Fase $record): bool => $record->tipo->esDeGrupos() && $record->estado !== EstadoFase::Cerrada)
-                    ->requiresConfirmation()
                     ->modalHeading(fn (Fase $record): string => 'Sortear «'.$record->nombre.'»')
-                    ->modalDescription(fn (Fase $record): string => $record->tieneResultados()
-                        ? 'La fase ya tiene resultados: volver a sortear los borra todos y rehace los grupos y los partidos.'
-                        : 'Se reparten en grupos las parejas confirmadas de la categoría y se generan sus partidos.')
+                    ->modalDescription(fn (Fase $record): string => ($record->tieneResultados()
+                        ? 'La fase ya tiene resultados: volver a sortear los borra todos y rehace los grupos y los partidos. '
+                        : 'Se reparten en grupos las parejas confirmadas de la categoría y se generan sus partidos. ')
+                        .($record->configuracionDeGrupos()->modoDeSorteo === ModoDeSorteo::Manual
+                            ? 'En modo manual, ponga a cada pareja en su grupo.'
+                            : 'Si quiere, fije a mano algunas parejas en su grupo: el resto se sortea.'))
                     ->modalSubmitActionLabel('Sortear')
-                    ->action(function (Fase $record, Action $action): void {
+                    ->fillForm(fn (Fase $record): array => collect($record->configuracionDeGrupos()->gruposManuales ?? [])
+                        ->mapWithKeys(fn (array $ids, int $i): array => ["grupo_{$i}" => $ids])->all())
+                    ->schema(fn (Fase $record): array => $this->gruposAMano($record))
+                    ->action(function (Fase $record, array $data, Action $action): void {
+                        $fijos = [];
+                        for ($i = 0; array_key_exists("grupo_{$i}", $data); $i++) {
+                            $fijos[] = array_values(array_map('intval', (array) $data["grupo_{$i}"]));
+                        }
+                        while ($fijos !== [] && end($fijos) === []) {
+                            array_pop($fijos);
+                        }
+
                         try {
-                            $reparto = app(SortearGrupos::class)->handle($record, $this->usuario(), forzar: $record->tieneResultados());
+                            $reparto = app(SortearGrupos::class)->handle($record, $this->usuario(), forzar: $record->tieneResultados(), fijos: $fijos);
                             $partidos = app(GenerarPartidos::class)->handle($record->refresh(), $this->usuario());
                         } catch (ErrorDeCompeticion $e) {
                             Avisos::error('No se ha podido sortear', [$e->getMessage()]);
@@ -109,9 +132,13 @@ class FasesRelationManager extends RelationManager
                     ->modalDescription(fn (Fase $record): string => $record->tipo->esDeGrupos()
                         ? 'Hace falta que todos los partidos tengan resultado. Se deciden los clasificados y, si la fase siguiente es un cuadro, se construye con ellos.'
                         : 'Hace falta que todos los partidos tengan resultado. La fase queda cerrada.')
-                    ->action(function (Fase $record, Action $action): void {
+                    ->schema(fn (Fase $record): array => $record->tipo->esDeGrupos() ? [
+                        Toggle::make('avisar')->label('Avisar a cada pareja clasificada de su cruce')->default(false)
+                            ->helperText('Por correo y en su portal. Desmarcado, no se avisa a nadie.'),
+                    ] : [])
+                    ->action(function (Fase $record, array $data, Action $action): void {
                         try {
-                            $clasificados = app(CerrarFase::class)->handle($record, $this->usuario());
+                            $clasificados = app(CerrarFase::class)->handle($record, $this->usuario(), avisar: (bool) ($data['avisar'] ?? false));
                         } catch (ErrorDeCompeticion $e) {
                             Avisos::error('No se ha podido cerrar la fase', [$e->getMessage()]);
                             $action->halt();
@@ -157,6 +184,40 @@ class FasesRelationManager extends RelationManager
                 DeleteAction::make()
                     ->visible(fn (Fase $record): bool => $record->estado === EstadoFase::Pendiente),
             ]);
+    }
+
+    /**
+     * Un selector por grupo (A, B…) con las parejas confirmadas, para
+     * fijarlas a mano antes del sorteo.
+     *
+     * @return list<Select>
+     */
+    private function gruposAMano(Fase $fase): array
+    {
+        $parejas = $this->categoria()->participantes()
+            ->where('estado', EstadoParticipante::Activo->value)
+            ->whereHas('inscripcion', fn ($q) => $q->where('estado', EstadoInscripcion::Confirmada->value))
+            ->orderBy('nombre')
+            ->get()
+            ->mapWithKeys(fn (Participante $p): array => [$p->id => $p->nombre.($p->cabeza_de_serie !== null ? " (CS {$p->cabeza_de_serie})" : '')])
+            ->all();
+
+        $configuracion = $fase->configuracionDeGrupos();
+        $n = max(1, count($parejas));
+        $grupos = match (true) {
+            $configuracion->modoDeSorteo === ModoDeSorteo::Manual => $configuracion->numeroDeGrupos ?? (int) ceil($n / ($configuracion->tamanoDeGrupo ?? 4)),
+            $configuracion->numeroDeGrupos !== null => min($configuracion->numeroDeGrupos, $n),
+            default => intdiv($n, $configuracion->tamanoDeGrupo ?? 4),
+        };
+
+        $campos = [];
+        for ($i = 0; $i < max(1, $grupos); $i++) {
+            $campos[] = Select::make("grupo_{$i}")->label('Grupo '.Grupo::nombrePorOrden($i + 1))
+                ->multiple()->searchable()->options($parejas)
+                ->placeholder($configuracion->modoDeSorteo === ModoDeSorteo::Manual ? 'Elija sus parejas' : 'Al sorteo');
+        }
+
+        return $campos;
     }
 
     private function usuario(): User

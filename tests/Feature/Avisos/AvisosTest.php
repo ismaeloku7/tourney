@@ -152,20 +152,31 @@ test('el resultado de un jugador avisa al rival para validarlo, y el validado a 
     expect((new ResultadoDelPartido($partido->refresh()))->titulo())->toBe('Resultado: 6-2 6-3');
 });
 
-test('al cerrar los grupos cada clasificado recibe su cruce del cuadro', function () {
+test('al cerrar los grupos, si se pide, cada clasificado recibe su cruce del cuadro', function () {
     $fase = torneoConGrupo($this->torneo, $this->categoria, $this->propietario);
     foreach ($fase->partidos()->get() as $partido) {
         app(RegistrarResultado::class)->handle($partido, new Resultado([new Set(6, 1), new Set(6, 1)]), $this->propietario);
     }
 
     Notification::fake();
-    $clasificados = app(CerrarFase::class)->handle($fase, $this->propietario);
+    $clasificados = app(CerrarFase::class)->handle($fase, $this->propietario, avisar: true);
 
     expect($clasificados)->toHaveCount(2);
     foreach ($clasificados as $clasificado) {
         Notification::assertSentTo(Participante::query()->findOrFail($clasificado->participante)->jugadores, CruceAsignado::class);
     }
     Notification::assertCount(4);
+});
+
+test('al cerrar los grupos sin pedirlo no se avisa a nadie', function () {
+    $fase = torneoConGrupo($this->torneo, $this->categoria, $this->propietario);
+    foreach ($fase->partidos()->get() as $partido) {
+        app(RegistrarResultado::class)->handle($partido, new Resultado([new Set(6, 1), new Set(6, 1)]), $this->propietario);
+    }
+
+    Notification::fake();
+    expect(app(CerrarFase::class)->handle($fase, $this->propietario))->toHaveCount(2);
+    Notification::assertNothingSent();
 });
 
 test('la organización manda un aviso a los inscritos de una categoría por los canales que elige', function () {

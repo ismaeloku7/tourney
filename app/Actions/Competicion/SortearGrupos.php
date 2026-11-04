@@ -19,13 +19,16 @@ use Illuminate\Support\Facades\DB;
 /**
  * Reparte en grupos a los participantes confirmados de la categoría y lo
  * guarda: grupos, sus miembros y la semilla del sorteo. Una fase con
- * resultados no se resortea salvo `forzar`, que anula lo jugado.
+ * resultados no se resortea salvo `forzar`, que anula lo jugado. Con
+ * `fijos`, esas parejas van al grupo que se diga y el resto se sortea (en
+ * modo manual, son los grupos enteros); se guardan para el próximo sorteo.
  */
 final class SortearGrupos
 {
     public function __construct(private readonly RepartidorDeGrupos $repartidor = new RepartidorDeGrupos) {}
 
-    public function handle(Fase $fase, User $usuario, bool $forzar = false): RepartoDeGrupos
+    /** @param  list<list<int>>|null  $fijos  Ids de participante por grupo (A, B…), o null para dejar los guardados. */
+    public function handle(Fase $fase, User $usuario, bool $forzar = false, ?array $fijos = null): RepartoDeGrupos
     {
         if (! $fase->tipo->esDeGrupos()) {
             throw new OperacionNoPermitida('Solo se sortean las fases de grupos.');
@@ -46,6 +49,9 @@ final class SortearGrupos
         $participantes = array_values($participantes);
 
         $configuracion = $fase->configuracionDeGrupos();
+        if ($fijos !== null) {
+            $configuracion = $configuracion->conGruposManuales($fijos);
+        }
 
         return DB::transaction(function () use ($fase, $usuario, $participantes, $configuracion): RepartoDeGrupos {
             $antes = [];

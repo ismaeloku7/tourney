@@ -188,3 +188,36 @@ test('desde la ficha del torneo se planifica y se cambia el estado con sus compr
         ->assertNotified('No se ha podido cambiar el estado');
     expect($vacio->refresh()->estado)->toBe(EstadoTorneo::Borrador);
 });
+
+test('al sortear se fijan a mano parejas en sus grupos y el resto sale por sorteo', function () {
+    $ids = $this->categoria->participantes()->orderBy('id')->pluck('id')->all();
+    [$sinCabeza1, $sinCabeza2, $sinCabeza3] = array_slice($ids, 9, 3);
+
+    fasesDe($this->categoria)
+        ->mountAction(TestAction::make('sortear')->table($this->grupos))
+        ->setActionData(['grupo_0' => [(string) $sinCabeza1, (string) $sinCabeza2], 'grupo_2' => [(string) $sinCabeza3]])
+        ->callMountedAction()
+        ->assertHasNoActionErrors()
+        ->assertNotified('3 grupos y 18 partidos');
+
+    $grupos = $this->grupos->refresh()->grupos()->with('participantes')->orderBy('orden')->get();
+    expect($grupos)->toHaveCount(3)
+        ->and($grupos[0]->participantes->pluck('id')->all())->toContain($sinCabeza1, $sinCabeza2)
+        ->and($grupos[2]->participantes->pluck('id')->all())->toContain($sinCabeza3)
+        ->and($grupos->map(fn ($g): int => $g->participantes->count())->all())->toBe([4, 4, 4])
+        ->and($this->grupos->configuracionDeGrupos()->gruposManuales)->toBe([[$sinCabeza1, $sinCabeza2], [], [$sinCabeza3]]);
+
+    // Más parejas de las que caben en un grupo: no se sortea.
+    fasesDe($this->categoria)
+        ->callAction(TestAction::make('sortear')->table($this->grupos), ['grupo_1' => array_map('strval', array_slice($ids, 0, 5))])
+        ->assertNotified('No se ha podido sortear');
+});
+
+test('cada fase se oculta o se enseña en la web desde su listado', function () {
+    expect($this->grupos->visible_en_web)->toBeTrue();
+
+    fasesDe($this->categoria)->call('updateTableColumnState', 'visible_en_web', (string) $this->grupos->getKey(), false);
+
+    expect($this->grupos->refresh()->visible_en_web)->toBeFalse()
+        ->and($this->cuadro->refresh()->visible_en_web)->toBeTrue();
+});
