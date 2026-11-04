@@ -20,6 +20,7 @@ use Filament\Schemas\Components\Grid;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
 /**
  * El botón «Añadir compañero» de una pareja incompleta: da de alta al
@@ -54,7 +55,8 @@ final class CompaneroDePareja
                         TextInput::make('nombre')->label('Nombre')->required($nuevo)->maxLength(80),
                         TextInput::make('apellidos')->label('Apellidos')->required($nuevo)->maxLength(120),
                         TextInput::make('email')->label('Correo electrónico')->email()->maxLength(190)->autocomplete('off')
-                            ->unique(Jugador::class, 'email')
+                            // La regla de Laravel, no ->unique(): en la acción de una pareja, Filament excluiría su id de la tabla de jugadores.
+                            ->rule(Rule::unique(Jugador::class, 'email'))
                             ->validationMessages(['unique' => 'Ya hay un jugador con este correo: elíjalo en «Ya está en la base de jugadores».'])
                             ->helperText('Con su correo entra en su portal y le llegan los avisos.'),
                         TextInput::make('telefono')->label('Teléfono')->tel()->maxLength(30),
