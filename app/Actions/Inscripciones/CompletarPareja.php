@@ -14,14 +14,15 @@ use Illuminate\Support\Facades\DB;
 /**
  * Pone el compañero que le faltaba a una pareja (las importadas «sin
  * compañero»). Si se pide, la inscripción pasa a confirmada o, sin plaza,
- * a la lista de espera.
+ * a la lista de espera (con o sin correo a los jugadores). Si la pareja se
+ * llamaba como su único jugador, pasa a llamarse como los dos.
  */
 final class CompletarPareja
 {
     public function __construct(private readonly CambiarEstadoDeInscripcion $cambiar) {}
 
     /** @throws OperacionNoPermitida */
-    public function handle(Inscripcion $inscripcion, Jugador $companero, bool $confirmar, ?User $usuario = null): Inscripcion
+    public function handle(Inscripcion $inscripcion, Jugador $companero, bool $confirmar, ?User $usuario = null, bool $avisar = true): Inscripcion
     {
         $participante = $inscripcion->participante;
 
@@ -39,13 +40,19 @@ final class CompletarPareja
         }
 
         DB::transaction(function () use ($participante, $companero, $inscripcion, $usuario): void {
+            $primero = $participante->jugadores()->first();
             $participante->participanteJugadores()->create(['jugador_id' => $companero->id, 'orden' => 2, 'confirmado_en' => now()]);
+
+            if ($primero !== null && $participante->nombre === Participante::nombreDesdeJugadores($primero)) {
+                $participante->update(['nombre' => Participante::nombreDesdeJugadores($primero, $companero)]);
+            }
+
             RegistroDeCambio::anotar('completar_pareja', $inscripcion, $usuario, null, ['jugador' => $companero->id]);
         });
 
         if ($confirmar && $inscripcion->estado === EstadoInscripcion::Pendiente) {
             $destino = InscribirPareja::alCupo($inscripcion->categoria) ? EstadoInscripcion::ListaDeEspera : EstadoInscripcion::Confirmada;
-            $this->cambiar->handle($inscripcion, $destino, $usuario);
+            $this->cambiar->handle($inscripcion, $destino, $usuario, $avisar);
         }
 
         return $inscripcion->refresh();

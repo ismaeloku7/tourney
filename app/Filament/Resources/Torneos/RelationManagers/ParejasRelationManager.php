@@ -6,6 +6,7 @@ use App\Enums\EstadoInscripcion;
 use App\Filament\ConfirmarCompletas;
 use App\Filament\Resources\Categorias\CategoriaResource;
 use App\Filament\Resources\Parejas\ColumnasDePareja;
+use App\Filament\Resources\Parejas\CompaneroDePareja;
 use App\Filament\Resources\Parejas\NivelesDePareja;
 use App\Models\Categoria;
 use App\Models\Inscripcion;
@@ -72,6 +73,7 @@ class ParejasRelationManager extends RelationManager
             ])
             ->recordAction('niveles')
             ->recordActions([
+                CompaneroDePareja::accion(),
                 NivelesDePareja::accion(),
                 Action::make('gestionar')->label('Gestionar')->icon(Heroicon::OutlinedArrowTopRightOnSquare)
                     ->tooltip('Confirmar, añadir compañero, pago, baja… en su categoría')

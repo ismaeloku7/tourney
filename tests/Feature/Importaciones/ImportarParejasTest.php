@@ -9,6 +9,7 @@ use App\Enums\OrigenInscripcion;
 use App\Enums\Rol;
 use App\Filament\Resources\Categorias\Pages\EditCategoria;
 use App\Filament\Resources\Categorias\RelationManagers\InscripcionesRelationManager;
+use App\Filament\Resources\Parejas\Pages\ListParejas;
 use App\Filament\Resources\Torneos\Pages\EditTorneo;
 use App\Filament\Resources\Torneos\RelationManagers\ParejasRelationManager;
 use App\Models\Categoria;
@@ -145,7 +146,7 @@ test('a la pareja sin compañero se le añade desde la categoría y queda confir
 
     Livewire::test(InscripcionesRelationManager::class, ['ownerRecord' => $inscripcion->categoria, 'pageClass' => EditCategoria::class])
         ->assertActionVisible(TestAction::make('companero')->table($inscripcion))
-        ->callAction(TestAction::make('companero')->table($inscripcion), ['companero_id' => $companero->id, 'confirmar' => true])
+        ->callAction(TestAction::make('companero')->table($inscripcion), ['origen' => 'existente', 'jugador_id' => $companero->id, 'confirmar' => true])
         ->assertHasNoActionErrors()
         ->assertNotified('Pareja completa');
 
@@ -153,6 +154,48 @@ test('a la pareja sin compañero se le añade desde la categoría y queda confir
         ->and($inscripcion->participante->jugadores()->count())->toBe(2);
 
     expect(fn () => app(CompletarPareja::class)->handle($inscripcion, Jugador::factory()->create(), true))->toThrow(OperacionNoPermitida::class, 'ya tiene sus dos jugadores');
+});
+
+test('desde Parejas se da de alta al compañero que falta con todos sus datos', function () {
+    app(ImportarParejas::class)->handle($this->torneo, excelDelRally(), 'xlsx', $this->propietario, confirmar: false);
+    $inscripcion = Participante::query()->where('nombre', 'frade-frade')->sole()->inscripcion;
+
+    Filament::setCurrentPanel('panel');
+    $this->actingAs($this->propietario);
+
+    // Un correo que ya es de otro jugador no se repite: se elige en la base.
+    Livewire::test(ListParejas::class)
+        ->callAction(TestAction::make('companero')->table($inscripcion), ['origen' => 'nuevo', 'nombre' => 'Pedro', 'apellidos' => 'Frade', 'email' => 'davidfrademanso@gmail.com'])
+        ->assertHasActionErrors(['email' => 'unique']);
+
+    Livewire::test(ListParejas::class)
+        ->assertActionVisible(TestAction::make('companero')->table($inscripcion))
+        ->callAction(TestAction::make('companero')->table($inscripcion), [
+            'origen' => 'nuevo',
+            'nombre' => 'Pedro',
+            'apellidos' => 'Frade Gil',
+            'email' => 'Pedro.Frade@Example.com',
+            'telefono' => '600123456',
+            'nivel_declarado' => '2,5',
+            'genero' => 'masculino',
+            'fecha_nacimiento' => '1990-05-04',
+            'confirmar' => true,
+            'avisar' => false,
+        ])
+        ->assertHasNoActionErrors()
+        ->assertNotified('Pareja completa');
+
+    $pedro = Jugador::query()->where('email', 'pedro.frade@example.com')->sole();
+    expect($pedro->nombre_completo)->toBe('Pedro Frade Gil')
+        ->and($pedro->getAttribute('telefono'))->toBe('600123456')
+        ->and($pedro->nivel_declarado)->toBe('2,5')
+        ->and($pedro->fecha_nacimiento?->toDateString())->toBe('1990-05-04')
+        ->and($inscripcion->refresh()->estado)->toBe(EstadoInscripcion::Confirmada)
+        ->and($inscripcion->participante->jugadores()->pluck('jugadores.id')->last())->toBe($pedro->id);
+    Mail::assertNothingSent();
+
+    // Ya completa, el botón no sale.
+    Livewire::test(ListParejas::class)->assertActionHidden(TestAction::make('companero')->table($inscripcion->refresh()));
 });
 
 test('desde la ficha del torneo se sube el Excel y se importa', function () {
