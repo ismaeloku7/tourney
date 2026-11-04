@@ -14,6 +14,7 @@ use App\Filament\Avisos;
 use App\Filament\ConfirmarCompletas;
 use App\Filament\Resources\Parejas\CompaneroDePareja;
 use App\Filament\Resources\Parejas\NivelesDePareja;
+use App\Filament\Resources\Parejas\ParejaResource;
 use App\Models\Categoria;
 use App\Models\Inscripcion;
 use App\Models\Jugador;
@@ -114,8 +115,10 @@ class InscripcionesRelationManager extends RelationManager
                         }, $inscripcion->participante->nombre);
                     }),
             ])
-            ->recordAction('niveles')
+            ->recordUrl(fn (Inscripcion $record): string => ParejaResource::getUrl('edit', ['record' => $record]))
             ->recordActions([
+                Action::make('editar')->label('Editar')->icon(Heroicon::OutlinedPencilSquare)
+                    ->url(fn (Inscripcion $record): string => ParejaResource::getUrl('edit', ['record' => $record])),
                 NivelesDePareja::accion(),
                 CompaneroDePareja::accion(),
                 ActionGroup::make([

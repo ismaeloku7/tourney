@@ -11,6 +11,6 @@ class ListParejas extends ListRecords
 
     public function getSubheading(): string
     {
-        return 'Las parejas de todos los torneos. Para confirmarlas, completarlas o darlas de baja, «Gestionar» lleva a su categoría.';
+        return 'Las parejas de todos los torneos. Pulse en una para editarla: nombre, estado, pago, notas y los datos de sus jugadores.';
     }
 }

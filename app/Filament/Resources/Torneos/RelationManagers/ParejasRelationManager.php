@@ -4,11 +4,11 @@ namespace App\Filament\Resources\Torneos\RelationManagers;
 
 use App\Enums\EstadoInscripcion;
 use App\Filament\ConfirmarCompletas;
-use App\Filament\Resources\Categorias\CategoriaResource;
 use App\Filament\Resources\Parejas\ColumnasDePareja;
 use App\Filament\Resources\Parejas\CompaneroDePareja;
 use App\Filament\Resources\Parejas\MoverParejas;
 use App\Filament\Resources\Parejas\NivelesDePareja;
+use App\Filament\Resources\Parejas\ParejaResource;
 use App\Models\Categoria;
 use App\Models\Inscripcion;
 use App\Models\Torneo;
@@ -72,14 +72,13 @@ class ParejasRelationManager extends RelationManager
             ->headerActions([
                 ConfirmarCompletas::accion(fn (): Torneo => $this->torneo(), fn (): ?Categoria => null),
             ])
-            ->recordAction('niveles')
+            ->recordUrl(fn (Inscripcion $record): string => ParejaResource::getUrl('edit', ['record' => $record]))
             ->recordActions([
                 CompaneroDePareja::accion(),
                 NivelesDePareja::accion(),
                 MoverParejas::accion(),
-                Action::make('gestionar')->label('Gestionar')->icon(Heroicon::OutlinedArrowTopRightOnSquare)
-                    ->tooltip('Confirmar, añadir compañero, pago, baja… en su categoría')
-                    ->url(fn (Inscripcion $record): string => CategoriaResource::getUrl('edit', ['record' => $record->categoria_id])),
+                Action::make('editar')->label('Editar')->icon(Heroicon::OutlinedPencilSquare)
+                    ->url(fn (Inscripcion $record): string => ParejaResource::getUrl('edit', ['record' => $record])),
             ])
             ->toolbarActions([
                 MoverParejas::enBloque(),
