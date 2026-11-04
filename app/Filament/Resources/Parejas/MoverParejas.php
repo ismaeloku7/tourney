@@ -87,10 +87,15 @@ final class MoverParejas
         $problemas = [];
 
         // Por orden de llegada: si no caben todas, la plaza es de la que se inscribió antes.
-        $inscripciones = array_values(array_filter($inscripciones, fn (mixed $i): bool => $i instanceof Inscripcion));
-        usort($inscripciones, fn (Inscripcion $a, Inscripcion $b): int => $a->id <=> $b->id);
-
+        $porLlegada = [];
         foreach ($inscripciones as $inscripcion) {
+            if ($inscripcion instanceof Inscripcion) {
+                $porLlegada[$inscripcion->id] = $inscripcion;
+            }
+        }
+        ksort($porLlegada);
+
+        foreach ($porLlegada as $inscripcion) {
 
             try {
                 app(MoverPareja::class)->handle($inscripcion, $destino, $usuario instanceof User ? $usuario : null);
