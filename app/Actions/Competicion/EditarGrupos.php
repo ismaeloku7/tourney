@@ -11,7 +11,6 @@ use App\Enums\EstadoParticipante;
 use App\Enums\EstadoPartido;
 use App\Models\Fase;
 use App\Models\Grupo;
-use App\Models\Participante;
 use App\Models\RegistroDeCambio;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
