@@ -13,6 +13,7 @@ use App\Enums\Genero;
 use App\Enums\OrigenInscripcion;
 use App\Filament\Avisos;
 use App\Filament\ConfirmarCompletas;
+use App\Filament\Resources\Parejas\NivelesDePareja;
 use App\Models\Categoria;
 use App\Models\Inscripcion;
 use App\Models\Jugador;
@@ -113,7 +114,9 @@ class InscripcionesRelationManager extends RelationManager
                         }, $inscripcion->participante->nombre);
                     }),
             ])
+            ->recordAction('niveles')
             ->recordActions([
+                NivelesDePareja::accion(),
                 Action::make('companero')->label('Añadir compañero')->icon(Heroicon::OutlinedUserPlus)->color('warning')
                     ->visible(fn (Inscripcion $record): bool => $record->participante->jugadores->count() < 2)
                     ->modalHeading(fn (Inscripcion $record): string => 'Compañero de '.$record->participante->nombre)
