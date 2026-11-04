@@ -39,6 +39,9 @@ class Fase extends Model
     /** @use HasFactory<FaseFactory> */
     use EnLaBaseDelOrganizador, HasFactory, VaALaPapelera;
 
+    /** Lo que se ve en la web, por defecto (también antes de leerlo de la base). */
+    protected $attributes = ['visible_en_web' => true];
+
     protected function casts(): array
     {
         return [

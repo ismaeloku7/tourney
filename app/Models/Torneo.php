@@ -56,6 +56,9 @@ class Torneo extends Model
     /** @use HasFactory<TorneoFactory> */
     use EnLaBaseDelOrganizador, HasFactory, VaALaPapelera;
 
+    /** Lo que se ve en la web, por defecto (también antes de leerlo de la base). */
+    protected $attributes = ['web_inscritos' => true, 'web_horarios' => true];
+
     protected function casts(): array
     {
         return [
