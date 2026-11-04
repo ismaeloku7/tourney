@@ -40,7 +40,7 @@ class PartidosDePista extends Component
         $datos = new DatosDelTorneo($this->torneo->refresh());
         $dia = now()->between($this->torneo->fecha_inicio->startOfDay(), $this->torneo->fecha_fin->endOfDay()) ? now()->toDateString() : $this->torneo->fecha_inicio->toDateString();
 
-        $partidos = $this->torneo->horarios_publicados_en === null ? collect() : $datos->partidosConHora()
+        $partidos = ! $datos->horariosVisibles() ? collect() : $datos->partidosConHora()
             ->where('partidos.pista_id', $this->pista->id)
             ->whereDate('franjas.inicio', $dia)
             ->get()

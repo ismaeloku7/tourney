@@ -18,7 +18,9 @@ use Illuminate\Database\Eloquent\Collection;
 /**
  * Lo que enseñan las páginas públicas de un torneo, ya escrito: inscritos
  * por categoría, grupos con su clasificación, cuadros por rondas y
- * horarios por día. Todo con los nombres públicos.
+ * horarios por día. Todo con los nombres públicos, y solo lo que la
+ * organización deja ver: las fases ocultas no salen, y sin horarios
+ * visibles no hay horas, ni tablero, ni partidos de pista.
  */
 final class DatosDelTorneo
 {
@@ -121,7 +123,7 @@ final class DatosDelTorneo
      */
     public function horarios(): array
     {
-        if ($this->torneo->horarios_publicados_en === null) {
+        if (! $this->horariosVisibles()) {
             return [];
         }
 
@@ -150,7 +152,8 @@ final class DatosDelTorneo
     public function partidosConHora(): Builder
     {
         return Partido::query()
-            ->whereHas('fase.categoria', fn (Builder $q) => $q->where('torneo_id', $this->torneo->id))
+            ->whereHas('fase', fn (Builder $q) => $q->where('visible_en_web', true)->whereHas('categoria', fn (Builder $c) => $c->where('torneo_id', $this->torneo->id)))
+            ->when(! $this->torneo->web_horarios, fn (Builder $q) => $q->whereRaw('1 = 0'))
             ->whereNotNull('franja_id')->whereNotNull('local_id')->whereNotNull('visitante_id')
             ->with(['fase.categoria', 'local.jugadores', 'visitante.jugadores', 'ganador', 'pista', 'franja', 'sets'])
             ->join('franjas', 'franjas.id', '=', 'partidos.franja_id')
@@ -167,15 +170,21 @@ final class DatosDelTorneo
         return [
             'partido' => "{$local} – {$visitante}",
             'resultado' => $p->cerrado() ? Marcador::resultado($p) : '',
-            'hora' => $p->franja !== null && $this->torneo->horarios_publicados_en !== null ? $p->franja->inicio->translatedFormat('D j/n H:i').($p->pista !== null ? ' · '.$p->pista->nombre : '') : null,
+            'hora' => $p->franja !== null && $this->horariosVisibles() ? $p->franja->inicio->translatedFormat('D j/n H:i').($p->pista !== null ? ' · '.$p->pista->nombre : '') : null,
             'ganaLocal' => $p->ganador_id === null ? null : $p->ganador_id === $p->local_id,
         ];
+    }
+
+    /** Las horas se ven si están publicadas y la organización no las oculta. */
+    public function horariosVisibles(): bool
+    {
+        return $this->torneo->horarios_publicados_en !== null && $this->torneo->web_horarios;
     }
 
     /** @return Collection<int, Fase> */
     private function fases(): Collection
     {
-        return Fase::query()->whereIn('categoria_id', $this->torneo->categorias->pluck('id'))
+        return Fase::query()->whereIn('categoria_id', $this->torneo->categorias->pluck('id'))->where('visible_en_web', true)
             ->with(['categoria', 'grupos.clasificaciones.participante.jugadores', 'grupos.partidos.local.jugadores', 'grupos.partidos.visitante.jugadores', 'grupos.partidos.sets', 'grupos.partidos.franja', 'grupos.partidos.pista', 'partidos.local.jugadores', 'partidos.visitante.jugadores', 'partidos.ganador', 'partidos.sets', 'partidos.franja', 'partidos.pista'])
             ->get()
             ->sortBy(fn (Fase $f): int => $f->categoria->orden * 100 + $f->orden)

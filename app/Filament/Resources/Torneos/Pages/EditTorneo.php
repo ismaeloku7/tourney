@@ -14,6 +14,7 @@ use App\Exportaciones\AccionesDeExportacion;
 use App\Filament\Avisos;
 use App\Filament\Resources\Torneos\TorneoResource;
 use App\Models\Categoria;
+use App\Models\Fase;
 use App\Models\Torneo;
 use App\Models\User;
 use Filament\Actions\Action;
@@ -28,6 +29,7 @@ use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Resources\Pages\EditRecord;
 use Filament\Support\Icons\Heroicon;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Storage;
 
 /**
@@ -126,6 +128,38 @@ class EditTorneo extends EditRecord
 
                     // Se recarga la ficha para que las categorías y parejas nuevas se vean ya.
                     $this->redirect(static::getUrl(['record' => $this->torneo(), 'relation' => self::PESTANA_PAREJAS]));
+                }),
+            Action::make('web')
+                ->label('Qué se ve en la web')
+                ->icon(Heroicon::OutlinedEye)
+                ->color('gray')
+                ->modalHeading('Qué se ve en la web del torneo')
+                ->modalDescription('Desmarque lo que aún no quiera enseñar: no sale en la web, ni en el tablero, ni en el portal de los jugadores. Usted lo sigue viendo y gestionando aquí. Por defecto se ve todo.')
+                ->modalSubmitActionLabel('Guardar')
+                ->fillForm(fn (): array => [
+                    'web_inscritos' => $this->torneo()->web_inscritos,
+                    'web_horarios' => $this->torneo()->web_horarios,
+                    'fases' => $this->fasesDelTorneo()->where('visible_en_web', true)->modelKeys(),
+                ])
+                ->schema([
+                    Toggle::make('web_inscritos')->label('La lista de inscritos'),
+                    Toggle::make('web_horarios')->label('Los horarios')
+                        ->helperText('Con los horarios ocultos tampoco salen el tablero ni las páginas de las pistas.'),
+                    CheckboxList::make('fases')->label('Grupos, cuadros y finales')
+                        ->options(fn (): array => $this->fasesDelTorneo()->mapWithKeys(fn (Fase $f): array => [$f->id => $f->categoria->nombre.' · '.$f->nombre])->all())
+                        ->bulkToggleable()
+                        ->helperText('Cada fase de cada categoría: sus grupos con la clasificación, su cuadro y sus partidos.'),
+                ])
+                ->action(function (array $data): void {
+                    $torneo = $this->torneo();
+                    $torneo->update(['web_inscritos' => (bool) ($data['web_inscritos'] ?? true), 'web_horarios' => (bool) ($data['web_horarios'] ?? true)]);
+
+                    $visibles = array_map('intval', (array) ($data['fases'] ?? []));
+                    foreach ($this->fasesDelTorneo() as $fase) {
+                        $fase->update(['visible_en_web' => in_array($fase->id, $visibles, true)]);
+                    }
+
+                    Avisos::hecho('Guardado: la web enseña solo lo marcado');
                 }),
             Action::make('aviso')
                 ->label('Enviar aviso')
@@ -234,6 +268,13 @@ class EditTorneo extends EditRecord
             EstadoTorneo::Archivado => 'El torneo pasa al archivo.',
             null => '',
         };
+    }
+
+    /** @return Collection<int, Fase> */
+    private function fasesDelTorneo(): Collection
+    {
+        return Fase::query()->whereIn('categoria_id', $this->torneo()->categorias()->pluck('id'))->with('categoria')->get()
+            ->sortBy(fn (Fase $f): int => $f->categoria->orden * 100 + $f->orden)->values();
     }
 
     private function torneo(): Torneo

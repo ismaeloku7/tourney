@@ -262,6 +262,8 @@ class PortalDelJugador extends Component
 
         return Partido::query()
             ->whereHas('fase.categoria.torneo', fn (Builder $q) => $q->whereNotIn('estado', [EstadoTorneo::Borrador->value]))
+            // Lo que la organización aún no enseña en la web tampoco sale en el portal.
+            ->whereHas('fase', fn (Builder $q) => $q->where('visible_en_web', true))
             ->where(fn (Builder $q) => $q
                 ->whereHas('local.participanteJugadores', fn (Builder $l) => $l->where('jugador_id', $id))
                 ->orWhereHas('visitante.participanteJugadores', fn (Builder $v) => $v->where('jugador_id', $id)));

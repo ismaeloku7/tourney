@@ -14,7 +14,7 @@
     </div>
 
     <nav class="mt-6 flex gap-1 overflow-x-auto border-b border-neutral-200" aria-label="Secciones del torneo">
-        @foreach (\App\Livewire\Publico\FichaDelTorneo::PESTANAS as $clave => $nombre)
+        @foreach ($pestanas as $clave => $nombre)
             <button type="button" wire:click="ver('{{ $clave }}')" @class(['whitespace-nowrap border-b-2 px-3 py-2 text-sm font-medium', 'border-(--acento) text-neutral-900' => $pestana === $clave, 'border-transparent text-neutral-500 hover:text-neutral-800' => $pestana !== $clave])>{{ $nombre }}</button>
         @endforeach
     </nav>
