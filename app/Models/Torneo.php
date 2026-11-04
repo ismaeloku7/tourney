@@ -31,6 +31,8 @@ use Illuminate\Database\Eloquent\Relations\HasManyThrough;
  * @property CarbonInterface|null $inscripcion_desde
  * @property CarbonInterface|null $inscripcion_hasta
  * @property bool $inscripcion_online
+ * @property bool $web_inscritos
+ * @property bool $web_horarios
  * @property EstadoTorneo $estado
  * @property bool $listado_en_plataforma
  * @property ResultadosPorJugadores $resultados_por_jugadores
@@ -48,7 +50,7 @@ use Illuminate\Database\Eloquent\Relations\HasManyThrough;
  * @property CarbonInterface|null $archivado_en
  * @property int|null $creado_por
  */
-#[Fillable(['nombre', 'slug', 'deporte', 'sede_id', 'direccion', 'fecha_inicio', 'fecha_fin', 'inscripcion_desde', 'inscripcion_hasta', 'inscripcion_online', 'estado', 'listado_en_plataforma', 'resultados_por_jugadores', 'minutos_para_validar', 'privacidad_alias', 'cartel_path', 'normativa', 'contacto', 'descanso_minimo_minutos', 'margen_entre_partidos_minutos', 'campos_extra', 'publicado_en', 'horarios_publicados_en', 'finalizado_en', 'archivado_en', 'creado_por'])]
+#[Fillable(['nombre', 'slug', 'deporte', 'sede_id', 'direccion', 'fecha_inicio', 'fecha_fin', 'inscripcion_desde', 'inscripcion_hasta', 'inscripcion_online', 'web_inscritos', 'web_horarios', 'estado', 'listado_en_plataforma', 'resultados_por_jugadores', 'minutos_para_validar', 'privacidad_alias', 'cartel_path', 'normativa', 'contacto', 'descanso_minimo_minutos', 'margen_entre_partidos_minutos', 'campos_extra', 'publicado_en', 'horarios_publicados_en', 'finalizado_en', 'archivado_en', 'creado_por'])]
 class Torneo extends Model
 {
     /** @use HasFactory<TorneoFactory> */
@@ -62,6 +64,8 @@ class Torneo extends Model
             'inscripcion_desde' => 'datetime',
             'inscripcion_hasta' => 'datetime',
             'inscripcion_online' => 'boolean',
+            'web_inscritos' => 'boolean',
+            'web_horarios' => 'boolean',
             'estado' => EstadoTorneo::class,
             'listado_en_plataforma' => 'boolean',
             'resultados_por_jugadores' => ResultadosPorJugadores::class,

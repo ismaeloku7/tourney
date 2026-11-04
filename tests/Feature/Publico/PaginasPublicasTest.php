@@ -9,6 +9,7 @@ use App\Competicion\Datos\Resultado;
 use App\Competicion\Datos\Set;
 use App\Enums\EstadoTorneo;
 use App\Enums\Rol;
+use App\Filament\Resources\Torneos\Pages\EditTorneo;
 use App\Livewire\Publico\FichaDelTorneo;
 use App\Models\Categoria;
 use App\Models\Fase;
@@ -21,6 +22,7 @@ use App\Models\Pista;
 use App\Models\Torneo;
 use App\Models\User;
 use Database\Seeders\PlanesSeeder;
+use Filament\Facades\Filament;
 use Livewire\Livewire;
 
 /**
@@ -124,4 +126,47 @@ test('el tablero y la página de la pista responden con sus partidos', function 
 
     $otra = comoOrganizador($this->organizador, fn () => Pista::factory()->create());
     $this->get("http://norte.saas.test/torneos/open-otono/pista/{$otra->id}")->assertNotFound();
+});
+
+test('lo que la organización oculta no sale en la web, ni en el tablero, ni en la pista', function () {
+    usarOrganizador($this->organizador);
+    $torneo = Torneo::query()->where('slug', 'open-otono')->sole();
+    $fase = Fase::query()->where('nombre', 'Fase de grupos')->sole();
+
+    $fase->update(['visible_en_web' => false]);
+    $torneo->update(['web_inscritos' => false, 'web_horarios' => false]);
+
+    $ficha = Livewire::test(FichaDelTorneo::class, ['torneo' => $torneo])
+        ->assertDontSee('Inscritos')
+        ->assertDontSee('Horarios');
+    $ficha->call('ver', 'grupos')->assertDontSee('Grupo A')->assertDontSee('6-3 6-4');
+    $ficha->call('ver', 'inscritos')->assertSet('pestana', 'grupos');
+
+    $this->get('http://norte.saas.test/torneos/open-otono/tablero')->assertOk()->assertDontSee('6-3 6-4');
+    $this->get("http://norte.saas.test/torneos/open-otono/pista/{$this->pista->id}")->assertOk()->assertDontSee('Mixta B');
+
+    // Al volver a enseñarlo, vuelve todo.
+    usarOrganizador($this->organizador);
+    $fase->update(['visible_en_web' => true]);
+    $torneo->update(['web_inscritos' => true, 'web_horarios' => true]);
+    Livewire::test(FichaDelTorneo::class, ['torneo' => $torneo->refresh()])
+        ->call('ver', 'grupos')->assertSee('Grupo A')
+        ->call('ver', 'horarios')->assertSee('Central');
+});
+
+test('desde la ficha del torneo se marca qué se ve en la web', function () {
+    usarOrganizador($this->organizador);
+    Filament::setCurrentPanel('panel');
+    $this->actingAs(User::query()->where('rol', Rol::Propietario->value)->firstOrFail());
+    $torneo = Torneo::query()->where('slug', 'open-otono')->sole();
+    $fase = Fase::query()->where('nombre', 'Fase de grupos')->sole();
+
+    Livewire::test(EditTorneo::class, ['record' => $torneo->getRouteKey()])
+        ->callAction('web', ['web_inscritos' => true, 'web_horarios' => false, 'fases' => []])
+        ->assertHasNoActionErrors()
+        ->assertNotified('Guardado: la web enseña solo lo marcado');
+
+    expect($torneo->refresh()->web_horarios)->toBeFalse()
+        ->and($torneo->web_inscritos)->toBeTrue()
+        ->and($fase->refresh()->visible_en_web)->toBeFalse();
 });

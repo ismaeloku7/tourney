@@ -28,11 +28,12 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
  * @property array<string, mixed> $configuracion
  * @property int|null $formato_partido_id
  * @property EstadoFase $estado
+ * @property bool $visible_en_web
  * @property int|null $fase_origen_id
  * @property int|null $semilla_sorteo
  * @property CarbonInterface|null $cerrada_en
  */
-#[Fillable(['categoria_id', 'tipo', 'nombre', 'orden', 'configuracion', 'formato_partido_id', 'estado', 'fase_origen_id', 'semilla_sorteo', 'cerrada_en'])]
+#[Fillable(['categoria_id', 'tipo', 'nombre', 'orden', 'configuracion', 'formato_partido_id', 'estado', 'visible_en_web', 'fase_origen_id', 'semilla_sorteo', 'cerrada_en'])]
 class Fase extends Model
 {
     /** @use HasFactory<FaseFactory> */
@@ -41,6 +42,7 @@ class Fase extends Model
     protected function casts(): array
     {
         return [
+            'visible_en_web' => 'boolean',
             'tipo' => TipoDeFase::class,
             'orden' => 'integer',
             'configuracion' => 'array',

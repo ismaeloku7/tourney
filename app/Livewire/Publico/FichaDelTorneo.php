@@ -37,14 +37,29 @@ class FichaDelTorneo extends Component
 
         $this->torneo = $torneo;
 
-        if (! array_key_exists($this->pestana, self::PESTANAS)) {
+        if (! array_key_exists($this->pestana, $this->pestanas())) {
             $this->pestana = 'info';
         }
     }
 
+    /**
+     * Las pestañas que se ven: los inscritos y los horarios, si la
+     * organización no los oculta.
+     *
+     * @return array<string, string>
+     */
+    public function pestanas(): array
+    {
+        return array_filter(self::PESTANAS, fn (string $clave): bool => match ($clave) {
+            'inscritos' => $this->torneo->web_inscritos,
+            'horarios' => $this->torneo->web_horarios,
+            default => true,
+        }, ARRAY_FILTER_USE_KEY);
+    }
+
     public function ver(string $pestana): void
     {
-        if (array_key_exists($pestana, self::PESTANAS)) {
+        if (array_key_exists($pestana, $this->pestanas())) {
             $this->pestana = $pestana;
         }
     }
@@ -93,8 +108,9 @@ class FichaDelTorneo extends Component
         return view('livewire.publico.ficha-del-torneo', [
             'datos' => $datos,
             'enJuego' => $this->torneo->estado === EstadoTorneo::EnJuego,
+            'pestanas' => $this->pestanas(),
             'contenido' => match ($this->pestana) {
-                'inscritos' => $datos->inscritos(),
+                'inscritos' => $this->torneo->web_inscritos ? $datos->inscritos() : [],
                 'grupos' => $datos->grupos(),
                 'cuadro' => $datos->cuadros(),
                 'horarios' => $datos->horarios(),
