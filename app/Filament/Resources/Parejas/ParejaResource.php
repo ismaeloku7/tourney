@@ -97,6 +97,7 @@ class ParejaResource extends Resource
             ])
             ->recordAction('niveles')
             ->recordActions([
+                CompaneroDePareja::accion(),
                 NivelesDePareja::accion(),
                 Action::make('gestionar')->label('Gestionar')->icon(Heroicon::OutlinedArrowTopRightOnSquare)
                     ->tooltip('Confirmar, añadir compañero, pago, baja… en su categoría')

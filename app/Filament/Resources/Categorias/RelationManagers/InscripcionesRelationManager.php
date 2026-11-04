@@ -3,7 +3,6 @@
 namespace App\Filament\Resources\Categorias\RelationManagers;
 
 use App\Actions\Inscripciones\CambiarEstadoDeInscripcion;
-use App\Actions\Inscripciones\CompletarPareja;
 use App\Actions\Inscripciones\FijarCabezaDeSerie;
 use App\Actions\Inscripciones\InscribirPareja;
 use App\Actions\Inscripciones\MarcarPago;
@@ -13,6 +12,7 @@ use App\Enums\Genero;
 use App\Enums\OrigenInscripcion;
 use App\Filament\Avisos;
 use App\Filament\ConfirmarCompletas;
+use App\Filament\Resources\Parejas\CompaneroDePareja;
 use App\Filament\Resources\Parejas\NivelesDePareja;
 use App\Models\Categoria;
 use App\Models\Inscripcion;
@@ -117,27 +117,7 @@ class InscripcionesRelationManager extends RelationManager
             ->recordAction('niveles')
             ->recordActions([
                 NivelesDePareja::accion(),
-                Action::make('companero')->label('Añadir compañero')->icon(Heroicon::OutlinedUserPlus)->color('warning')
-                    ->visible(fn (Inscripcion $record): bool => $record->participante->jugadores->count() < 2)
-                    ->modalHeading(fn (Inscripcion $record): string => 'Compañero de '.$record->participante->nombre)
-                    ->modalSubmitActionLabel('Añadir')
-                    ->schema([
-                        self::selectorDeJugador('companero_id', 'Compañero'),
-                        Toggle::make('confirmar')->label('Confirmar la inscripción')->default(true)->inline(false)
-                            ->helperText('Si la categoría está al cupo, va a la lista de espera.'),
-                    ])
-                    ->action(function (Inscripcion $record, array $data, Action $action): void {
-                        try {
-                            app(CompletarPareja::class)->handle($record, Jugador::query()->findOrFail((int) $data['companero_id']), (bool) ($data['confirmar'] ?? true), $this->usuario());
-                        } catch (ErrorDeCompeticion $e) {
-                            Avisos::error('No se ha podido completar la pareja', [$e->getMessage()]);
-                            $action->halt();
-
-                            return;
-                        }
-
-                        Avisos::hecho('Pareja completa');
-                    }),
+                CompaneroDePareja::accion(),
                 ActionGroup::make([
                     Action::make('confirmar')->label('Confirmar')->icon(Heroicon::OutlinedCheck)->color('success')
                         ->visible(fn (Inscripcion $record): bool => in_array($record->estado, [EstadoInscripcion::Pendiente, EstadoInscripcion::ListaDeEspera], true))
