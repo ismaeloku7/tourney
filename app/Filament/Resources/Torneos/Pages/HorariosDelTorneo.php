@@ -177,7 +177,7 @@ class HorariosDelTorneo extends Page
     {
         $torneo = $this->torneo();
         $calentamiento = $torneo->margen_entre_partidos_minutos;
-        $seRecolocan = $propuesta?->partidos ?? [];
+        $seRecolocan = $propuesta->partidos ?? [];
 
         /** @var list<array{partido: int|null, pista: int, inicio: CarbonImmutable, fin: CarbonImmutable, nuevo: bool}> $ocupaciones */
         $ocupaciones = [];
