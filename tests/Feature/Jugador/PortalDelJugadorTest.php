@@ -4,12 +4,12 @@ use App\Actions\Competicion\GenerarPartidos;
 use App\Actions\Competicion\SortearGrupos;
 use App\Actions\Jugadores\CambiarNivel;
 use App\Competicion\Errores\OperacionNoPermitida;
-use App\Enums\Ajuste;
 use App\Enums\EstadoInscripcion;
 use App\Enums\EstadoPartido;
 use App\Enums\EstadoTorneo;
 use App\Enums\ResultadosPorJugadores;
 use App\Enums\Rol;
+use App\Livewire\Publico\MiInscripcion;
 use App\Livewire\Publico\PortalDelJugador;
 use App\Models\Categoria;
 use App\Models\Disponibilidad;
@@ -23,7 +23,6 @@ use App\Models\Partido;
 use App\Models\RegistroDeCambio;
 use App\Models\Torneo;
 use App\Models\User;
-use App\Models\ValorDeAjuste;
 use Database\Seeders\PlanesSeeder;
 use Livewire\Livewire;
 
@@ -179,74 +178,68 @@ test('el jugador cambia sus datos y puede borrarlos conservando los resultados',
     $this->assertGuest('jugador');
 });
 
-test('el jugador cambia su nivel y la capitana también el de su compañera', function () {
+test('el jugador cambia su nivel desde sus datos', function () {
     $this->ana->update(['nivel_declarado' => '3']);
-    $this->eva->update(['nivel_declarado' => '2']);
 
     Livewire::test(PortalDelJugador::class)
-        ->assertSee('Nivel de Eva')
         ->assertSet('nivel', '3')
-        ->assertSet('nivelesDeCompaneros', [$this->eva->id => '2'])
+        ->assertSee(route('jugador.inscripcion', $this->inscripcion), false)
         ->set('nivel', '3,5')
         ->call('guardarDatos')
         ->assertHasNoErrors()
-        ->set("nivelesDeCompaneros.{$this->eva->id}", '2,75')
-        ->call('guardarNivelDeCompanero', $this->eva->id)
-        ->assertHasNoErrors()
-        ->assertSee('Nivel de Eva guardado.')
         ->set('nivel', 'muy bueno')
         ->call('guardarDatos')
         ->assertHasErrors('nivel');
 
+    expect($this->ana->refresh()->nivel_declarado)->toBe('3,5');
+});
+
+test('desde su inscripción, cualquiera de la pareja pone el nivel de los dos, sea o no el capitán', function () {
+    $this->ana->update(['nivel_declarado' => '3']);
+    $this->eva->update(['nivel_declarado' => '2']);
+
+    // Eva no es la capitana (Ana es la jugadora 1).
+    $this->actingAs($this->eva, 'jugador');
+    $this->get("http://norte.saas.test/jugador/inscripciones/{$this->inscripcion->id}")->assertOk()->assertSee('Open de Primavera')->assertSee('Mixta B');
+
+    Livewire::test(MiInscripcion::class, ['inscripcion' => $this->inscripcion])
+        ->assertSet('niveles', [$this->ana->id => '3', $this->eva->id => '2'])
+        ->set("niveles.{$this->ana->id}", '3,5')
+        ->set("niveles.{$this->eva->id}", '2,75')
+        ->call('guardarNiveles')
+        ->assertHasNoErrors()
+        ->assertSee('Niveles guardados.')
+        ->assertSee('Media 3,13')
+        ->set("niveles.{$this->ana->id}", 'muy bueno')
+        ->call('guardarNiveles')
+        ->assertHasErrors("niveles.{$this->ana->id}");
+
     expect($this->ana->refresh()->nivel_declarado)->toBe('3,5')
         ->and($this->eva->refresh()->nivel_declarado)->toBe('2,75')
-        ->and($this->nuestra->refresh()->nivelMedioTexto())->toBe('Media 3,13')
         ->and(RegistroDeCambio::query()->where('accion', 'cambiar_nivel')->count())->toBe(2);
 });
 
-test('quien no es capitán solo cambia el suyo, y nadie el de otra pareja', function () {
-    $this->actingAs($this->eva, 'jugador');
+test('la inscripción de otra pareja no se abre, y nadie cambia el nivel de otra pareja', function () {
+    $otra = Inscripcion::query()->whereKeyNot($this->inscripcion->id)->firstOrFail();
 
-    Livewire::test(PortalDelJugador::class)
-        ->assertDontSee('Nivel de Ana')
-        ->assertSet('nivelesDeCompaneros', [])
-        ->set('nivel', '4')
-        ->call('guardarDatos')
-        ->assertHasNoErrors()
-        ->set("nivelesDeCompaneros.{$this->ana->id}", '1')
-        ->call('guardarNivelDeCompanero', $this->ana->id)
-        ->assertHasErrors("nivel.{$this->ana->id}");
+    $this->get("http://norte.saas.test/jugador/inscripciones/{$otra->id}")->assertNotFound();
 
-    $rival = Inscripcion::query()->whereKeyNot($this->inscripcion->id)->firstOrFail()->participante->jugadores->last();
+    $rival = $otra->participante->jugadores->last();
     expect(fn () => app(CambiarNivel::class)->handle($this->ana, $rival, '1'))->toThrow(OperacionNoPermitida::class)
-        ->and($this->eva->refresh()->nivel_declarado)->toBe('4')
-        ->and($this->ana->refresh()->nivel_declarado)->not->toBe('1');
+        ->and(CambiarNivel::puede($this->eva, $this->ana))->toBeTrue()
+        ->and(CambiarNivel::puede($this->ana, $this->eva))->toBeTrue();
 });
 
-test('con la pareja de baja o el torneo terminado, la capitana ya no cambia el nivel de su compañera', function () {
+test('con el torneo terminado, los niveles ya no se cambian desde la inscripción', function () {
     $this->torneo->update(['estado' => EstadoTorneo::Finalizado]);
 
     expect(CambiarNivel::companeros($this->ana))->toHaveCount(0)
         ->and(CambiarNivel::puede($this->ana, $this->eva))->toBeFalse()
         ->and(CambiarNivel::puede($this->ana, $this->ana))->toBeTrue();
-});
 
-test('si el organizador lo deja en sus ajustes, quien no es capitán también cambia el nivel de su compañero', function () {
-    ValorDeAjuste::fijar([Ajuste::ParejaEditaAlCompanero->value => true]);
-    $this->ana->update(['nivel_declarado' => '3']);
-    $this->actingAs($this->eva, 'jugador');
-
-    Livewire::test(PortalDelJugador::class)
-        ->assertSee('Nivel de Ana')
-        ->assertDontSee('(eres el capitán)')
-        ->set("nivelesDeCompaneros.{$this->ana->id}", '2,5')
-        ->call('guardarNivelDeCompanero', $this->ana->id)
-        ->assertHasNoErrors();
-
-    expect($this->ana->refresh()->nivel_declarado)->toBe('2,5');
-
-    // Apagado otra vez, solo la capitana.
-    ValorDeAjuste::fijar([Ajuste::ParejaEditaAlCompanero->value => false]);
-    expect(CambiarNivel::puede($this->eva, $this->ana))->toBeFalse()
-        ->and(CambiarNivel::puede($this->ana, $this->eva))->toBeTrue();
+    Livewire::test(MiInscripcion::class, ['inscripcion' => $this->inscripcion])
+        ->assertSee('ya no se cambian')
+        ->assertDontSee('Guardar niveles')
+        ->call('guardarNiveles')
+        ->assertForbidden();
 });
