@@ -15,7 +15,7 @@ final readonly class ConfiguracionDeGrupos
 {
     /**
      * @param  list<CriterioDeDesempate>  $criteriosDeDesempate
-     * @param  list<list<int>>|null  $gruposManuales  Ids de participante por grupo, en modo manual.
+     * @param  list<list<int>>|null  $gruposManuales  Ids de participante por grupo: en modo manual, todos los grupos; en los demás, los que se fijan a mano antes de sortear el resto.
      */
     public function __construct(
         public ?int $numeroDeGrupos = null,
@@ -128,6 +128,17 @@ final readonly class ConfiguracionDeGrupos
             'clasificados' => $this->clasificados->toArray(),
             'grupos_manuales' => $this->gruposManuales,
         ];
+    }
+
+    /**
+     * Una copia con los participantes fijados a mano por grupo (el resto se
+     * sortea; en modo manual, son los grupos enteros).
+     *
+     * @param  list<list<int>>|null  $grupos
+     */
+    public function conGruposManuales(?array $grupos): self
+    {
+        return new self($this->numeroDeGrupos, $this->tamanoDeGrupo, $this->modoDeSorteo, $this->semilla, $this->partidosPorParticipante, $this->idaYVuelta, $this->puntuacion, $this->criteriosDeDesempate, $this->clasificados, $grupos);
     }
 
     /** Una copia con la semilla fijada (para persistir el sorteo). */

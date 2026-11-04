@@ -11,10 +11,11 @@ use App\Competicion\Errores\ParticipanteDuplicado;
 use App\Enums\ModoDeSorteo;
 
 /**
- * Reparte participantes en grupos: tamaños equilibrados, cabezas de serie
- * en serpiente, el resto al azar con semilla (el mismo sorteo se repite),
- * o manual (solo valida). Lo que es decisión del organizador vuelve como
- * aviso.
+ * Reparte participantes en grupos: tamaños equilibrados, primero los que
+ * el organizador fija a mano en cada grupo, luego las cabezas de serie en
+ * serpiente y el resto al azar con semilla (el mismo sorteo se repite), o
+ * todo manual (solo valida). Lo que es decisión del organizador vuelve
+ * como aviso.
  */
 final readonly class RepartidorDeGrupos
 {
@@ -45,6 +46,8 @@ final readonly class RepartidorDeGrupos
         $semilla = $configuracion->semilla ?? random_int(1, PHP_INT_MAX >> 1);
         $grupos = array_fill(0, count($tamanos), []);
         $colocados = [];
+
+        $this->colocarFijos($ids, $configuracion->gruposManuales ?? [], $tamanos, $grupos, $colocados);
 
         if ($configuracion->modoDeSorteo === ModoDeSorteo::CabezasDeSerie) {
             $this->colocarCabezas($participantes, $tamanos, $grupos, $colocados);
@@ -113,7 +116,7 @@ final readonly class RepartidorDeGrupos
      */
     private function colocarCabezas(array $participantes, array $tamanos, array &$grupos, array &$colocados): void
     {
-        $cabezas = array_values(array_filter($participantes, fn (Participante $p): bool => $p->cabezaDeSerie !== null));
+        $cabezas = array_values(array_filter($participantes, fn (Participante $p): bool => $p->cabezaDeSerie !== null && ! in_array($p->id, $colocados, true)));
         usort($cabezas, fn (Participante $a, Participante $b): int => ($a->cabezaDeSerie <=> $b->cabezaDeSerie) ?: ($a->id <=> $b->id));
 
         $g = count($tamanos);
@@ -130,6 +133,45 @@ final readonly class RepartidorDeGrupos
 
             $grupos[$grupo][] = $cabeza->id;
             $colocados[] = $cabeza->id;
+        }
+    }
+
+    /**
+     * Los que el organizador fija a mano, cada uno en su grupo, antes de
+     * sortear al resto. Un grupo no admite más de los que le tocan.
+     *
+     * @param  list<int>  $ids
+     * @param  list<list<int>>  $fijos
+     * @param  list<int>  $tamanos
+     * @param  array<int, list<int>>  $grupos
+     * @param  list<int>  $colocados
+     */
+    private function colocarFijos(array $ids, array $fijos, array $tamanos, array &$grupos, array &$colocados): void
+    {
+        foreach ($fijos as $i => $miembros) {
+            if ($miembros === []) {
+                continue;
+            }
+
+            $nombre = Grupo::nombrePorOrden($i + 1);
+            if (! isset($tamanos[$i])) {
+                throw new ConfiguracionInvalida(['Salen '.count($tamanos)." grupos: no hay grupo {$nombre} donde fijar parejas."]);
+            }
+
+            foreach ($miembros as $id) {
+                if (! in_array($id, $ids, true)) {
+                    throw new ConfiguracionInvalida(["El participante {$id} no está en esta fase (¿no está confirmado?)."]);
+                }
+                if (in_array($id, $colocados, true)) {
+                    throw new ParticipanteDuplicado($id);
+                }
+                $grupos[$i][] = $id;
+                $colocados[] = $id;
+            }
+
+            if (count($grupos[$i]) > $tamanos[$i]) {
+                throw new ConfiguracionInvalida(["En el grupo {$nombre} caben {$tamanos[$i]} parejas y se han fijado ".count($grupos[$i]).'.']);
+            }
         }
     }
 
