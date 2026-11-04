@@ -6,8 +6,10 @@ use App\Actions\Competicion\SortearGrupos;
 use App\Competicion\Datos\Resultado;
 use App\Competicion\Datos\Set;
 use App\Enums\EstadoFase;
+use App\Enums\EstadoInscripcion;
 use App\Enums\EstadoPartido;
 use App\Enums\EstadoTorneo;
+use App\Enums\ModoDeSorteo;
 use App\Enums\Rol;
 use App\Filament\Competicion\Marcador;
 use App\Filament\Resources\Categorias\Pages\EditCategoria;
@@ -19,6 +21,7 @@ use App\Models\Fase;
 use App\Models\FormatoPartido;
 use App\Models\Franja;
 use App\Models\Inscripcion;
+use App\Models\Jugador;
 use App\Models\Organizador;
 use App\Models\Participante;
 use App\Models\Pista;
@@ -220,4 +223,68 @@ test('cada fase se oculta o se enseña en la web desde su listado', function () 
 
     expect($this->grupos->refresh()->visible_en_web)->toBeFalse()
         ->and($this->cuadro->refresh()->visible_en_web)->toBeTrue();
+});
+
+test('en el sorteo se ponen las cabezas de serie en orden y entran las pendientes que se elijan', function () {
+    $ids = $this->categoria->participantes()->orderBy('id')->pluck('id')->all();
+    $pendiente = Participante::factory()->create(['categoria_id' => $this->categoria->id]);
+    Inscripcion::factory()->pendiente()->create(['participante_id' => $pendiente->id]);
+    $otraPendiente = Participante::factory()->create(['categoria_id' => $this->categoria->id]);
+    Inscripcion::factory()->pendiente()->create(['participante_id' => $otraPendiente->id]);
+
+    fasesDe($this->categoria)
+        ->callAction(TestAction::make('sortear')->table($this->grupos), [
+            'modo' => 'cabezas_de_serie',
+            'cabezas' => [(string) $ids[5], (string) $ids[4], (string) $ids[0]],
+            'grupo_1' => [(string) $pendiente->id],
+        ])
+        ->assertHasNoActionErrors()
+        ->assertNotified('3 grupos y 22 partidos');
+
+    $cabezas = Participante::query()->where('categoria_id', $this->categoria->id)->whereNotNull('cabeza_de_serie')->orderBy('cabeza_de_serie')->pluck('id')->all();
+    expect($cabezas)->toBe([$ids[5], $ids[4], $ids[0]])
+        ->and($pendiente->inscripcion->refresh()->estado)->toBe(EstadoInscripcion::Confirmada)
+        ->and($otraPendiente->inscripcion->refresh()->estado)->toBe(EstadoInscripcion::Pendiente);
+
+    $grupos = $this->grupos->refresh()->grupos()->with('participantes')->get();
+    expect($grupos[1]->participantes->pluck('id')->all())->toContain($pendiente->id)
+        ->and($grupos->flatMap(fn ($g) => $g->participantes->pluck('id'))->all())->not->toContain($otraPendiente->id)
+        ->and($grupos->map(fn ($g): int => count(array_intersect($g->participantes->pluck('id')->all(), $cabezas)))->all())->toBe([1, 1, 1]);
+});
+
+test('en el sorteo se pueden hacer todos los grupos a mano', function () {
+    $ids = array_map('strval', $this->categoria->participantes()->orderBy('id')->pluck('id')->all());
+
+    fasesDe($this->categoria)
+        ->callAction(TestAction::make('sortear')->table($this->grupos), [
+            'modo' => 'manual',
+            'grupo_0' => array_slice($ids, 0, 4),
+            'grupo_1' => array_slice($ids, 4, 4),
+            'grupo_2' => array_slice($ids, 8, 4),
+        ])
+        ->assertHasNoActionErrors()
+        ->assertNotified('3 grupos y 18 partidos');
+
+    $grupos = $this->grupos->refresh()->grupos()->with('participantes')->get();
+    expect($grupos->map(fn ($g): array => $g->participantes->pluck('id')->sort()->values()->all())->all())
+        ->toBe(array_map(fn (array $trozo): array => array_map('intval', $trozo), array_chunk($ids, 4)))
+        ->and($this->grupos->configuracionDeGrupos()->modoDeSorteo)->toBe(ModoDeSorteo::Manual);
+
+    // La misma pareja en dos grupos no se sortea.
+    fasesDe($this->categoria)
+        ->callAction(TestAction::make('sortear')->table($this->grupos), ['modo' => 'manual', 'grupo_0' => [$ids[0]], 'grupo_1' => [$ids[0]]])
+        ->assertNotified('No se ha podido sortear');
+});
+
+test('en los buscadores del sorteo salen los jugadores con su nivel', function () {
+    $pareja = Participante::factory()
+        ->conJugadores(Jugador::factory()->create(['nombre' => 'Ana', 'apellidos' => 'Gil', 'nivel_declarado' => '3.5']), Jugador::factory()->create(['nombre' => 'Eva', 'apellidos' => 'Sanz', 'nivel_declarado' => null]))
+        ->create(['categoria_id' => $this->categoria->id, 'cabeza_de_serie' => 9]);
+    Inscripcion::factory()->pendiente()->create(['participante_id' => $pareja->id]);
+
+    expect(FasesRelationManager::etiquetaDelSorteo($pareja->refresh()))
+        ->toContain('Ana Gil (3,5)')
+        ->toContain('Eva Sanz (sin nivel)')
+        ->toContain('CS 9')
+        ->toContain('pendiente');
 });
