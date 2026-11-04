@@ -16,6 +16,7 @@ use App\Livewire\Publico\AccesoJugador;
 use App\Livewire\Publico\FichaDelTorneo;
 use App\Livewire\Publico\InscripcionEnTorneo;
 use App\Livewire\Publico\InvitacionDePareja;
+use App\Livewire\Publico\MiInscripcion;
 use App\Livewire\Publico\PartidosDePista;
 use App\Livewire\Publico\PortalDelJugador;
 use App\Livewire\Publico\Tablero;
@@ -51,6 +52,7 @@ Route::middleware(ExigirOrganizador::class)->group(function (): void {
     Route::post('/jugador/salir', [AccesoDelJugador::class, 'salir'])->name('jugador.salir');
     Route::get('/invitacion/{token}', InvitacionDePareja::class)->middleware('throttle:20,1')->name('invitacion');
     Route::get('/jugador', PortalDelJugador::class)->middleware(ExigirJugador::class)->name('jugador.portal');
+    Route::get('/jugador/inscripciones/{inscripcion}', MiInscripcion::class)->middleware(ExigirJugador::class)->name('jugador.inscripcion');
 
     // La mesa de árbitros, con la sesión del equipo.
     Route::get('/mesa/acceso', AccesoDeMesa::class)->name('mesa.acceso');

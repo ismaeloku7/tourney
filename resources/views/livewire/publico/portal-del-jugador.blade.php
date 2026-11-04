@@ -35,7 +35,7 @@
                 @php($pendiente = $inscripcion->participante->participanteJugadores->first(fn ($f) => $f->confirmado_en === null))
                 <li class="tarjeta p-4">
                     <div class="flex flex-wrap items-baseline justify-between gap-2">
-                        <a href="{{ route('torneo.ficha', $torneo) }}" class="text-sm font-semibold hover:underline">{{ $torneo->nombre }}</a>
+                        <a href="{{ route('jugador.inscripcion', $inscripcion) }}" class="text-sm font-semibold hover:underline">{{ $torneo->nombre }}</a>
                         <span @class(['rounded-[3px] px-2 py-0.5 text-xs font-medium', 'bg-green-50 text-green-800' => $inscripcion->estado === \App\Enums\EstadoInscripcion::Confirmada, 'bg-amber-50 text-amber-800' => $inscripcion->estado === \App\Enums\EstadoInscripcion::Pendiente, 'bg-tema-fondo text-tema-suave' => ! in_array($inscripcion->estado, [\App\Enums\EstadoInscripcion::Confirmada, \App\Enums\EstadoInscripcion::Pendiente], true)])>{{ $inscripcion->estado->etiqueta() }}@if ($inscripcion->posicion_espera) (#{{ $inscripcion->posicion_espera }})@endif</span>
                     </div>
                     <p class="mt-1 text-sm text-tema-suave">{{ $inscripcion->categoria->nombre }} · {{ $inscripcion->participante->nombre }}</p>
@@ -44,17 +44,7 @@
                             {{ $fila->jugador->is($yo) ? 'tú' : $fila->jugador->nombre }} {{ $fila->jugador->nivel_declarado ?? '—' }}@if (! $loop->last) · @endif
                         @endforeach
                     </p>
-                    @foreach ($inscripcion->participante->participanteJugadores as $fila)
-                        @if ($inscripcion->estado !== \App\Enums\EstadoInscripcion::Baja && $fila->jugador_id !== $yo->id && array_key_exists($fila->jugador_id, $nivelesDeCompaneros) && ($losDosEditan || $inscripcion->participante->participanteJugadores->first()?->jugador_id === $yo->id))
-                            <form wire:submit="guardarNivelDeCompanero({{ $fila->jugador_id }})" class="mt-2 flex flex-wrap items-end gap-2 text-sm">
-                                <label>Nivel de {{ $fila->jugador->nombre }} @unless ($losDosEditan)<span class="text-tema-suave">(eres el capitán)</span>@endunless
-                                    <input type="text" inputmode="decimal" wire:model="nivelesDeCompaneros.{{ $fila->jugador_id }}" placeholder="3 o 2,5" class="mt-1 block w-28 campo px-2 py-1">
-                                </label>
-                                <button type="submit" class="boton-claro px-4 py-1.5">Guardar</button>
-                            </form>
-                            @error('nivel.'.$fila->jugador_id) <p class="mt-1 text-sm text-red-700">{{ $message }}</p> @enderror
-                        @endif
-                    @endforeach
+                    <a href="{{ route('jugador.inscripcion', $inscripcion) }}" class="enlace mt-2 inline-block text-sm">Ver la inscripción y poner los niveles →</a>
                     @if ($pendiente && $inscripcion->estado === \App\Enums\EstadoInscripcion::Pendiente)
                         <p class="mt-1 text-sm text-amber-700">Falta que {{ $pendiente->jugador->nombre }} confirme desde su correo.</p>
                     @endif
@@ -168,7 +158,7 @@
             <label class="block text-sm"><span class="font-medium">Nombre</span><input type="text" wire:model="nombre" class="mt-1 w-full campo">@error('nombre') <span class="text-red-700">{{ $message }}</span> @enderror</label>
             <label class="block text-sm"><span class="font-medium">Apellidos</span><input type="text" wire:model="apellidos" class="mt-1 w-full campo">@error('apellidos') <span class="text-red-700">{{ $message }}</span> @enderror</label>
             <label class="block text-sm"><span class="font-medium">Teléfono</span><input type="tel" wire:model="telefono" class="mt-1 w-full campo"></label>
-            <label class="block text-sm"><span class="font-medium">Nivel</span><input type="text" inputmode="decimal" wire:model="nivel" placeholder="3 o 2,5" class="mt-1 w-full campo">@error('nivel') <span class="text-red-700">{{ $message }}</span> @enderror<span class="text-tema-suave">Un número del 0 al 10. {{ $losDosEditan ? 'El de tu compañero lo cambias en la inscripción.' : 'Si eres el capitán de tu pareja, el de tu compañero lo cambias en la inscripción.' }}</span></label>
+            <label class="block text-sm"><span class="font-medium">Nivel</span><input type="text" inputmode="decimal" wire:model="nivel" placeholder="3 o 2,5" class="mt-1 w-full campo">@error('nivel') <span class="text-red-700">{{ $message }}</span> @enderror<span class="text-tema-suave">Un número del 0 al 10. El de tu compañero lo pones en la inscripción: pulsa en el torneo.</span></label>
             <label class="block text-sm"><span class="font-medium">Alias</span><input type="text" wire:model="alias" class="mt-1 w-full campo"><span class="text-tema-suave">Lo que se enseña en los torneos con privacidad.</span></label>
             <p class="text-sm text-tema-suave sm:col-span-2">Tu correo: {{ $yo->getAttribute('email') }}. Para cambiarlo, escribe a la organización.</p>
             <div><button type="submit" class="boton">Guardar</button></div>

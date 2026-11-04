@@ -53,9 +53,6 @@ class PortalDelJugador extends Component
 
     public string $nivel = '';
 
-    /** @var array<int, string> jugador => nivel, de los compañeros de las parejas que capitanea */
-    public array $nivelesDeCompaneros = [];
-
     /** @var array<int, array{dia: string, desde: string, hasta: string}> torneo => intervalo nuevo */
     public array $noDisponible = [];
 
@@ -75,9 +72,6 @@ class PortalDelJugador extends Component
         $this->telefono = (string) $yo->getAttribute('telefono');
         $this->alias = (string) $yo->alias;
         $this->nivel = (string) $yo->nivel_declarado;
-        foreach (CambiarNivel::companeros($yo) as $companero) {
-            $this->nivelesDeCompaneros[$companero->id] = (string) $companero->nivel_declarado;
-        }
         $this->avisosCorreo = (bool) ($yo->avisos['correo'] ?? true);
         $this->avisosPush = (bool) ($yo->avisos['push'] ?? true);
     }
@@ -182,24 +176,6 @@ class PortalDelJugador extends Component
         $this->aviso = 'Datos guardados.';
     }
 
-    public function guardarNivelDeCompanero(int $jugador, CambiarNivel $cambiar): void
-    {
-        $companero = Jugador::query()->find($jugador);
-        abort_if($companero === null, 404);
-
-        try {
-            $cambiar->handle($this->yo(), $companero, $this->nivelesDeCompaneros[$jugador] ?? null);
-        } catch (ErrorDeCompeticion $e) {
-            $this->aviso = null;
-            $this->addError('nivel.'.$jugador, $e->getMessage());
-
-            return;
-        }
-
-        $this->resetErrorBag();
-        $this->aviso = "Nivel de {$companero->nombre} guardado.";
-    }
-
     public function borrarMisDatos(AnonimizarJugador $anonimizar): void
     {
         if (mb_strtoupper(trim($this->confirmarBorrado)) !== 'BORRAR') {
@@ -243,7 +219,6 @@ class PortalDelJugador extends Component
             'torneosConHuecos' => $torneosAbiertosAlHorario,
             'noDisponibilidades' => Disponibilidad::query()->where('jugador_id', $yo->id)->orderBy('desde')->get()->groupBy('torneo_id'),
             'historial' => $yo->notifications()->latest()->limit(15)->get(),
-            'losDosEditan' => CambiarNivel::losDosEditan(),
         ]);
     }
 
