@@ -5,6 +5,7 @@ use App\Actions\Competicion\RegistrarResultado;
 use App\Actions\Competicion\SortearGrupos;
 use App\Competicion\Datos\Resultado;
 use App\Competicion\Datos\Set;
+use App\Competicion\Errores\ConfiguracionInvalida;
 use App\Enums\EstadoFase;
 use App\Enums\EstadoInscripcion;
 use App\Enums\EstadoPartido;
@@ -523,4 +524,45 @@ test('al configurar el cuadro se ve su esquema: rondas, cruces y quién llega a 
     $pagina->mountAction(TestAction::make('edit')->table($this->cuadro))
         ->callMountedAction()
         ->assertHasNoActionErrors();
+});
+
+test('en una fase de grupos ya sorteada se cambia quién pasa: por ejemplo, los dos mejores terceros', function () {
+    $this->grupos->update(['configuracion' => [...$this->grupos->configuracion, 'clasificados' => ['por_grupo' => 2]]]);
+    app(SortearGrupos::class)->handle($this->grupos, $this->propietario);
+    app(GenerarPartidos::class)->handle($this->grupos->refresh(), $this->propietario);
+
+    $pagina = fasesDe($this->categoria);
+    $automatico = fn (): string => FaseForm::esquema(['regla_de_cruces' => 'entre_grupos'], $pagina->instance(), $this->cuadro)->toHtml();
+    expect($automatico())->toContain('Bye');
+
+    $pagina->assertActionHidden(TestAction::make('edit')->table($this->grupos))
+        ->callAction(TestAction::make('quienPasa')->table($this->grupos), ['por_grupo' => 2, 'cuantos_mejores' => 2, 'mejores_de_posicion' => 3])
+        ->assertHasNoActionErrors()
+        ->assertNotified('Guardado');
+
+    $regla = $this->grupos->refresh()->configuracionDeGrupos()->clasificados;
+    expect($regla->porGrupo)->toBe(2)->and($regla->cuantosMejores)->toBe(2)->and($regla->mejoresDePosicion)->toBe(3)
+        ->and($automatico())->toContain('Mejor 3º nº 1')->not->toContain('Bye');
+});
+
+test('con el cuadro a mano, en cada hueco va cualquier posición y la fase de grupos pasa a clasificar justo a esos', function () {
+    // Solo los primeros y el mejor segundo.
+    fasesDe($this->categoria)
+        ->callAction(TestAction::make('edit')->table($this->cuadro), ['configuracion' => [
+            'regla_de_cruces' => 'a_posiciones',
+            'mejores_de' => 2,
+            'cruces_por_posicion' => [['local' => '1A', 'visitante' => 'M1'], ['local' => '1B', 'visitante' => '1C']],
+            'tercer_y_cuarto_puesto' => false,
+            'consolacion' => 'ninguna',
+        ]])
+        ->assertHasNoActionErrors()
+        ->assertNotified('Cuadro guardado');
+
+    $regla = $this->grupos->refresh()->configuracionDeGrupos()->clasificados;
+    expect($regla->porGrupo)->toBe(1)->and($regla->cuantosMejores)->toBe(1)->and($regla->mejoresDePosicion)->toBe(2)
+        ->and($this->cuadro->refresh()->configuracion['cruces_por_posicion'])->toBe([['1A', 'M1'], ['1B', '1C']]);
+
+    // Si pasa el 2º de un grupo, pasan los de todos.
+    expect(fn () => FaseForm::quienPasaDesde(['1A', '1B', '1C', '2A'], ['A', 'B', 'C'], 3))->toThrow(ConfiguracionInvalida::class)
+        ->and(FaseForm::quienPasaDesde(['1A', '1B', '1C', '2A', '2B', '2C', 'M1', 'M2'], ['A', 'B', 'C'], 3))->toBe(['por_grupo' => 2, 'cuantos_mejores' => 2, 'mejores_de_posicion' => 3]);
 });

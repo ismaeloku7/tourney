@@ -16,6 +16,7 @@ use App\Enums\ReglaDeCruces;
 use App\Enums\TipoDeFase;
 use App\Models\Categoria;
 use App\Models\Fase;
+use App\Models\Grupo;
 use Filament\Actions\Action;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Repeater;
@@ -113,28 +114,44 @@ class FaseForm
                             ReglaDeCruces::Sorteo->value => 'Por sorteo',
                             ReglaDeCruces::APosiciones->value => 'A mano: tú decides dónde va cada posición (1º A contra 2º C…)',
                         ])
-                        ->default(ReglaDeCruces::EntreGrupos->value)->required()->live()->columnSpanFull(),
+                        ->default(ReglaDeCruces::EntreGrupos->value)->required()->live()->columnSpanFull()
+                        // Al pasar a mano sin cruces, se parte del cuadro automático para cambiar solo lo que haga falta.
+                        ->afterStateUpdated(function (?string $state, Get $get, Set $set, RelationManager $livewire, ?Fase $record): void {
+                            if ($state === ReglaDeCruces::APosiciones->value && array_filter((array) $get('configuracion.cruces_por_posicion')) === []) {
+                                $set('configuracion.cruces_por_posicion', self::crucesAutomaticos($livewire, $record));
+                            }
+                        }),
+                    Select::make('configuracion.mejores_de')->label('Los «mejores» que pasan son los…')
+                        ->options(fn (RelationManager $livewire, ?Fase $record): array => self::opcionesDeMejores($livewire, $record))
+                        ->default(3)->live()
+                        ->afterStateHydrated(function (Select $component, mixed $state, RelationManager $livewire, ?Fase $record): void {
+                            if (blank($state)) {
+                                $component->state(self::mejoresDeAhora($livewire, $record));
+                            }
+                        })
+                        ->helperText('Para los cruces con «Mejor nº 1», «Mejor nº 2»…: de qué posición de grupo son.')
+                        ->visible(fn (Get $get): bool => $get('configuracion.regla_de_cruces') === ReglaDeCruces::APosiciones->value),
                     Select::make('configuracion.tamano_de_cuadro')->label('Tamaño del cuadro')
                         ->options([2 => '2 (final)', 4 => '4', 8 => '8', 16 => '16', 32 => '32', 64 => '64', 128 => '128'])
                         ->placeholder('El mínimo en el que caben')->live()
                         ->visible(fn (Get $get): bool => $get('configuracion.regla_de_cruces') !== ReglaDeCruces::APosiciones->value),
                     Repeater::make('configuracion.cruces_por_posicion')->label('Cruces de la primera ronda')
                         ->schema(function (RelationManager $livewire, ?Fase $record): array {
-                            $posiciones = self::posiciones($livewire, $record);
+                            $opciones = fn (Get $get): array => self::posicionesPosibles($livewire, $record, is_numeric($get('../../mejores_de')) ? (int) $get('../../mejores_de') : null);
 
                             return [
-                                Select::make('local')->hiddenLabel()->options($posiciones)->placeholder('Bye (pasa sin jugar)'),
-                                Select::make('visitante')->hiddenLabel()->options($posiciones)->placeholder('Bye (pasa sin jugar)'),
+                                Select::make('local')->hiddenLabel()->options($opciones)->searchable()->placeholder('Bye (pasa sin jugar)')->live(),
+                                Select::make('visitante')->hiddenLabel()->options($opciones)->searchable()->placeholder('Bye (pasa sin jugar)')->live(),
                             ];
                         })
-                        ->columns(2)->defaultItems(0)->reorderable()->addActionLabel('Añadir cruce')->live()
-                        ->hintAction(Action::make('proponer')->label('Proponer cruces')
+                        ->columns(2)->defaultItems(0)->reorderable()->itemNumbers()->addActionLabel('Añadir cruce')->live()
+                        ->hintAction(Action::make('proponer')->label('Partir del cuadro automático')
                             ->action(function (Set $set, RelationManager $livewire, ?Fase $record): void {
-                                $set('configuracion.cruces_por_posicion', self::cruceSugerido(array_keys(self::posiciones($livewire, $record))));
+                                $set('configuracion.cruces_por_posicion', self::crucesAutomaticos($livewire, $record));
                             }))
-                        ->helperText(fn (RelationManager $livewire, ?Fase $record): string => self::posiciones($livewire, $record) === []
+                        ->helperText(fn (RelationManager $livewire, ?Fase $record): string => self::faseDeGrupos(self::categoria($livewire), $record) === null
                             ? 'Añada antes la fase de grupos de la que salen las parejas.'
-                            : 'Una fila por partido, en el orden del cuadro: los ganadores de las filas 1 y 2 se cruzan en la ronda siguiente, los de la 3 y 4 entre sí, y así. Cada posición que pasa tiene que estar en una fila; un hueco vacío es un bye. Se rellena con quien quede en cada posición al cerrar los grupos.')
+                            : 'Una fila por partido de la primera ronda, en el orden del esquema de abajo (fila 1 = primer cruce…). En cada hueco, cualquier posición: «3º B», «Mejor nº 1»… o nada para un bye. Al guardar, la fase de grupos pasa a clasificar justo a los que pongas aquí.')
                         ->visible(fn (Get $get): bool => $get('configuracion.regla_de_cruces') === ReglaDeCruces::APosiciones->value)
                         ->columnSpanFull(),
                     Toggle::make('configuracion.evitar_reencuentros')->label('Evitar reencuentros de la fase anterior')->default(true)->inline(false)->live()
@@ -256,6 +273,199 @@ class FaseForm
         return $tamano.($configuracion->tercerYCuartoPuesto ? ' · con tercer puesto' : '');
     }
 
+    /** La fase de grupos (o liga) de la que salen las parejas de esta fase: la anterior más cercana. */
+    public static function faseDeGrupos(Categoria $categoria, ?Fase $fase): ?Fase
+    {
+        $orden = $fase->orden ?? ((int) $categoria->fases()->max('orden') + 1);
+
+        return $categoria->fases()->where('orden', '<', $orden)
+            ->whereIn('tipo', [TipoDeFase::Grupos->value, TipoDeFase::Liga->value])
+            ->orderByDesc('orden')->first();
+    }
+
+    /**
+     * Las letras de los grupos y cuántas parejas tiene el más grande: los
+     * hechos o, sin sortear, los que saldrán.
+     *
+     * @return array{0: list<string>, 1: int}
+     */
+    public static function letrasYTamano(Categoria $categoria, Fase $grupos): array
+    {
+        $hechos = $grupos->grupos()->withCount('participantes')->orderBy('orden')->get();
+        if ($hechos->isNotEmpty()) {
+            return [array_values($hechos->map(fn (Grupo $g): string => (string) $g->nombre)->all()), max(2, (int) $hechos->max('participantes_count'))];
+        }
+
+        try {
+            $configuracion = $grupos->configuracionDeGrupos();
+        } catch (ConfiguracionInvalida) {
+            return [[], 0];
+        }
+
+        $parejas = max(1, $categoria->participantes()->where('estado', EstadoParticipante::Activo->value)
+            ->whereHas('inscripcion', fn ($q) => $q->where('estado', EstadoInscripcion::Confirmada->value))->count());
+        $cuantos = max(1, $configuracion->numeroDeGrupos ?? intdiv($parejas, $configuracion->tamanoDeGrupo ?? 4));
+
+        return [array_map(fn (int $i): string => GrupoDto::nombrePorOrden($i), range(1, $cuantos)), max(2, (int) ceil($parejas / $cuantos))];
+    }
+
+    /**
+     * Todo lo que se puede poner en un cruce a mano, pase o no ahora: cada
+     * posición de cada grupo («3B» → «3º grupo B») y los mejores de una
+     * posición («M1» → «Mejor 3º nº 1»).
+     *
+     * @return array<string, string>
+     */
+    public static function posicionesPosibles(RelationManager $livewire, ?Fase $fase, ?int $mejoresDe): array
+    {
+        $categoria = self::categoria($livewire);
+        $grupos = self::faseDeGrupos($categoria, $fase);
+        if ($grupos === null) {
+            return [];
+        }
+
+        [$letras, $tamano] = self::letrasYTamano($categoria, $grupos);
+        $mejoresDe ??= self::mejoresDeAhora($livewire, $fase);
+
+        $opciones = [];
+        for ($posicion = 1; $posicion <= $tamano; $posicion++) {
+            foreach ($letras as $letra) {
+                $opciones[$posicion.$letra] = $posicion.'º grupo '.$letra;
+            }
+        }
+        for ($k = 1; $k <= count($letras); $k++) {
+            $opciones['M'.$k] = ConfiguracionDeEliminatoria::etiquetaDePosicion('M'.$k, $mejoresDe);
+        }
+
+        return $opciones;
+    }
+
+    /** @return array<int, string> */
+    public static function opcionesDeMejores(RelationManager $livewire, ?Fase $fase): array
+    {
+        $categoria = self::categoria($livewire);
+        $grupos = self::faseDeGrupos($categoria, $fase);
+        $tamano = $grupos !== null ? self::letrasYTamano($categoria, $grupos)[1] : 4;
+
+        $opciones = [];
+        for ($posicion = 2; $posicion <= max(2, $tamano); $posicion++) {
+            $opciones[$posicion] = 'Mejores '.$posicion.'º';
+        }
+
+        return $opciones;
+    }
+
+    /** De qué posición son ahora los mejores que pasan (o la siguiente a las que pasan enteras). */
+    public static function mejoresDeAhora(RelationManager $livewire, ?Fase $fase): int
+    {
+        $grupos = self::faseDeGrupos(self::categoria($livewire), $fase);
+
+        try {
+            $clasificados = $grupos?->configuracionDeGrupos()->clasificados;
+        } catch (ConfiguracionInvalida) {
+            $clasificados = null;
+        }
+
+        return $clasificados === null ? 3 : ($clasificados->mejoresDePosicion ?? $clasificados->porGrupo + 1);
+    }
+
+    /**
+     * Los cruces de la primera ronda del cuadro automático, como filas del
+     * formulario, para partir de ellos al hacerlo a mano.
+     *
+     * @return list<array{local: string|null, visitante: string|null}>
+     */
+    public static function crucesAutomaticos(RelationManager $livewire, ?Fase $fase): array
+    {
+        $codigos = array_keys(self::posiciones($livewire, $fase));
+        $esquema = app(EsquemaDeCuadro::class)->armar($codigos, new ConfiguracionDeEliminatoria);
+
+        return array_map(fn (array $p): array => ['local' => $p['localCodigo'], 'visitante' => $p['visitanteCodigo']], $esquema['rondas'][0]['partidos'] ?? []);
+    }
+
+    /**
+     * Quién tiene que pasar de la fase de grupos para que salgan los cruces
+     * puestos a mano: los N primeros de todos los grupos y, si se usan, los
+     * mejores de una posición.
+     *
+     * @param  list<string>  $codigos
+     * @param  list<string>  $letras
+     * @return array{por_grupo: int, cuantos_mejores: int, mejores_de_posicion: int|null}
+     *
+     * @throws ConfiguracionInvalida
+     */
+    public static function quienPasaDesde(array $codigos, array $letras, ?int $mejoresDe): array
+    {
+        $directos = [];
+        $mejores = [];
+        $errores = [];
+
+        foreach ($codigos as $codigo) {
+            if (preg_match('/^M(\d+)$/', $codigo, $partes) === 1) {
+                $mejores[] = (int) $partes[1];
+            } elseif (preg_match('/^(\d+)([A-Z]+)$/', $codigo, $partes) === 1) {
+                if (! in_array($partes[2], $letras, true)) {
+                    $errores[] = "No hay grupo {$partes[2]}.";
+                }
+                $directos[(int) $partes[1]][$partes[2]] = true;
+            }
+        }
+
+        $porGrupo = $directos === [] ? 0 : max(array_keys($directos));
+        for ($posicion = 1; $posicion <= $porGrupo; $posicion++) {
+            foreach ($letras as $letra) {
+                if (! isset($directos[$posicion][$letra])) {
+                    $errores[] = "Falta el {$posicion}º del grupo {$letra}: si pasan los {$posicion}º de un grupo, pasan los de todos (los sueltos van como «mejores»).";
+                }
+            }
+        }
+
+        sort($mejores);
+        if ($mejores !== [] && $mejores !== range(1, count($mejores))) {
+            $errores[] = 'Los mejores van por orden: Mejor nº 1, nº 2…';
+        }
+        if ($mejores !== [] && ($mejoresDe === null || $mejoresDe <= $porGrupo)) {
+            $errores[] = 'Los «mejores» tienen que ser de una posición que no pase entera: de los '.($porGrupo + 1).'º o más.';
+        }
+
+        if ($errores !== []) {
+            throw new ConfiguracionInvalida(array_values(array_unique($errores)));
+        }
+
+        return ['por_grupo' => $porGrupo, 'cuantos_mejores' => count($mejores), 'mejores_de_posicion' => $mejores === [] ? null : $mejoresDe];
+    }
+
+    /**
+     * Las posiciones de los cruces a mano, en orden: primero todos los
+     * primeros (A, B…), luego los segundos… y al final los mejores.
+     *
+     * @param  array<mixed>  $filas
+     * @return list<string>
+     */
+    public static function codigosDeLosCruces(array $filas): array
+    {
+        $codigos = [];
+        foreach ($filas as $fila) {
+            foreach (array_values((array) $fila) as $codigo) {
+                if (is_string($codigo) && $codigo !== '') {
+                    $codigos[] = strtoupper($codigo);
+                }
+            }
+        }
+
+        $clave = function (string $codigo): array {
+            if (preg_match('/^M(\d+)$/', $codigo, $partes) === 1) {
+                return [1000, (int) $partes[1], ''];
+            }
+            preg_match('/^(\d+)([A-Z]+)$/', $codigo, $partes);
+
+            return [(int) ($partes[1] ?? 999), 0, str_pad($partes[2] ?? '', 3, ' ', STR_PAD_LEFT)];
+        };
+        usort($codigos, fn (string $a, string $b): int => $clave($a) <=> $clave($b));
+
+        return array_values(array_unique($codigos));
+    }
+
     /**
      * El esquema del cuadro con lo que hay en el formulario: rondas,
      * cruces y quién llega a cada hueco. Sin fase de grupos antes, con los
@@ -279,8 +489,23 @@ class FaseForm
             $aviso = 'Orientativo: entre los primeros (y entre los segundos) el orden sale de sus resultados en los grupos.';
         }
 
-        if (($datos['regla_de_cruces'] ?? null) === ReglaDeCruces::APosiciones->value && array_filter((array) ($datos['cruces_por_posicion'] ?? [])) === []) {
-            $esquema = ['rondas' => [], 'tercero' => null, 'error' => 'Añade los cruces de la primera ronda (o pulsa «Proponer cruces») para ver el cuadro.'];
+        if (($datos['regla_de_cruces'] ?? null) === ReglaDeCruces::APosiciones->value) {
+            // A mano: pasan justo los que estén en los cruces.
+            $usados = self::codigosDeLosCruces((array) ($datos['cruces_por_posicion'] ?? []));
+            $grupos = self::faseDeGrupos(self::categoria($livewire), $fase);
+            $mejoresDe = is_numeric($datos['mejores_de'] ?? null) ? (int) $datos['mejores_de'] : self::mejoresDeAhora($livewire, $fase);
+
+            if ($usados === [] || $grupos === null) {
+                $esquema = ['rondas' => [], 'tercero' => null, 'error' => $grupos === null ? 'Añade antes la fase de grupos de la que salen las parejas.' : 'Añade los cruces de la primera ronda (o pulsa «Partir del cuadro automático») para ver el cuadro.'];
+            } else {
+                try {
+                    self::quienPasaDesde($usados, self::letrasYTamano(self::categoria($livewire), $grupos)[0], $mejoresDe);
+                    $esquema = app(EsquemaDeCuadro::class)->armar($usados, ConfiguracionDeEliminatoria::desdeArray($datos), $mejoresDe);
+                } catch (ConfiguracionInvalida $e) {
+                    $esquema = ['rondas' => [], 'tercero' => null, 'error' => implode(' ', $e->errores)];
+                }
+            }
+            $aviso = null;
         } else {
             try {
                 $esquema = app(EsquemaDeCuadro::class)->armar($codigos, ConfiguracionDeEliminatoria::desdeArray($datos), $mejoresDe);
@@ -302,10 +527,7 @@ class FaseForm
     public static function posiciones(RelationManager $livewire, ?Fase $fase): array
     {
         $categoria = self::categoria($livewire);
-        $orden = $fase->orden ?? ((int) $categoria->fases()->max('orden') + 1);
-        $grupos = $categoria->fases()->where('orden', '<', $orden)
-            ->whereIn('tipo', [TipoDeFase::Grupos->value, TipoDeFase::Liga->value])
-            ->orderByDesc('orden')->first();
+        $grupos = self::faseDeGrupos($categoria, $fase);
 
         if ($grupos === null) {
             return [];
@@ -317,13 +539,7 @@ class FaseForm
             return [];
         }
 
-        $letras = $grupos->grupos()->orderBy('orden')->pluck('nombre')->map(fn (mixed $n): string => (string) $n)->all();
-        if ($letras === []) {
-            $parejas = $categoria->participantes()->where('estado', EstadoParticipante::Activo->value)
-                ->whereHas('inscripcion', fn ($q) => $q->where('estado', EstadoInscripcion::Confirmada->value))->count();
-            $cuantos = $configuracion->numeroDeGrupos ?? max(1, intdiv(max(1, $parejas), $configuracion->tamanoDeGrupo ?? 4));
-            $letras = array_map(fn (int $i): string => GrupoDto::nombrePorOrden($i), range(1, $cuantos));
-        }
+        [$letras] = self::letrasYTamano($categoria, $grupos);
 
         $opciones = [];
         for ($posicion = 1; $posicion <= $configuracion->clasificados->porGrupo; $posicion++) {
