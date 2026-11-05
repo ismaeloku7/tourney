@@ -398,6 +398,26 @@ test('una tanda elegida y sin repartir se reparte al guardar, una por grupo', fu
         ->and($this->grupos->configuracionDeGrupos()->repartidos)->toBe($repartidas);
 });
 
+test('el sorteo por niveles reparte por bombos según el nivel medio de cada pareja', function () {
+    $parejas = $this->categoria->participantes()->with('jugadores')->orderBy('id')->get()->values();
+    foreach ($parejas as $i => $pareja) {
+        foreach ($pareja->jugadores as $jugador) {
+            $jugador->update(['nivel_declarado' => (string) (1 + $i * 0.5)]);
+        }
+    }
+    // Las tres de más nivel son las tres últimas creadas.
+    $mejores = $parejas->slice(9)->pluck('id')->all();
+
+    fasesDe($this->categoria)
+        ->callAction(TestAction::make('sortear')->table($this->grupos), ['modo' => 'por_niveles'])
+        ->assertHasNoActionErrors()
+        ->assertNotified('3 grupos y 18 partidos');
+
+    $grupos = $this->grupos->refresh()->grupos()->with('participantes')->get();
+    expect($grupos->map(fn ($g): int => count(array_intersect($g->participantes->pluck('id')->all(), $mejores)))->all())->toBe([1, 1, 1])
+        ->and($this->grupos->configuracionDeGrupos()->modoDeSorteo)->toBe(ModoDeSorteo::PorNiveles);
+});
+
 test('el cuadro se puede hacer a mano por posiciones y se rellena al cerrar los grupos', function () {
     // Las posiciones que se ofrecen: los 2 primeros de cada grupo (A, B, C) y los 2 mejores terceros.
     $posiciones = FaseForm::posiciones(fasesDe($this->categoria)->instance(), $this->cuadro);
