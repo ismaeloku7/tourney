@@ -6,6 +6,7 @@ use App\Competicion\Datos\ConfiguracionDeEliminatoria;
 use App\Competicion\Datos\ConfiguracionDeGrupos;
 use App\Competicion\Datos\Grupo as GrupoDto;
 use App\Competicion\Errores\ConfiguracionInvalida;
+use App\Competicion\EsquemaDeCuadro;
 use App\Enums\CriterioDeDesempate;
 use App\Enums\EstadoInscripcion;
 use App\Enums\EstadoParticipante;
@@ -24,8 +25,10 @@ use Filament\Forms\Components\Toggle;
 use Filament\Resources\RelationManagers\RelationManager;
 use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Section;
+use Filament\Schemas\Components\Text;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Schemas\Components\Utilities\Set;
+use Illuminate\Support\HtmlString;
 
 /**
  * El formulario de una fase: los campos del tipo elegido, guardados en
@@ -104,16 +107,17 @@ class FaseForm
                 ->columns(2)
                 ->visible(fn (Get $get): bool => self::tipo($get('tipo'))?->esDeCuadro() ?? false)
                 ->components([
+                    Radio::make('configuracion.regla_de_cruces')->label('Cómo se arma el cuadro')
+                        ->options([
+                            ReglaDeCruces::EntreGrupos->value => 'Automático: los primeros contra los segundos de otro grupo',
+                            ReglaDeCruces::Sorteo->value => 'Por sorteo',
+                            ReglaDeCruces::APosiciones->value => 'A mano: tú decides dónde va cada posición (1º A contra 2º C…)',
+                        ])
+                        ->default(ReglaDeCruces::EntreGrupos->value)->required()->live()->columnSpanFull(),
                     Select::make('configuracion.tamano_de_cuadro')->label('Tamaño del cuadro')
                         ->options([2 => '2 (final)', 4 => '4', 8 => '8', 16 => '16', 32 => '32', 64 => '64', 128 => '128'])
-                        ->placeholder('El mínimo en el que caben'),
-                    Select::make('configuracion.regla_de_cruces')->label('Cruces')
-                        ->options([
-                            ReglaDeCruces::EntreGrupos->value => ReglaDeCruces::EntreGrupos->etiqueta(),
-                            ReglaDeCruces::Sorteo->value => ReglaDeCruces::Sorteo->etiqueta(),
-                            ReglaDeCruces::APosiciones->value => ReglaDeCruces::APosiciones->etiqueta(),
-                        ])
-                        ->default(ReglaDeCruces::EntreGrupos->value)->required()->live(),
+                        ->placeholder('El mínimo en el que caben')->live()
+                        ->visible(fn (Get $get): bool => $get('configuracion.regla_de_cruces') !== ReglaDeCruces::APosiciones->value),
                     Repeater::make('configuracion.cruces_por_posicion')->label('Cruces de la primera ronda')
                         ->schema(function (RelationManager $livewire, ?Fase $record): array {
                             $posiciones = self::posiciones($livewire, $record);
@@ -123,7 +127,7 @@ class FaseForm
                                 Select::make('visitante')->hiddenLabel()->options($posiciones)->placeholder('Bye (pasa sin jugar)'),
                             ];
                         })
-                        ->columns(2)->defaultItems(0)->reorderable()->addActionLabel('Añadir cruce')
+                        ->columns(2)->defaultItems(0)->reorderable()->addActionLabel('Añadir cruce')->live()
                         ->hintAction(Action::make('proponer')->label('Proponer cruces')
                             ->action(function (Set $set, RelationManager $livewire, ?Fase $record): void {
                                 $set('configuracion.cruces_por_posicion', self::cruceSugerido(array_keys(self::posiciones($livewire, $record))));
@@ -133,8 +137,12 @@ class FaseForm
                             : 'Una fila por partido, en el orden del cuadro: los ganadores de las filas 1 y 2 se cruzan en la ronda siguiente, los de la 3 y 4 entre sí, y así. Cada posición que pasa tiene que estar en una fila; un hueco vacío es un bye. Se rellena con quien quede en cada posición al cerrar los grupos.')
                         ->visible(fn (Get $get): bool => $get('configuracion.regla_de_cruces') === ReglaDeCruces::APosiciones->value)
                         ->columnSpanFull(),
-                    Toggle::make('configuracion.evitar_reencuentros')->label('Evitar reencuentros de la fase anterior')->default(true)->inline(false),
-                    Toggle::make('configuracion.tercer_y_cuarto_puesto')->label('Partido por el tercer puesto')->default(false)->inline(false),
+                    Toggle::make('configuracion.evitar_reencuentros')->label('Evitar reencuentros de la fase anterior')->default(true)->inline(false)->live()
+                        ->visible(fn (Get $get): bool => $get('configuracion.regla_de_cruces') === ReglaDeCruces::EntreGrupos->value),
+                    Toggle::make('configuracion.tercer_y_cuarto_puesto')->label('Partido por el tercer puesto')->default(false)->inline(false)->live(),
+                    Text::make(fn (Get $get, RelationManager $livewire, ?Fase $record): HtmlString => self::esquema((array) $get('configuracion'), $livewire, $record))
+                        ->visible(fn (Get $get): bool => self::tipo($get('tipo')) === TipoDeFase::Eliminatoria)
+                        ->columnSpanFull(),
                     Select::make('configuracion.consolacion')->label('Consolación')
                         ->options(OrigenDeConsolacion::opciones())->default(OrigenDeConsolacion::Ninguna->value)
                         ->visible(fn (Get $get): bool => self::tipo($get('tipo')) === TipoDeFase::Eliminatoria)
@@ -246,6 +254,42 @@ class FaseForm
         $tamano = $configuracion->tamanoDeCuadro !== null ? "Cuadro de {$configuracion->tamanoDeCuadro}" : 'Cuadro al tamaño que haga falta';
 
         return $tamano.($configuracion->tercerYCuartoPuesto ? ' · con tercer puesto' : '');
+    }
+
+    /**
+     * El esquema del cuadro con lo que hay en el formulario: rondas,
+     * cruces y quién llega a cada hueco. Sin fase de grupos antes, con los
+     * cabezas de serie de las parejas confirmadas.
+     */
+    /** @param  array<mixed>  $datos  La configuración del formulario. */
+    public static function esquema(array $datos, RelationManager $livewire, ?Fase $fase): HtmlString
+    {
+        $posiciones = self::posiciones($livewire, $fase);
+        $codigos = array_keys($posiciones);
+        // «Mejor 3º nº 1»: de qué posición son los mejores.
+        $mejoresDe = preg_match('/^Mejor (\d+)º/', $posiciones['M1'] ?? '', $partes) === 1 ? (int) $partes[1] : null;
+        $aviso = null;
+
+        if ($codigos === []) {
+            $parejas = self::categoria($livewire)->participantes()->where('estado', EstadoParticipante::Activo->value)
+                ->whereHas('inscripcion', fn ($q) => $q->where('estado', EstadoInscripcion::Confirmada->value))->count();
+            $codigos = array_map(fn (int $i): string => 'CS'.$i, range(1, max(2, $parejas)));
+            $aviso = 'Sin fase de grupos antes: con las '.$parejas.' parejas confirmadas, por orden de cabeza de serie.';
+        } elseif (($datos['regla_de_cruces'] ?? null) === ReglaDeCruces::EntreGrupos->value) {
+            $aviso = 'Orientativo: entre los primeros (y entre los segundos) el orden sale de sus resultados en los grupos.';
+        }
+
+        if (($datos['regla_de_cruces'] ?? null) === ReglaDeCruces::APosiciones->value && array_filter((array) ($datos['cruces_por_posicion'] ?? [])) === []) {
+            $esquema = ['rondas' => [], 'tercero' => null, 'error' => 'Añade los cruces de la primera ronda (o pulsa «Proponer cruces») para ver el cuadro.'];
+        } else {
+            try {
+                $esquema = app(EsquemaDeCuadro::class)->armar($codigos, ConfiguracionDeEliminatoria::desdeArray($datos), $mejoresDe);
+            } catch (ConfiguracionInvalida $e) {
+                $esquema = ['rondas' => [], 'tercero' => null, 'error' => implode(' ', $e->errores)];
+            }
+        }
+
+        return new HtmlString(view('filament.panel.competicion.esquema-cuadro', [...$esquema, 'aviso' => $aviso])->render());
     }
 
     /**
