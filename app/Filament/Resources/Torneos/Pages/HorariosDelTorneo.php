@@ -12,6 +12,7 @@ use App\Competicion\Errores\ConfiguracionInvalida;
 use App\Competicion\Errores\ErrorDeCompeticion;
 use App\Competicion\Errores\OperacionNoPermitida;
 use App\Competicion\MoverEnElHorario;
+use App\Competicion\PlanificadorContinuo;
 use App\Enums\EstadoPartido;
 use App\Filament\Avisos;
 use App\Filament\Competicion\Marcador;
@@ -205,7 +206,7 @@ class HorariosDelTorneo extends Page
      * Cada día con sus pistas y lo que ocupa cada una: lo guardado y, si
      * hay una propuesta, lo propuesto en lugar de lo que se recoloca.
      *
-     * @return list<array{titulo: string, desde: int, minutos: int, horas: list<array{etiqueta: string, izquierda: float}>, pistas: list<array{id: int, nombre: string, bloques: list<array{partido: int|null, movible: bool, izquierda: float, ancho: float, calentamiento: float, hora: string, texto: string, detalle: string, color: string, nuevo: bool}>}>}>
+     * @return list<array{titulo: string, desde: int, minutos: int, horas: list<array{etiqueta: string, izquierda: float}>, pistas: list<array{id: int, nombre: string, bloques: list<array{partido: int|null, movible: bool, tercero: bool, izquierda: float, ancho: float, calentamiento: float, hora: string, texto: string, detalle: string, color: string, nuevo: bool}>}>}>
      */
     private function dias(?PropuestaDeHorarios $propuesta): array
     {
@@ -233,10 +234,11 @@ class HorariosDelTorneo extends Page
 
         $partidos = Partido::query()
             ->whereIn('id', array_filter(array_column($ocupaciones, 'partido')))
-            ->with(['local', 'visitante', 'fase.categoria'])
+            ->with(['local.participanteJugadores', 'visitante.participanteJugadores', 'fase.categoria'])
             ->get()
             ->keyBy('id');
         $sePuedeMover = Gate::allows('update', $torneo);
+        $terceros = self::tercerosSeguidos($ocupaciones, $partidos->all(), $calentamiento);
 
         $colores = [];
         foreach ($torneo->categorias()->orderBy('orden')->pluck('id')->values() as $i => $categoria) {
@@ -298,9 +300,11 @@ class HorariosDelTorneo extends Page
                         'calentamiento' => $partido !== null ? round(100 * min($calentamiento, $minutos) / $minutos, 3) : 0.0,
                         'hora' => $o['inicio']->format('H:i'),
                         'texto' => $texto,
-                        'detalle' => $o['inicio']->format('H:i').'–'.$o['fin']->format('H:i').($categoria !== null ? ' · '.$categoria->nombre : '').($partido !== null ? ' · P'.$partido->id : '').' · '.$texto,
+                        'detalle' => $o['inicio']->format('H:i').'–'.$o['fin']->format('H:i').($categoria !== null ? ' · '.$categoria->nombre : '').($partido !== null ? ' · P'.$partido->id : '').' · '.$texto
+                            .($partido !== null && isset($terceros[$partido->id]) ? ' · ¡Alguien juega su tercer partido seguido!' : ''),
                         'color' => $categoria !== null ? ($colores[$categoria->id] ?? '#6d7a84') : '#c4c9ce',
                         'nuevo' => $o['nuevo'],
+                        'tercero' => $partido !== null && isset($terceros[$partido->id]),
                     ];
                 }
 
@@ -370,12 +374,14 @@ class HorariosDelTorneo extends Page
         }
 
         $avisos = [];
+        // Tres seguidos se ve en el propio partido (con «!»); aquí solo se avisa de lo que no puede ser.
+        $resultado['avisos'] = array_values(array_filter($resultado['avisos'], fn (array $a): bool => $a['tipo'] === 'a_la_vez'));
         if ($resultado['avisos'] !== []) {
             $nombres = Partido::query()->with(['local', 'visitante'])->whereIn('id', array_column($resultado['avisos'], 'partido'))->get()->keyBy('id');
             foreach ($resultado['avisos'] as $aviso) {
                 $partido = $nombres->get($aviso['partido']);
                 $quien = $partido !== null ? Marcador::lado($partido, true).' – '.Marcador::lado($partido, false) : 'P'.$aviso['partido'];
-                $avisos[] = $quien.($aviso['tipo'] === 'a_la_vez' ? ': alguien juega a la vez en otra pista.' : ': alguien juega tres seguidos.');
+                $avisos[] = $quien.': alguien juega a la vez en otra pista.';
             }
         }
 
@@ -457,6 +463,44 @@ class HorariosDelTorneo extends Page
 
             RegistroDeCambio::anotar('mover_en_horario', $torneo, $usuario, ['partidos' => $antes], ['partidos' => array_map(fn (array $c): array => [$c['pista'], date('Y-m-d H:i', $c['inicio'])], $cambios)]);
         });
+    }
+
+    /**
+     * Los partidos que son el tercero (o más) seguido de alguno de sus
+     * jugadores: con menos de 20 minutos sin jugar entre uno y otro.
+     *
+     * @param  list<array{partido: int|null, pista: int, inicio: CarbonImmutable, fin: CarbonImmutable, nuevo: bool}>  $ocupaciones
+     * @param  array<int, Partido>  $partidos
+     * @return array<int, true>
+     */
+    private static function tercerosSeguidos(array $ocupaciones, array $partidos, int $calentamientoMinutos): array
+    {
+        $porJugador = [];
+        foreach ($ocupaciones as $o) {
+            $partido = $o['partido'] !== null ? ($partidos[$o['partido']] ?? null) : null;
+            if ($partido === null) {
+                continue;
+            }
+            // Quien viene de jugar no calienta: cuenta el juego.
+            $juega = $o['inicio']->addMinutes($calentamientoMinutos)->min($o['fin'])->getTimestamp();
+            foreach ([...($partido->local?->idsDeJugadores() ?? []), ...($partido->visitante?->idsDeJugadores() ?? [])] as $jugador) {
+                $porJugador[$jugador][] = [$juega, $o['fin']->getTimestamp(), $partido->id];
+            }
+        }
+
+        $terceros = [];
+        foreach ($porJugador as $juegos) {
+            usort($juegos, fn (array $a, array $b): int => $a[0] <=> $b[0]);
+            $racha = 1;
+            for ($i = 1; $i < count($juegos); $i++) {
+                $racha = $juegos[$i][0] - $juegos[$i - 1][1] < PlanificadorContinuo::MINUTOS_PARA_DESCANSAR * 60 ? $racha + 1 : 1;
+                if ($racha >= 3) {
+                    $terceros[$juegos[$i][2]] = true;
+                }
+            }
+        }
+
+        return $terceros;
     }
 
     /** Un partido que todavía no se ha jugado ni está en juego. */

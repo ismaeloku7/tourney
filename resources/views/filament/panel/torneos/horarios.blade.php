@@ -33,6 +33,7 @@
         .hor-bloque.destino { outline: 2px dashed #1f2328; outline-offset: 1px; }
         .hor-linea.destino { background-color: #eef4ff; }
         .hor-ayuda { font-size: .75rem; color: #8a939b; }
+        .hor-alerta { position: absolute; top: .15rem; right: .15rem; width: .9rem; height: .9rem; border-radius: 999px; background: #fff; color: #d9480f; font-weight: 800; font-size: .625rem; line-height: .9rem; text-align: center; pointer-events: none; }
         .hor-leyenda { display: flex; gap: 1rem; font-size: .75rem; color: #8a939b; flex-wrap: wrap; }
         .hor-leyenda i { display: inline-block; width: 1.25rem; height: .75rem; border-radius: .2rem; vertical-align: middle; margin-right: .25rem; }
         .hor-vacio { font-size: .875rem; color: #8a939b; }
@@ -116,6 +117,7 @@
                 <span><i style="background: #6d7a84; opacity: .45"></i>Ya programado (no se toca)</span>
             @endif
             <span><i style="background: #c4c9ce"></i>Pista bloqueada</span>
+            <span><i style="background: #6d7a84; position: relative"><b style="position: absolute; top: -.2rem; right: -.35rem; width: .75rem; height: .75rem; border-radius: 999px; background: #fff; color: #d9480f; font-size: .55rem; line-height: .75rem; text-align: center; box-shadow: 0 0 0 1px #e6e8eb">!</b></i>Tercer partido seguido de alguien</span>
             @foreach ($categorias as $categoria)
                 <span><i style="background: {{ $categoria['color'] }}"></i>{{ $categoria['nombre'] }}</span>
             @endforeach
@@ -176,6 +178,9 @@
                                     >
                                         <div class="hor-cal" style="width: {{ $bloque['calentamiento'] }}%"></div>
                                         <span style="color: #fff"><b>{{ $bloque['hora'] }}</b> {{ $bloque['texto'] }}</span>
+                                        @if ($bloque['tercero'])
+                                            <span class="hor-alerta" aria-label="Alguien juega su tercer partido seguido">!</span>
+                                        @endif
                                     </div>
                                 @endforeach
                             </div>

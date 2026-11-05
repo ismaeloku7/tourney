@@ -76,8 +76,8 @@ function sinChoques(PlanDePistas $plan, array $partidos, int $descanso, int $cal
     }
 }
 
-/** Ningún jugador juega tres seguidos (con menos de 20 minutos sin jugar entre uno y otro). */
-function sinTresSeguidos(PlanDePistas $plan, array $partidos, int $calentamiento = 10): void
+/** Ningún jugador juega $maximo o más seguidos (con menos de 20 minutos sin jugar entre uno y otro). */
+function sinTresSeguidos(PlanDePistas $plan, array $partidos, int $calentamiento = 10, int $maximo = 3): void
 {
     $jugadoresDe = [];
     foreach ($partidos as $partido) {
@@ -96,7 +96,7 @@ function sinTresSeguidos(PlanDePistas $plan, array $partidos, int $calentamiento
         $racha = 1;
         for ($i = 1; $i < count($lista); $i++) {
             $racha = $lista[$i][0] - $lista[$i - 1][1] < PlanificadorContinuo::MINUTOS_PARA_DESCANSAR * 60 ? $racha + 1 : 1;
-            expect($racha)->toBeLessThan(3);
+            expect($racha)->toBeLessThan($maximo);
         }
     }
 }
@@ -213,14 +213,21 @@ test('sin descanso no deja la pista parada mientras haya algo que jugar, y nadie
     sinTresSeguidos($plan, $partidos);
 });
 
-test('un grupo solo no juega tres seguidos aunque la pista tenga que esperar', function () {
+test('un grupo solo juega sus tres partidos seguidos antes que dejar la pista parada, pero nunca cuatro', function () {
     $partidos = grupoDeCuatro(1, 1);
 
     $plan = (new PlanificadorContinuo)->planificar($partidos, pistasDe(2), new RestriccionesDePlanificacion(0, [], 10));
 
-    expect($plan->conflictos)->toBe([]);
+    expect($plan->conflictos)->toBe([])
+        ->and($plan->minutosMuertos)->toBe(0)
+        ->and($plan->fin?->format('H:i'))->toBe('12:30');
     sinChoques($plan, $partidos, 0);
-    sinTresSeguidos($plan, $partidos);
+    sinTresSeguidos($plan, $partidos, maximo: 4);
+
+    // Con otro partido de una de esas parejas, el cuarto espera a que descanse.
+    $conOtro = [...$partidos, encuentro(7, 1, 9)];
+    $plan = (new PlanificadorContinuo)->planificar($conOtro, pistasDe(2), new RestriccionesDePlanificacion(0, [], 10));
+    sinTresSeguidos($plan, $conOtro, maximo: 4);
 });
 
 test('cada categoría repite pistas: no anda por todas', function () {
