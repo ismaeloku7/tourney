@@ -2,7 +2,6 @@
 
 use App\Actions\Competicion\AnotarMarcador;
 use App\Actions\Competicion\EmpezarPartido;
-use App\Actions\Competicion\GenerarFranjas;
 use App\Actions\Competicion\GenerarPartidos;
 use App\Actions\Competicion\PlanificarHorarios;
 use App\Actions\Competicion\RegistrarResultado;
@@ -61,7 +60,6 @@ beforeEach(function () {
     $fase = Fase::factory()->grupos(['semilla' => 2])->create(['categoria_id' => $categoria->id]);
     app(SortearGrupos::class)->handle($fase, $this->propietario);
     app(GenerarPartidos::class)->handle($fase, $this->propietario);
-    app(GenerarFranjas::class)->handle($this->torneo);
     app(PlanificarHorarios::class)->handle($this->torneo, $this->propietario);
     $this->torneo->update(['estado' => EstadoTorneo::EnJuego, 'horarios_publicados_en' => now()]);
 });

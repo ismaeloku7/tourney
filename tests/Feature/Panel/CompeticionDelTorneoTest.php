@@ -121,5 +121,6 @@ test('un administrador de otro torneo no entra', function () {
     $administrador = User::factory()->rol(Rol::Administrador)->create();
     $this->actingAs($administrador);
 
-    competicionDe($this->torneo)->assertForbidden();
+    // El recurso ya filtra sus torneos: el ajeno ni se encuentra.
+    competicionDe($this->torneo)->assertNotFound();
 });
