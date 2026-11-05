@@ -239,6 +239,25 @@ Cómo encaja en lo que hay:
 SMS como respaldo (Twilio o un proveedor español como Altiria) solo si
 hay jugadores sin WhatsApp; no se hace de entrada.
 
+## 3b. Copias de seguridad
+
+Pedido sobre la marcha: una copia de seguridad desde el propio panel y
+otra automática cada día.
+
+- `CopiaDeSeguridad` hace un zip con la base (un volcado `.sql` que se
+  restaura en cualquier MySQL o SQLite, hecho en PHP sin depender de
+  `mysqldump`; si la base es un archivo SQLite, también el archivo) y los
+  archivos subidos del organizador. Una carpeta por organizador y otra
+  para la base central, en `storage/app/private/copias`, con las últimas
+  30 de cada una.
+- Comando `copias:hacer` (todo, o `--organizador=slug`), programado cada
+  noche a las 04:10.
+- Página «Copias de seguridad» en el panel (solo el propietario): hacer
+  una ahora y descargar las últimas.
+- Las copias viven en el mismo servidor: hay que descargarlas o copiarlas
+  fuera de vez en cuando. Subirlas solas a un disco externo (S3 o
+  similar) es el siguiente paso si se quiere.
+
 ## 4. Orden de trabajo
 
 Cada bloque es una rama y una pull request, y deja la aplicación
