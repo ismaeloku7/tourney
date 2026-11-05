@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Competicion\PlanificarHorarios;
 use App\Enums\EstadoPartido;
 use App\Enums\EstadoTorneo;
 use App\Enums\Rol;
@@ -99,4 +100,29 @@ test('el tercer partido seguido de una pareja lleva un aviso en la vista', funct
 
     Livewire::test(HorariosDelTorneo::class, ['record' => $this->torneo->getRouteKey()])
         ->assertSee('¡Alguien juega su tercer partido seguido!');
+});
+
+test('uno que no cabía en la propuesta se arrastra al horario y se guarda al aplicarla', function () {
+    $colocado = colocadoEn($this->fase, $this->uno, $this->dia->setTime(9, 0));
+    $sinSitio = Partido::factory()->create(['fase_id' => $this->fase->id, 'estado' => 'pendiente']);
+    $huella = app(PlanificarHorarios::class)->huella($this->torneo);
+
+    $pagina = Livewire::test(HorariosDelTorneo::class, ['record' => $this->torneo->getRouteKey()])
+        ->set('propuesta', [
+            'colocados' => [],
+            'conflictos' => [[$sinSitio->id, 'sin_franja', 'No queda hueco.']],
+            'fin' => null, 'muertos' => 0, 'ocupacion' => 0,
+            'partidos' => [$sinSitio->id], 'huella' => $huella, 'rehacer' => false,
+        ])
+        ->assertSee('1 partido no cabe')
+        // Soltado a las 9:20 en la pista 1: dentro del colocado, va detrás de él.
+        ->call('moverPartido', $sinSitio->id, $this->uno->id, $this->dia->setTime(9, 20)->getTimestamp())
+        ->assertNotified('Partido movido')
+        ->assertDontSee('1 partido no cabe');
+
+    expect($pagina->get('propuesta')['colocados'])->toBe([[$sinSitio->id, $this->uno->id, $this->dia->setTime(10, 10)->getTimestamp(), $this->dia->setTime(11, 20)->getTimestamp()]]);
+
+    $pagina->callAction('aplicar')->assertNotified('1 partidos con hora y pista');
+    expect($sinSitio->refresh()->franja->inicio->format('H:i'))->toBe('10:10')
+        ->and($colocado->refresh()->franja->inicio->format('H:i'))->toBe('09:00');
 });

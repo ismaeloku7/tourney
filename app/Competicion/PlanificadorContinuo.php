@@ -84,7 +84,185 @@ final readonly class PlanificadorContinuo
             }
         }
 
+        if ($mejor['conflictos'] !== []) {
+            $mejor = $this->reparar($mejor, $base, $partidos, $restricciones);
+        }
+
         return $this->plan($mejor, $base, $partidos);
+    }
+
+    /**
+     * Para cada partido sin sitio, busca uno ya colocado cuyo hueco le
+     * valga y que quepa en otro sitio libre: lo aparta allí y mete el que
+     * faltaba en su lugar. O, si ya cabe en algún hueco, lo mete.
+     *
+     * @param  array{colocados: array<int, array{0: int, 1: int, 2: int}>, conflictos: list<Conflicto>, puntuacion: array{0: int, 1: int, 2: int}}  $resultado
+     * @param  array{tramos: array<int, list<array{0: int, 1: int}>>, pista: array<int, list<array{0: int, 1: int}>>, jugador: array<int, list<array{0: int, 1: int}>>, noPuede: array<int, list<array{0: int, 1: int}>>, fin: array<int, int>}  $base
+     * @param  list<PartidoAPlanificar>  $partidos
+     * @return array{colocados: array<int, array{0: int, 1: int, 2: int}>, conflictos: list<Conflicto>, puntuacion: array{0: int, 1: int, 2: int}}
+     */
+    private function reparar(array $resultado, array $base, array $partidos, RestriccionesDePlanificacion $restricciones): array
+    {
+        $porId = [];
+        foreach ($partidos as $partido) {
+            $porId[$partido->id] = $partido;
+        }
+        $colocados = $resultado['colocados'];
+        $quedan = [];
+
+        foreach ($resultado['conflictos'] as $conflicto) {
+            $partido = $porId[$conflicto->partido] ?? null;
+            if ($partido === null || $conflicto->tipo !== Conflicto::SIN_FRANJA) {
+                $quedan[] = $conflicto;
+
+                continue;
+            }
+
+            // Directamente en un hueco.
+            $hueco = $this->buscarHueco($partido, $colocados, $porId, $base, $restricciones);
+            if ($hueco !== null) {
+                $colocados[$partido->id] = $hueco;
+
+                continue;
+            }
+
+            // En el sitio de otro, que se va a un hueco.
+            $hecho = false;
+            foreach ($colocados as $id => [$pista, $t]) {
+                $otro = $porId[$id] ?? null;
+                if ($otro === null) {
+                    continue;
+                }
+                $sinEl = $colocados;
+                unset($sinEl[$id]);
+                $aqui = $this->colocacion($partido, $pista, $t, $restricciones);
+                if (! $this->cabe($partido, $aqui, $sinEl, $porId, $base, $restricciones)) {
+                    continue;
+                }
+                $conEl = array_replace($sinEl, [$partido->id => $aqui]);
+                $alli = $this->buscarHueco($otro, $conEl, $porId, $base, $restricciones);
+                if ($alli !== null) {
+                    $colocados = array_replace($conEl, [$id => $alli]);
+                    $hecho = true;
+
+                    break;
+                }
+            }
+
+            if (! $hecho) {
+                $quedan[] = $conflicto;
+            }
+        }
+
+        return [...$resultado, 'colocados' => $colocados, 'conflictos' => $quedan];
+    }
+
+    /**
+     * El primer sitio libre para el partido (la hora más temprana): al
+     * empezar un tramo o al acabar otro partido de la pista.
+     *
+     * @param  array<int, array{0: int, 1: int, 2: int}>  $colocados
+     * @param  array<int, PartidoAPlanificar>  $porId
+     * @param  array{tramos: array<int, list<array{0: int, 1: int}>>, pista: array<int, list<array{0: int, 1: int}>>, jugador: array<int, list<array{0: int, 1: int}>>, noPuede: array<int, list<array{0: int, 1: int}>>, fin: array<int, int>}  $base
+     * @return array{0: int, 1: int, 2: int}|null
+     */
+    private function buscarHueco(PartidoAPlanificar $partido, array $colocados, array $porId, array $base, RestriccionesDePlanificacion $restricciones): ?array
+    {
+        $minimo = $restricciones->noAntesDe?->getTimestamp() ?? PHP_INT_MIN;
+        $mejor = null;
+
+        foreach ($base['tramos'] as $pista => $tramos) {
+            $momentos = array_map(fn (array $t): int => $t[0], $tramos);
+            foreach ($base['pista'][$pista] ?? [] as [, $b]) {
+                $momentos[] = $b;
+            }
+            foreach ($colocados as [$suPista, , $fin]) {
+                if ($suPista === $pista) {
+                    $momentos[] = $fin;
+                }
+            }
+            foreach (array_unique($momentos) as $t) {
+                $t = max($t, $minimo);
+                if ($mejor !== null && $t >= $mejor[1]) {
+                    continue;
+                }
+                $aqui = $this->colocacion($partido, $pista, $t, $restricciones);
+                if ($this->cabe($partido, $aqui, $colocados, $porId, $base, $restricciones)) {
+                    $mejor = $aqui;
+                }
+            }
+        }
+
+        return $mejor;
+    }
+
+    /** @return array{0: int, 1: int, 2: int} */
+    private function colocacion(PartidoAPlanificar $partido, int $pista, int $t, RestriccionesDePlanificacion $restricciones): array
+    {
+        return [$pista, $t, $t + ($restricciones->calentamientoMinutos + $partido->duracionMinutos) * 60];
+    }
+
+    /**
+     * Si el partido cabe ahí con lo demás como está: dentro del tramo, sin
+     * solapar en la pista ni a sus jugadores (con su descanso), después de
+     * los que le dan sus parejas y antes de los que salen de él.
+     *
+     * @param  array{0: int, 1: int, 2: int}  $aqui
+     * @param  array<int, array{0: int, 1: int, 2: int}>  $colocados
+     * @param  array<int, PartidoAPlanificar>  $porId
+     * @param  array{tramos: array<int, list<array{0: int, 1: int}>>, pista: array<int, list<array{0: int, 1: int}>>, jugador: array<int, list<array{0: int, 1: int}>>, noPuede: array<int, list<array{0: int, 1: int}>>, fin: array<int, int>}  $base
+     */
+    private function cabe(PartidoAPlanificar $partido, array $aqui, array $colocados, array $porId, array $base, RestriccionesDePlanificacion $restricciones): bool
+    {
+        [$pista, $t, $fin] = $aqui;
+        $calentamiento = $restricciones->calentamientoMinutos * 60;
+        $descanso = $restricciones->descansoMinimoMinutos * 60;
+        $inicio = $t + $calentamiento;
+
+        if ($fin > $this->finDelTramo($t, $base['tramos'][$pista] ?? [])) {
+            return false;
+        }
+        if (! $partido->deGrupos && in_array($pista, $restricciones->pistasExteriores, true) && array_diff(array_keys($base['tramos']), $restricciones->pistasExteriores) !== []) {
+            return false;
+        }
+
+        $ocupada = $base['pista'][$pista] ?? [];
+        $suyos = array_fill_keys($partido->jugadores, true);
+        $jugando = [];
+        foreach ($colocados as $id => [$suPista, $suT, $suFin]) {
+            if ($id === $partido->id) {
+                continue;
+            }
+            if ($suPista === $pista) {
+                $ocupada[] = [$suT, $suFin];
+            }
+            $otro = $porId[$id] ?? null;
+            if ($otro !== null && array_intersect_key(array_fill_keys($otro->jugadores, true), $suyos) !== []) {
+                $jugando[] = [$suT + $calentamiento, $suFin];
+            }
+            // Los que salen de este tienen que empezar después.
+            if ($otro !== null && in_array($partido->id, $otro->dependeDe, true) && $suT + $calentamiento < $fin + $descanso) {
+                return false;
+            }
+        }
+        if ($this->solapa($t, $fin, $ocupada, 0) || $this->solapa($inicio, $fin, $jugando, $descanso)) {
+            return false;
+        }
+
+        foreach ($partido->jugadores as $jugador) {
+            if ($this->solapa($inicio, $fin, $base['jugador'][$jugador] ?? [], $descanso) || $this->solapa($t, $fin, $base['noPuede'][$jugador] ?? [], 0)) {
+                return false;
+            }
+        }
+
+        foreach ($partido->dependeDe as $previo) {
+            $finPrevio = isset($colocados[$previo]) ? $colocados[$previo][2] : ($base['fin'][$previo] ?? null);
+            if ($finPrevio === null || $inicio < $finPrevio + $descanso) {
+                return false;
+            }
+        }
+
+        return true;
     }
 
     /**

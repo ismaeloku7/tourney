@@ -278,3 +278,16 @@ test('en grupos cada pareja juega alguna vez fuera; los cruces del cuadro, dentr
         ->and($plan->colocadoDe(50)?->pista)->toBeLessThan(3)
         ->and($plan->colocadoDe(51)?->pista)->toBeLessThan(3);
 });
+
+test('si uno no cabe, aparta a otro a un hueco libre y lo mete en su sitio', function () {
+    // Una pista para dos partidos. El jugador 10 no puede de 10:30 a 13:00: su partido tiene que ir a las 9:00.
+    $partidos = [encuentro(1, 3, 4), encuentro(2, 1, 2)];
+    $noPuede = [10 => [new Intervalo(a_las('10:30'), a_las('13:00'))]];
+
+    // Con un solo intento, el orden natural pone primero el 1 a las 9:00.
+    $plan = (new PlanificadorContinuo(1))->planificar($partidos, pistasDe(1, '09:00', '11:20'), new RestriccionesDePlanificacion(0, $noPuede, 10));
+
+    expect($plan->conflictos)->toBe([])
+        ->and($plan->colocadoDe(2)?->inicio->format('H:i'))->toBe('09:00')
+        ->and($plan->colocadoDe(1)?->inicio->format('H:i'))->toBe('10:10');
+});
