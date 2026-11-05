@@ -275,3 +275,27 @@ test('push:claves genera un par de claves VAPID', function () {
     config()->set('webpush.clave_publica', null);
     $this->artisan('push:claves')->expectsOutputToContain('WEBPUSH_VAPID_PUBLIC_KEY=')->assertSuccessful();
 });
+
+test('de una fase oculta en la web no se avisa de nada: ni resultados, ni validaciones, ni cruces', function () {
+    $this->torneo->update(['resultados_por_jugadores' => ResultadosPorJugadores::ConValidacion, 'estado' => EstadoTorneo::EnJuego]);
+    $fase = torneoConGrupo($this->torneo, $this->categoria, $this->propietario);
+    $fase->update(['visible_en_web' => false]);
+    $cuadro = Fase::query()->where('categoria_id', $this->categoria->id)->whereKeyNot($fase->id)->firstOrFail();
+    $cuadro->update(['visible_en_web' => false]);
+    $partidos = $fase->partidos()->orderBy('id')->get();
+
+    Notification::fake();
+
+    // Un jugador anota: el rival no recibe «valida el resultado»; la organización anota: nadie recibe el resultado.
+    app(RegistrarResultado::class)->handle($partidos[0], new Resultado([new Set(6, 2), new Set(6, 3)]), $partidos[0]->local->jugadores->first());
+    foreach ($partidos->slice(1) as $partido) {
+        app(RegistrarResultado::class)->handle($partido, new Resultado([new Set(6, 1), new Set(6, 1)]), $this->propietario);
+    }
+    app(ValidarResultado::class)->handle($partidos[0]->refresh(), $partidos[0]->visitante->jugadores->first());
+
+    // Con el cuadro oculto, cerrar avisando tampoco manda los cruces.
+    app(CerrarFase::class)->handle($fase, $this->propietario, avisar: true);
+
+    Notification::assertNothingSent();
+    expect($this->remitente->titulos())->toBe([]);
+});
