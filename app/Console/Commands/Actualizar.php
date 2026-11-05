@@ -12,7 +12,8 @@ use Illuminate\Support\Facades\Schema;
  */
 class Actualizar extends Command
 {
-    protected $signature = 'actualizar';
+    // --force no cambia nada (aquí siempre se migra forzado); se acepta porque es lo que se pone por costumbre en los scripts de despliegue.
+    protected $signature = 'actualizar {--force : No hace falta: siempre se migra en modo forzado}';
 
     protected $description = 'Tras desplegar: migra la base central y la de cada organizador';
 
