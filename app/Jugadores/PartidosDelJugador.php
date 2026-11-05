@@ -2,7 +2,6 @@
 
 namespace App\Jugadores;
 
-use App\Actions\Competicion\AnotarMarcador;
 use App\Enums\EstadoPartido;
 use App\Enums\EstadoTorneo;
 use App\Enums\ResultadosPorJugadores;
@@ -22,28 +21,6 @@ use Illuminate\Database\Eloquent\Collection;
  */
 final class PartidosDelJugador
 {
-    /** Lo que ocupa la pista antes de este partido: «Ahora juegan X – Y (va 6-3 4-2)». */
-    private function delante(Partido $p): ?string
-    {
-        if ($p->pista_id === null || $p->orden_en_pista === null) {
-            return null;
-        }
-
-        $anterior = Partido::query()->where('pista_id', $p->pista_id)->where('orden_en_pista', '<', $p->orden_en_pista)
-            ->whereIn('estado', [EstadoPartido::EnJuego->value, EstadoPartido::Pendiente->value, EstadoPartido::Programado->value])
-            ->whereNotNull('franja_id')
-            ->orderByDesc('orden_en_pista')->with(['local', 'visitante'])->first();
-
-        if ($anterior === null) {
-            return 'La pista está libre: os toca.';
-        }
-
-        $texto = ($anterior->estado === EstadoPartido::EnJuego ? 'Ahora juegan ' : 'Antes juegan ').Marcador::lado($anterior, true).' – '.Marcador::lado($anterior, false);
-        $enVivo = AnotarMarcador::texto($anterior);
-
-        return $texto.($enVivo !== '' ? " (va {$enVivo})" : '').'.';
-    }
-
     /** @return Builder<Partido> */
     public function consulta(Jugador $yo): Builder
     {
@@ -81,7 +58,7 @@ final class PartidosDelJugador
     /**
      * Lo que el portal enseña de un partido y lo que el jugador puede hacer.
      *
-     * @return array{id: int, torneo: string, categoria: string, texto: string, rival: string, local: string, visitante: string, resultado: string, hora: string|null, pista: string|null, estado: EstadoPartido, porJugar: bool, gane: bool|null, puedeAnotar: bool, puedeValidar: bool, encadenado: bool, enVivo: string, marcador: array{sets: list<array{0: int, 1: int}>, juegos: array{0: int, 1: int}}, puedeMarcar: bool, delante: string|null}
+     * @return array{id: int, torneo: string, categoria: string, texto: string, rival: string, local: string, visitante: string, resultado: string, hora: string|null, pista: string|null, estado: EstadoPartido, porJugar: bool, gane: bool|null, puedeAnotar: bool, puedeValidar: bool}
      */
     public function fila(Partido $p, Jugador $yo): array
     {
@@ -111,11 +88,6 @@ final class PartidosDelJugador
             'gane' => $p->ganador_id === null ? null : $p->ganador_id === $miParticipante,
             'puedeAnotar' => $torneo->resultados_por_jugadores !== ResultadosPorJugadores::Desactivado && $this->porJugar($p),
             'puedeValidar' => $p->estado === EstadoPartido::PendienteValidacion && $registrador !== null && $miLadoEsLocal !== $ladoDelRegistradorEsLocal,
-            'encadenado' => $torneo->encadenado(),
-            'enVivo' => AnotarMarcador::texto($p),
-            'marcador' => $p->marcador_en_vivo ?? ['sets' => [], 'juegos' => [0, 0]],
-            'puedeMarcar' => $torneo->encadenado() && $torneo->resultados_por_jugadores !== ResultadosPorJugadores::Desactivado && $this->porJugar($p),
-            'delante' => $torneo->encadenado() && $this->porJugar($p) && $p->estado !== EstadoPartido::EnJuego ? $this->delante($p) : null,
         ];
     }
 }

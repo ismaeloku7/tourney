@@ -18,7 +18,7 @@
 @if ($g['partidos'] !== [])
     <ul class="mt-3 space-y-1 border-t border-tema-borde pt-3 text-sm">
         @foreach ($g['partidos'] as $p)
-            <li class="flex justify-between gap-3"><span>{{ $p['partido'] }}</span><span class="whitespace-nowrap text-tema-suave">{{ $p['resultado'] ?: ($p['enVivo'] !== '' ? 'va '.$p['enVivo'] : ($p['hora'] ?? '')) }}</span></li>
+            <li class="flex justify-between gap-3"><span>{{ $p['partido'] }}</span><span class="whitespace-nowrap text-tema-suave">{{ $p['resultado'] ?: ($p['hora'] ?? '') }}</span></li>
         @endforeach
     </ul>
 @endif

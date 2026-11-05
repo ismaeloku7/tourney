@@ -5,12 +5,6 @@
         <span class="text-sm font-medium text-tema-azul">{{ $p['hora'] ?? ($p['porJugar'] ? 'Sin hora todavía' : '') }}</span>
     </div>
     <div class="mt-1 text-sm font-semibold">{{ $p['texto'] }}</div>
-    @if ($p['delante'])
-        <p class="mt-1 text-sm text-tema-suave">{{ $p['delante'] }}</p>
-    @endif
-    @if ($p['estado'] === \App\Enums\EstadoPartido::EnJuego && $p['enVivo'] !== '')
-        <p class="mt-1 text-lg font-semibold tabular-nums">{{ $p['enVivo'] }}</p>
-    @endif
     <div class="mt-1 flex flex-wrap items-center gap-2 text-sm">
         @if ($p['resultado'] !== '')
             <span class="tabular-nums font-medium">{{ $p['resultado'] }}</span>
@@ -23,14 +17,8 @@
     </div>
     @if ($editando === $p['id'])
         @include('livewire.publico._formulario-resultado', ['local' => $p['local'], 'visitante' => $p['visitante'], 'conEspeciales' => false])
-    @elseif ($p['puedeMarcar'] && $p['estado'] === \App\Enums\EstadoPartido::EnJuego)
-        @include('livewire.mesa._marcador', ['p' => $p + ['marcadorTexto' => $p['enVivo']]])
-        <button type="button" wire:click="terminarPartido({{ $p['id'] }})" class="mt-3 boton px-4 py-1.5">Hemos terminado: guardar resultado</button>
     @elseif ($p['puedeAnotar'] || $p['puedeValidar'])
         <div class="mt-3 flex flex-wrap gap-2">
-            @if ($p['puedeMarcar'])
-                <button type="button" wire:click="empezarPartido({{ $p['id'] }})" class="boton px-4 py-1.5">Empezamos</button>
-            @endif
             @if ($p['puedeAnotar'])
                 <button type="button" wire:click="abrirResultado({{ $p['id'] }})" class="boton-claro px-4 py-1.5">Anotar resultado</button>
             @endif

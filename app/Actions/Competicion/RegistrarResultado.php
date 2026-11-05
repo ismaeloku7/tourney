@@ -88,8 +88,6 @@ final class RegistrarResultado
                 'validacion_vence_en' => $pendienteDeValidar ? now()->addMinutes($torneo->minutos_para_validar) : null,
                 'validado_en' => $pendienteDeValidar ? null : now(),
                 'validado_por' => $quien instanceof User ? $quien->id : null,
-                'terminado_en' => now(),
-                'marcador_en_vivo' => null,
             ])->save();
 
             if (! $pendienteDeValidar) {
@@ -108,12 +106,6 @@ final class RegistrarResultado
             app(Avisos::class)->resultadoPorValidar($guardado);
         } elseif ($guardado->cerrado()) {
             app(Avisos::class)->resultadoDelPartido($guardado);
-        }
-
-        // La pista queda libre: la cola se reestima y al siguiente le toca.
-        if ($torneo->encadenado()) {
-            app(ReestimarHorarios::class)->handle($torneo, $guardado->pista_id);
-            app(Avisos::class)->siguienteEnPista($guardado, 'os_toca');
         }
 
         return $guardado;

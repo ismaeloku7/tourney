@@ -13,7 +13,6 @@
                     <li class="rounded-[3px] bg-neutral-900 p-4">
                         <div class="text-sm text-neutral-400">{{ $p['pista'] }} · {{ $p['categoria'] }}</div>
                         <div class="mt-1 text-xl font-semibold">{{ $p['partido'] }}</div>
-                        @if ($p['enVivo'] !== '')<div class="mt-1 text-2xl font-bold tabular-nums" style="color: var(--acento)">{{ $p['enVivo'] }}</div>@endif
                     </li>
                 @empty
                     <li class="text-xl text-neutral-500">Ahora no hay partidos en juego.</li>

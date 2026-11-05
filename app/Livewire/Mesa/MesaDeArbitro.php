@@ -2,16 +2,13 @@
 
 namespace App\Livewire\Mesa;
 
-use App\Actions\Competicion\AnotarMarcador;
 use App\Actions\Competicion\RegistrarResultado;
 use App\Actions\Competicion\ValidarResultado;
-use App\Avisos\EnlaceDeWhatsApp;
 use App\Competicion\Errores\ErrorDeCompeticion;
 use App\Competicion\Errores\ResultadoInvalido;
 use App\Enums\EstadoPartido;
 use App\Filament\Competicion\Marcador;
-use App\Livewire\Concerns\MarcadorEnVivo;
-use App\Models\Jugador;
+use App\Livewire\Concerns\FormularioDeResultado;
 use App\Models\Partido;
 use App\Models\Pista;
 use App\Models\Torneo;
@@ -28,14 +25,12 @@ use Livewire\Component;
 /**
  * La mesa en el móvil: elige torneo, día y pista, y ve los partidos en
  * orden con un botón para anotar el resultado (también walkover, retirada
- * o no presentado) o validar el que dejó un jugador. Con partidos
- * encadenados, además empieza cada partido, lleva el marcador en vivo y
- * avisa por WhatsApp a la pareja siguiente.
+ * o no presentado) o validar el que dejó un jugador.
  */
 #[Layout('components.layouts.publico')]
 class MesaDeArbitro extends Component
 {
-    use MarcadorEnVivo;
+    use FormularioDeResultado;
 
     #[Url]
     public ?int $torneo = null;
@@ -110,11 +105,9 @@ class MesaDeArbitro extends Component
                 ->whereDate('franjas.inicio', (string) $this->dia)
                 ->whereIn('partidos.pista_id', $this->pista !== null && $pistas->contains('id', $this->pista) ? [$this->pista] : $pistas->pluck('id')->all())
                 ->get()
-                ->when($torneo->encadenado(), fn ($coleccion) => $coleccion->sortBy(fn (Partido $p): string => ($p->pista_id ?? 0).'-'.str_pad((string) ($p->orden_en_pista ?? 999), 3, '0', STR_PAD_LEFT))->values())
                 ->map(fn (Partido $p): array => [
                     'id' => $p->id,
-                    'hora' => $torneo->encadenado() && $p->inicio_estimado !== null ? '~'.$p->inicio_estimado->format('H:i') : $p->franja->inicio->format('H:i'),
-                    'orden' => $torneo->encadenado() ? $p->orden_en_pista : null,
+                    'hora' => $p->franja->inicio->format('H:i'),
                     'pista' => $p->pista->nombre ?? '',
                     'categoria' => $p->fase->categoria->nombre,
                     'local' => $p->local->nombre ?? Marcador::lado($p, true),
@@ -122,12 +115,6 @@ class MesaDeArbitro extends Component
                     'resultado' => $p->cerrado() || $p->estado === EstadoPartido::PendienteValidacion ? Marcador::resultado($p) : '',
                     'estado' => $p->estado,
                     'abierto' => in_array($p->estado, [EstadoPartido::Pendiente, EstadoPartido::Programado, EstadoPartido::EnJuego], true),
-                    'encadenado' => $torneo->encadenado(),
-                    'porEmpezar' => $torneo->encadenado() && in_array($p->estado, [EstadoPartido::Pendiente, EstadoPartido::Programado], true) && $p->local_id !== null && $p->visitante_id !== null,
-                    'enJuego' => $p->estado === EstadoPartido::EnJuego,
-                    'marcador' => $p->marcador_en_vivo ?? ['sets' => [], 'juegos' => [0, 0]],
-                    'marcadorTexto' => AnotarMarcador::texto($p),
-                    'whatsapp' => $torneo->encadenado() && in_array($p->estado, [EstadoPartido::Pendiente, EstadoPartido::Programado], true) ? $this->enlacesDeWhatsApp($p, $torneo) : [],
                 ])->all();
         }
 
@@ -139,44 +126,6 @@ class MesaDeArbitro extends Component
             'pistas' => $pistas,
             'partidos' => $partidos,
         ]);
-    }
-
-    /**
-     * Un enlace de WhatsApp por jugador de la pareja, con el mensaje de
-     * «sois los siguientes» y cómo va el partido que ocupa su pista.
-     *
-     * @return list<array{nombre: string, url: string}>
-     */
-    private function enlacesDeWhatsApp(Partido $partido, Torneo $torneo): array
-    {
-        $enPista = Partido::query()->where('pista_id', $partido->pista_id)->where('estado', EstadoPartido::EnJuego->value)->with(['local', 'visitante'])->first();
-        $situacion = $enPista === null
-            ? 'La pista está libre: podéis entrar.'
-            : 'Ahora juegan '.Marcador::lado($enPista, true).' – '.Marcador::lado($enPista, false).(AnotarMarcador::texto($enPista) !== '' ? ' (va '.AnotarMarcador::texto($enPista).')' : '').'.';
-        $hora = $partido->inicio_estimado !== null ? ' Hora estimada: '.$partido->inicio_estimado->format('H:i').'.' : '';
-
-        $enlaces = [];
-        foreach ([$partido->local, $partido->visitante] as $participante) {
-            foreach ($participante?->jugadores ?? [] as $jugador) {
-                $texto = "Hola {$jugador->nombre}, {$torneo->nombre}: sois los siguientes en ".($partido->pista->nombre ?? 'pista').". {$situacion}{$hora} Id calentando.";
-                $url = EnlaceDeWhatsApp::para($jugador, $texto);
-                if ($url !== null) {
-                    $enlaces[] = ['nombre' => $jugador->nombre_completo, 'url' => $url];
-                }
-            }
-        }
-
-        return $enlaces;
-    }
-
-    protected function partidoEnVivo(int $id): Partido
-    {
-        return $this->partidoPermitido($id);
-    }
-
-    protected function quienMarca(): User|Jugador
-    {
-        return $this->usuario();
     }
 
     private function partidoPermitido(int $id): Partido
