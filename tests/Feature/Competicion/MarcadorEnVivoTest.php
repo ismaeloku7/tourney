@@ -67,7 +67,7 @@ beforeEach(function () {
 });
 
 /** Los partidos de una pista en orden de hora. */
-function enPista(Pista $pista)
+function partidosDePista(Pista $pista)
 {
     return Partido::query()->where('pista_id', $pista->id)->whereNotNull('franja_id')
         ->join('franjas', 'franjas.id', '=', 'partidos.franja_id')->orderBy('franjas.inicio')->select('partidos.*')
@@ -75,7 +75,7 @@ function enPista(Pista $pista)
 }
 
 test('empezar un partido lo pone en juego con la hora real y el marcador a cero; cerrarlo borra el marcador', function () {
-    $primero = enPista($this->central)->first();
+    $primero = partidosDePista($this->central)->first();
 
     $primero = app(EmpezarPartido::class)->handle($primero, $this->propietario);
     expect($primero->estado)->toBe(EstadoPartido::EnJuego)
@@ -98,7 +98,7 @@ test('empezar un partido lo pone en juego con la hora real y el marcador a cero;
 });
 
 test('un jugador de la pareja lleva el marcador si el torneo lo permite; otro jugador, no', function () {
-    $primero = enPista($this->central)->first();
+    $primero = partidosDePista($this->central)->first();
     $mio = $primero->local->jugadores->first();
     $ajeno = Jugador::factory()->create();
 
@@ -123,18 +123,18 @@ test('un jugador de la pareja lleva el marcador si el torneo lo permite; otro ju
         ->and($primero->marcador_en_vivo)->toBe(['sets' => [[2, 1]], 'juegos' => [0, 0]]);
 
     // El siguiente de la pista ve cómo va el de delante.
-    $segundo = enPista($this->central)->get(1);
+    $segundo = partidosDePista($this->central)->get(1);
     $this->actingAs($segundo->local->jugadores->first(), 'jugador');
     Livewire::test(MisPartidos::class)->assertSee('Ahora juegan')->assertSee('(va 2-1)');
 
     // Con los jugadores desactivados, ni empezar ni marcar.
     $this->torneo->update(['resultados_por_jugadores' => ResultadosPorJugadores::Desactivado]);
-    $otro = enPista($this->dos)->first();
+    $otro = partidosDePista($this->dos)->first();
     expect(fn () => app(EmpezarPartido::class)->handle($otro, $otro->local->jugadores->first()))->toThrow(OperacionNoPermitida::class);
 });
 
 test('la mesa empieza el partido, lleva el marcador, lo termina con los sets puestos y avisa por WhatsApp a los siguientes', function () {
-    [$primero, $segundo] = enPista($this->central)->take(2)->all();
+    [$primero, $segundo] = partidosDePista($this->central)->take(2)->all();
     $segundo->local->jugadores->first()->update(['nombre' => 'Lola', 'telefono' => '600 11 22 33']);
     $this->actingAs($this->propietario);
 
