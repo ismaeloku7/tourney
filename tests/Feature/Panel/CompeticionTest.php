@@ -504,19 +504,23 @@ test('después del sorteo se añaden o se quitan grupos', function () {
 });
 
 test('al configurar el cuadro se ve su esquema: rondas, cruces y quién llega a cada hueco', function () {
+    $pagina = fasesDe($this->categoria);
+    $esquema = fn (array $configuracion): string => FaseForm::esquema($configuracion, $pagina->instance(), $this->cuadro)->toHtml();
+
     // 3 grupos, pasan 2 por grupo y los 2 mejores terceros: cuartos.
-    fasesDe($this->categoria)
-        ->mountAction(TestAction::make('edit')->table($this->cuadro))
-        ->assertSee('Cuartos')
-        ->assertSee('Semifinales')
-        ->assertSee('Ganador C1')
-        ->assertSee('Orientativo')
-        ->setActionData(['configuracion' => [
-            'regla_de_cruces' => 'a_posiciones',
-            'cruces_por_posicion' => [['local' => '1A', 'visitante' => 'M2'], ['local' => '2B', 'visitante' => '2C'], ['local' => '1C', 'visitante' => '2A'], ['local' => 'M1', 'visitante' => '1B']],
-        ]])
-        ->assertSee('Mejor 3º nº 2')
-        ->assertSee('Ganador S1')
-        ->setActionData(['configuracion' => ['regla_de_cruces' => 'sorteo']])
-        ->assertSee('Sorteo');
+    expect($esquema(['regla_de_cruces' => 'entre_grupos']))
+        ->toContain('Cuartos')->toContain('Semifinales')->toContain('Final')
+        ->toContain('Ganador C1')->toContain('1º A')->toContain('Orientativo');
+
+    $aMano = $esquema(['regla_de_cruces' => 'a_posiciones', 'cruces_por_posicion' => [
+        ['local' => '1A', 'visitante' => 'M2'], ['local' => '2B', 'visitante' => '2C'], ['local' => '1C', 'visitante' => '2A'], ['local' => 'M1', 'visitante' => '1B'],
+    ]]);
+    expect($aMano)->toContain('Mejor 3º nº 2')->toContain('Ganador S1')->not->toContain('Orientativo')
+        ->and($esquema(['regla_de_cruces' => 'a_posiciones']))->toContain('Proponer cruces')
+        ->and($esquema(['regla_de_cruces' => 'sorteo', 'tercer_y_cuarto_puesto' => true]))->toContain('Sorteo')->toContain('Tercer puesto')->toContain('Perdedor S1');
+
+    // Y el formulario de la fase se abre y se guarda con el esquema dentro.
+    $pagina->mountAction(TestAction::make('edit')->table($this->cuadro))
+        ->callMountedAction()
+        ->assertHasNoActionErrors();
 });

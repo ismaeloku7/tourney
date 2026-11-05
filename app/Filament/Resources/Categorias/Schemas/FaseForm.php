@@ -140,7 +140,7 @@ class FaseForm
                     Toggle::make('configuracion.evitar_reencuentros')->label('Evitar reencuentros de la fase anterior')->default(true)->inline(false)->live()
                         ->visible(fn (Get $get): bool => $get('configuracion.regla_de_cruces') === ReglaDeCruces::EntreGrupos->value),
                     Toggle::make('configuracion.tercer_y_cuarto_puesto')->label('Partido por el tercer puesto')->default(false)->inline(false)->live(),
-                    Text::make(fn (Get $get, RelationManager $livewire, ?Fase $record): HtmlString => self::esquema($get, $livewire, $record))
+                    Text::make(fn (Get $get, RelationManager $livewire, ?Fase $record): HtmlString => self::esquema((array) $get('configuracion'), $livewire, $record))
                         ->visible(fn (Get $get): bool => self::tipo($get('tipo')) === TipoDeFase::Eliminatoria)
                         ->columnSpanFull(),
                     Select::make('configuracion.consolacion')->label('Consolación')
@@ -261,14 +261,14 @@ class FaseForm
      * cruces y quién llega a cada hueco. Sin fase de grupos antes, con los
      * cabezas de serie de las parejas confirmadas.
      */
-    public static function esquema(Get $get, RelationManager $livewire, ?Fase $fase): HtmlString
+    /** @param  array<mixed>  $datos  La configuración del formulario. */
+    public static function esquema(array $datos, RelationManager $livewire, ?Fase $fase): HtmlString
     {
         $posiciones = self::posiciones($livewire, $fase);
         $codigos = array_keys($posiciones);
         // «Mejor 3º nº 1»: de qué posición son los mejores.
         $mejoresDe = preg_match('/^Mejor (\d+)º/', $posiciones['M1'] ?? '', $partes) === 1 ? (int) $partes[1] : null;
         $aviso = null;
-        $datos = (array) $get('configuracion');
 
         if ($codigos === []) {
             $parejas = self::categoria($livewire)->participantes()->where('estado', EstadoParticipante::Activo->value)
