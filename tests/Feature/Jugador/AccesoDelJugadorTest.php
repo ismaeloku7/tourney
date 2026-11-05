@@ -44,7 +44,9 @@ test('un jugador pide el enlace, entra con él una sola vez y vuelve a donde iba
     expect(EnlaceMagico::query()->sole()->token)->toBe(hash('sha256', $token));
 
     $this->get("http://norte.saas.test/jugador/entrar/{$token}?destino=/torneos/open/inscripcion")
-        ->assertRedirect('/torneos/open/inscripcion');
+        ->assertRedirect('/torneos/open/inscripcion')
+        // Y sigue dentro 30 días aunque cierre el navegador.
+        ->assertCookie(auth('jugador')->getRecallerName());
     $this->assertAuthenticatedAs($this->jugador, 'jugador');
 
     auth('jugador')->logout();
