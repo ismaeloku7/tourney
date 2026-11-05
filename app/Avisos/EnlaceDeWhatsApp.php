@@ -18,17 +18,21 @@ final class EnlaceDeWhatsApp
         return $telefono === null ? null : 'https://wa.me/'.$telefono.'?text='.rawurlencode($texto);
     }
 
-    /** Solo dígitos, con el prefijo de España si viene un móvil de nueve cifras. */
+    /**
+     * Solo dígitos. Un móvil o fijo español de nueve cifras sin prefijo
+     * recibe el 34; cualquier otro número se deja como venga, con lo que
+     * tenga de prefijo (Andorra tiene seis cifras, por ejemplo).
+     */
     public static function numero(string $telefono): ?string
     {
         $digitos = preg_replace('/\D+/', '', $telefono) ?? '';
         if (str_starts_with($digitos, '00')) {
             $digitos = substr($digitos, 2);
         }
-        if (strlen($digitos) === 9) {
+        if (strlen($digitos) === 9 && ! str_starts_with(trim($telefono), '+') && preg_match('/^[6789]/', $digitos) === 1) {
             $digitos = '34'.$digitos;
         }
 
-        return strlen($digitos) >= 10 ? $digitos : null;
+        return strlen($digitos) >= 6 ? $digitos : null;
     }
 }

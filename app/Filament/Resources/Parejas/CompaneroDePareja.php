@@ -59,7 +59,7 @@ final class CompaneroDePareja
                             ->rule(Rule::unique(Jugador::class, 'email'))
                             ->validationMessages(['unique' => 'Ya hay un jugador con este correo: elíjalo en «Ya está en la base de jugadores».'])
                             ->helperText('Con su correo entra en su portal y le llegan los avisos.'),
-                        TextInput::make('telefono')->label('Teléfono')->tel()->maxLength(30),
+                        TextInput::make('telefono')->label('Teléfono')->type('tel')->maxLength(30),
                         TextInput::make('nivel_declarado')->label('Nivel')->placeholder('3 o 2,5')->maxLength(5)
                             ->regex('/^(10([.,]0{1,2})?|\d([.,]\d{1,2})?)$/')
                             ->validationMessages(['regex' => 'Un número del 0 al 10, como 3 o 2,5.']),

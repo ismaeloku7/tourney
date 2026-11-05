@@ -177,7 +177,7 @@ class InscripcionesRelationManager extends RelationManager
                 TextInput::make('apellidos')->label('Apellidos')->required()->maxLength(120),
                 TextInput::make('email')->label('Correo electrónico')->email()->maxLength(190)->unique(Jugador::class, 'email')
                     ->helperText('Con su correo puede entrar en su portal para ver sus partidos y le llegan los avisos. Sin correo, no.'),
-                TextInput::make('telefono')->label('Teléfono')->tel()->maxLength(30),
+                TextInput::make('telefono')->label('Teléfono')->type('tel')->maxLength(30),
                 Select::make('genero')->label('Género')->options(Genero::opciones())->placeholder('Sin indicar'),
             ])
             ->createOptionModalHeading('Jugador nuevo')
