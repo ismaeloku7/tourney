@@ -407,7 +407,7 @@ class HorariosDelTorneo extends Page
                 }
             }
             $this->propuesta['colocados'] = $colocados;
-            $this->propuesta['fin'] = $colocados === [] ? null : max(array_map(fn (array $c): int => (int) $c[3], $colocados));
+            $this->propuesta['fin'] = max(array_map(fn (array $c): int => (int) $c[3], $colocados));
         } else {
             try {
                 $this->guardarCambios($resultado['cambios']);
