@@ -31,7 +31,7 @@ class EditCategoria extends EditRecord
 
         return [
             TorneoResource::getUrl('index') => 'Torneos',
-            TorneoResource::getUrl('edit', ['record' => $torneo]) => $torneo->nombre,
+            TorneoResource::getUrl('view', ['record' => $torneo]) => $torneo->nombre,
             '#' => $this->categoria()->nombre,
         ];
     }
@@ -44,7 +44,7 @@ class EditCategoria extends EditRecord
                 ->label('Volver al torneo')
                 ->icon(Heroicon::OutlinedArrowUturnLeft)
                 ->color('gray')
-                ->url(fn (): string => TorneoResource::getUrl('edit', ['record' => $this->categoria()->torneo])),
+                ->url(fn (): string => TorneoResource::getUrl('view', ['record' => $this->categoria()->torneo])),
         ];
     }
 

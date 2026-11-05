@@ -16,6 +16,7 @@ use App\Competicion\PlanificadorContinuo;
 use App\Enums\EstadoPartido;
 use App\Filament\Avisos;
 use App\Filament\Competicion\Marcador;
+use App\Filament\Resources\Torneos\Pages\Concerns\BarraDelTorneo;
 use App\Filament\Resources\Torneos\TorneoResource;
 use App\Models\Franja;
 use App\Models\Partido;
@@ -42,6 +43,7 @@ use Illuminate\Support\Facades\Gate;
  */
 class HorariosDelTorneo extends Page
 {
+    use BarraDelTorneo;
     use InteractsWithRecord;
 
     protected static string $resource = TorneoResource::class;
@@ -92,79 +94,86 @@ class HorariosDelTorneo extends Page
 
     protected function getHeaderActions(): array
     {
-        return [
-            Action::make('calcular')
-                ->label(fn (): string => $this->propuesta === null ? 'Calcular' : 'Volver a calcular')
-                ->icon(Heroicon::OutlinedSparkles)
-                ->visible(fn (): bool => Gate::allows('update', $this->torneo()))
-                ->modalHeading('Calcular los horarios')
-                ->modalDescription('Se calcula el plan y se enseña aquí, sin guardar nada. Cada partido reserva su pista el calentamiento más su duración estimada y el siguiente entra en cuanto acaba.')
-                ->modalSubmitActionLabel('Calcular')
-                ->schema([
-                    Toggle::make('rehacer')->label('Rehacer también los ya programados')->default(false)
-                        ->helperText('Los que no han empezado se vuelven a colocar desde ahora. Desmarcado, solo se colocan los que no tienen hora.'),
-                ])
-                ->action(function (array $data): void {
-                    $propuesta = app(PlanificarHorarios::class)->proponer($this->torneo(), (bool) ($data['rehacer'] ?? false));
-                    $this->propuesta = $propuesta->toArray();
+        return $this->barraDelTorneo('horarios');
+    }
 
-                    $plan = $propuesta->plan;
-                    $colocados = count($plan->colocados);
-                    if ($colocados === 0 && $plan->conflictos === []) {
-                        Avisos::aviso('No hay partidos que colocar');
-                    } else {
-                        Avisos::hecho('Plan calculado: revísalo y aplícalo', "{$colocados} partidos colocados".($plan->conflictos !== [] ? ', '.count($plan->conflictos).' sin sitio' : '').'.');
-                    }
-                }),
-            Action::make('recalcular')
-                ->label('Recalcular horas')
-                ->icon(Heroicon::OutlinedArrowPath)
-                ->color('gray')
-                ->visible(fn (): bool => $this->propuesta === null && HorasEnDirecto::activo($this->torneo()) && Gate::allows('update', $this->torneo()))
-                ->action(function (): void {
-                    $cambios = app(HorasEnDirecto::class)->recalcular($this->torneo());
-                    Avisos::hecho($cambios === [] ? 'Las horas ya estaban al día' : count($cambios).' partidos con nueva hora estimada');
-                }),
-            Action::make('aplicar')
-                ->label('Aplicar')
-                ->icon(Heroicon::OutlinedCheck)
-                ->color('success')
-                ->visible(fn (): bool => $this->propuesta !== null && ($this->propuesta['colocados'] ?? []) !== [] && Gate::allows('update', $this->torneo()))
-                ->requiresConfirmation()
-                ->modalHeading('Aplicar el plan')
-                ->modalDescription('Los partidos reciben su pista y su hora. Los jugadores lo ven cuando los horarios están publicados.')
-                ->modalSubmitActionLabel('Aplicar')
-                ->action(function (): void {
-                    $propuesta = PropuestaDeHorarios::desdeArray((array) $this->propuesta);
+    // Lo propio de los horarios va en la página (horarios.blade.php), no en la barra de arriba.
 
-                    try {
-                        app(PlanificarHorarios::class)->aplicar($this->torneo(), $propuesta, $this->usuario());
-                    } catch (ErrorDeCompeticion $e) {
-                        Avisos::error('No se ha aplicado', [$e->getMessage()]);
+    public function calcularAction(): Action
+    {
+        return Action::make('calcular')
+            ->label(fn (): string => $this->propuesta === null ? 'Calcular' : 'Volver a calcular')
+            ->icon(Heroicon::OutlinedSparkles)
+            ->visible(fn (): bool => Gate::allows('update', $this->torneo()))
+            ->modalHeading('Calcular los horarios')
+            ->modalDescription('Se calcula el plan y se enseña aquí, sin guardar nada. Cada partido reserva su pista el calentamiento más su duración estimada y el siguiente entra en cuanto acaba.')
+            ->modalSubmitActionLabel('Calcular')
+            ->schema([
+                Toggle::make('rehacer')->label('Rehacer también los ya programados')->default(false)
+                    ->helperText('Los que no han empezado se vuelven a colocar desde ahora. Desmarcado, solo se colocan los que no tienen hora.'),
+            ])
+            ->action(function (array $data): void {
+                $propuesta = app(PlanificarHorarios::class)->proponer($this->torneo(), (bool) ($data['rehacer'] ?? false));
+                $this->propuesta = $propuesta->toArray();
 
-                        return;
-                    }
+                $plan = $propuesta->plan;
+                $colocados = count($plan->colocados);
+                if ($colocados === 0 && $plan->conflictos === []) {
+                    Avisos::aviso('No hay partidos que colocar');
+                } else {
+                    Avisos::hecho('Plan calculado: revísalo y aplícalo', "{$colocados} partidos colocados".($plan->conflictos !== [] ? ', '.count($plan->conflictos).' sin sitio' : '').'.');
+                }
+            });
+    }
 
-                    $this->propuesta = null;
-                    Avisos::hecho(count($propuesta->plan->colocados).' partidos con hora y pista', self::resumen($propuesta));
-                }),
-            Action::make('descartar')
-                ->label('Descartar')
-                ->icon(Heroicon::OutlinedXMark)
-                ->color('gray')
-                ->visible(fn (): bool => $this->propuesta !== null)
-                ->action(fn () => $this->propuesta = null),
-            Action::make('partidos')
-                ->label('Partidos')
-                ->icon(Heroicon::OutlinedTableCells)
-                ->color('gray')
-                ->url(fn (): string => PartidosDelTorneo::getUrl(['record' => $this->torneo()])),
-            Action::make('torneo')
-                ->label('Volver al torneo')
-                ->icon(Heroicon::OutlinedArrowUturnLeft)
-                ->color('gray')
-                ->url(fn (): string => TorneoResource::getUrl('edit', ['record' => $this->torneo()])),
-        ];
+    public function recalcularAction(): Action
+    {
+        return Action::make('recalcular')
+            ->label('Recalcular horas')
+            ->icon(Heroicon::OutlinedArrowPath)
+            ->color('gray')
+            ->visible(fn (): bool => $this->propuesta === null && HorasEnDirecto::activo($this->torneo()) && Gate::allows('update', $this->torneo()))
+            ->action(function (): void {
+                $cambios = app(HorasEnDirecto::class)->recalcular($this->torneo());
+                Avisos::hecho($cambios === [] ? 'Las horas ya estaban al día' : count($cambios).' partidos con nueva hora estimada');
+            });
+    }
+
+    public function aplicarAction(): Action
+    {
+        return Action::make('aplicar')
+            ->label('Aplicar')
+            ->icon(Heroicon::OutlinedCheck)
+            ->color('success')
+            ->visible(fn (): bool => $this->propuesta !== null && ($this->propuesta['colocados'] ?? []) !== [] && Gate::allows('update', $this->torneo()))
+            ->requiresConfirmation()
+            ->modalHeading('Aplicar el plan')
+            ->modalDescription('Los partidos reciben su pista y su hora. Los jugadores lo ven cuando los horarios están publicados.')
+            ->modalSubmitActionLabel('Aplicar')
+            ->action(function (): void {
+                $propuesta = PropuestaDeHorarios::desdeArray((array) $this->propuesta);
+
+                try {
+                    app(PlanificarHorarios::class)->aplicar($this->torneo(), $propuesta, $this->usuario());
+                } catch (ErrorDeCompeticion $e) {
+                    Avisos::error('No se ha aplicado', [$e->getMessage()]);
+
+                    return;
+                }
+
+                $this->propuesta = null;
+                Avisos::hecho(count($propuesta->plan->colocados).' partidos con hora y pista', self::resumen($propuesta));
+            });
+    }
+
+    public function descartarAction(): Action
+    {
+        return Action::make('descartar')
+            ->label('Descartar')
+            ->icon(Heroicon::OutlinedXMark)
+            ->color('gray')
+            ->visible(fn (): bool => $this->propuesta !== null)
+            ->action(fn () => $this->propuesta = null);
     }
 
     /** «Termina el sábado 14 a las 19:40 · pistas ocupadas al 96 % · 25 min de pista parada.» */

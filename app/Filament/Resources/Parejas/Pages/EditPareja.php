@@ -67,7 +67,7 @@ class EditPareja extends EditRecord
             Action::make('categoria')->label('Ver su categoría')->icon(Heroicon::OutlinedRectangleStack)->color('gray')
                 ->url(fn (): string => CategoriaResource::getUrl('edit', ['record' => $this->inscripcion()->categoria_id])),
             Action::make('torneo')->label('Ver el torneo')->icon(Heroicon::OutlinedTrophy)->color('gray')
-                ->url(fn (): string => TorneoResource::getUrl('edit', ['record' => $this->inscripcion()->categoria->torneo_id])),
+                ->url(fn (): string => TorneoResource::getUrl('view', ['record' => $this->inscripcion()->categoria->torneo_id])),
             ActionGroup::make($this->inscripcion()->participante->jugadores->map(fn (Jugador $jugador): Action => Action::make("jugador_{$jugador->id}")
                 ->label($jugador->nombre_completo)->icon(Heroicon::OutlinedUser)
                 ->url(JugadorResource::getUrl('edit', ['record' => $jugador])))->all())

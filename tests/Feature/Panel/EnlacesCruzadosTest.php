@@ -54,7 +54,7 @@ test('la ficha del jugador lista sus torneos con la pareja, el compañero y el e
         ->assertSee('Rally 2026')
         ->assertSee('Open de Otoño')
         ->assertSee('Luis Ortega')
-        ->assertTableActionHasUrl('torneo', TorneoResource::getUrl('edit', ['record' => $this->rally]), $this->delRally->participante)
+        ->assertTableActionHasUrl('torneo', TorneoResource::getUrl('view', ['record' => $this->rally]), $this->delRally->participante)
         ->assertTableActionHasUrl('pareja', ParejaResource::getUrl('edit', ['record' => $this->delRally]), $this->delRally->participante);
 
     expect(TorneosRelationManager::getBadge($this->ana, EditJugador::class))->toBe('2');
@@ -69,7 +69,7 @@ test('en las listas de parejas y de inscritos cada jugador enlaza a su ficha', f
 
 test('desde la pareja se salta al torneo y a las fichas de sus jugadores', function () {
     Livewire::test(EditPareja::class, ['record' => $this->delRally->getRouteKey()])
-        ->assertActionHasUrl('torneo', TorneoResource::getUrl('edit', ['record' => $this->rally]))
+        ->assertActionHasUrl('torneo', TorneoResource::getUrl('view', ['record' => $this->rally]))
         ->assertActionHasUrl("jugador_{$this->ana->id}", JugadorResource::getUrl('edit', ['record' => $this->ana]));
 });
 

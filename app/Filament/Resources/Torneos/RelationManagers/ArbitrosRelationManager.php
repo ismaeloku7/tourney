@@ -21,6 +21,12 @@ use Filament\Tables\Table;
  */
 class ArbitrosRelationManager extends RelationManager
 {
+    /** En la ficha del torneo (de solo lectura) esta pestaña se sigue gestionando. */
+    public function isReadOnly(): bool
+    {
+        return false;
+    }
+
     protected static string $relationship = 'arbitros';
 
     protected static ?string $title = 'Árbitros';

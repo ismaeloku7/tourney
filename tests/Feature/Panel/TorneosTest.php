@@ -2,10 +2,15 @@
 
 use App\Enums\EstadoTorneo;
 use App\Enums\Rol;
+use App\Filament\Resources\Torneos\Pages\CompeticionDelTorneo;
 use App\Filament\Resources\Torneos\Pages\CreateTorneo;
 use App\Filament\Resources\Torneos\Pages\EditTorneo;
+use App\Filament\Resources\Torneos\Pages\HorariosDelTorneo;
 use App\Filament\Resources\Torneos\Pages\ListTorneos;
+use App\Filament\Resources\Torneos\Pages\PartidosDelTorneo;
+use App\Filament\Resources\Torneos\Pages\ViewTorneo;
 use App\Filament\Resources\Torneos\RelationManagers\CategoriasRelationManager;
+use App\Filament\Resources\Torneos\TorneoResource;
 use App\Models\Categoria;
 use App\Models\Organizador;
 use App\Models\Sede;
@@ -97,4 +102,30 @@ test('las categorías del torneo se ven en su ficha', function () {
         ->assertSuccessful()
         ->assertCanSeeTableRecords([$categoria])
         ->assertSee('Mixta B');
+});
+
+test('al abrir un torneo se ve su ficha sin poder tocarla, con «Editar» arriba, y la barra es la misma en todas sus páginas', function () {
+    $torneo = Torneo::factory()->create(['nombre' => 'Rally de Otoño', 'descanso_minimo_minutos' => 0, 'margen_entre_partidos_minutos' => 10]);
+    $this->actingAs($this->propietario);
+
+    Livewire::test(ViewTorneo::class, ['record' => $torneo->getRouteKey()])
+        ->assertSuccessful()
+        ->assertSee('Rally de Otoño')
+        ->assertSee('Sin descanso (enlazan)')
+        ->assertSee('10 minutos')
+        ->assertActionHasUrl('editar', TorneoResource::getUrl('edit', ['record' => $torneo]));
+
+    foreach ([ViewTorneo::class, EditTorneo::class, CompeticionDelTorneo::class, PartidosDelTorneo::class, HorariosDelTorneo::class] as $pagina) {
+        $componente = Livewire::test($pagina, ['record' => $torneo->getRouteKey()])->assertSuccessful();
+        foreach (['ficha', 'editar', 'competicion', 'partidos', 'horarios', 'importar', 'web', 'aviso'] as $boton) {
+            $componente->assertActionVisible($boton);
+        }
+    }
+
+    // Al guardar los cambios se vuelve a la ficha.
+    Livewire::test(EditTorneo::class, ['record' => $torneo->getRouteKey()])
+        ->fillForm(['nombre' => 'Rally de Invierno'])
+        ->call('save')
+        ->assertHasNoFormErrors()
+        ->assertRedirect(ViewTorneo::getUrl(['record' => $torneo]));
 });
