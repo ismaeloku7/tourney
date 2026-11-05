@@ -37,7 +37,7 @@ final readonly class EsquemaDeCuadro
         }
 
         $clasificados = [];
-        foreach (array_values($codigos) as $i => $codigo) {
+        foreach ($codigos as $i => $codigo) {
             $clasificados[] = $this->clasificado($codigo, $i + 1);
         }
 
@@ -52,7 +52,7 @@ final readonly class EsquemaDeCuadro
 
         $sorteo = $configuracion->reglaDeCruces === ReglaDeCruces::Sorteo;
         $codigoDe = [];
-        foreach (array_values($codigos) as $i => $codigo) {
+        foreach ($codigos as $i => $codigo) {
             $codigoDe[$i + 1] = $codigo;
         }
 
