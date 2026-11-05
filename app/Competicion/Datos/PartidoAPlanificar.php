@@ -8,6 +8,7 @@ final readonly class PartidoAPlanificar
     /**
      * @param  list<int>  $jugadores  Los jugadores de los dos lados (para no solapar personas).
      * @param  list<int>  $dependeDe  Partidos que tienen que jugarse antes.
+     * @param  bool  $deGrupos  De una fase de grupos o liga (si no, de un cuadro).
      */
     public function __construct(
         public int $id,
@@ -20,5 +21,6 @@ final readonly class PartidoAPlanificar
         public array $jugadores,
         public int $duracionMinutos,
         public array $dependeDe = [],
+        public bool $deGrupos = true,
     ) {}
 }

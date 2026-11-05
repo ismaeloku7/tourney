@@ -12,7 +12,9 @@ use App\Competicion\Datos\SugerenciaDeRecolocacion;
  * Con lo que ya se ha jugado se recalcula la hora estimada de lo que
  * falta, respetando el descanso de cada jugador y que un partido no
  * empiece antes de que acaben, más el descanso, los que le dan sus
- * parejas. El primer partido del día de una pista no se adelanta.
+ * parejas. El primer partido del día de una pista no se adelanta. Quien
+ * viene de jugar no calienta: su siguiente partido puede ir calentando
+ * mientras acaba.
  *
  * Si una pista se retrasa, propone pasar uno de sus partidos (nunca el
  * siguiente, y solo con tiempo para avisar) a otra pista que vaya bien.
@@ -23,11 +25,13 @@ final readonly class PistasEnDirecto
      * La hora estimada de cada partido sin acabar: id → [inicio, fin].
      *
      * @param  list<PartidoEnDirecto>  $partidos
+     * @param  int  $calentamientoMinutos  Lo que se reserva de pista antes de cada partido (incluido en sus minutos).
      * @return array<int, array{0: int, 1: int}>
      */
-    public function recalcular(array $partidos, int $ahora, int $descansoMinutos): array
+    public function recalcular(array $partidos, int $ahora, int $descansoMinutos, int $calentamientoMinutos = 0): array
     {
         $descanso = $descansoMinutos * 60;
+        $calentamiento = $calentamientoMinutos * 60;
         $hoy = date('Y-m-d', $ahora);
 
         /** @var array<int, int> $libre pista → libre desde */
@@ -68,7 +72,7 @@ final readonly class PistasEnDirecto
             // Ya en juego: es el primero de su pista, le tocaba antes de ahora y ni la pista ni sus jugadores estaban ocupados entonces.
             $pudoEmpezar = $p->orden === null && $p->inicio <= $ahora && ($libre[$pista] ?? PHP_INT_MIN) <= $p->inicio;
             foreach ($p->jugadores as $jugador) {
-                $pudoEmpezar = $pudoEmpezar && ($listo[$jugador] ?? PHP_INT_MIN) - $descanso <= $p->inicio;
+                $pudoEmpezar = $pudoEmpezar && ($listo[$jugador] ?? PHP_INT_MIN) - $descanso - $calentamiento <= $p->inicio;
             }
             foreach ($p->dependeDe as $previo) {
                 $pudoEmpezar = $pudoEmpezar && ($fin[$previo] ?? PHP_INT_MIN) <= $p->inicio;
@@ -84,12 +88,13 @@ final readonly class PistasEnDirecto
                     ? max($libre[$pista] ?? $ahora, $ahora)
                     : max($p->inicio, $libre[$pista] ?? PHP_INT_MIN);
 
+                // Quien viene de jugar no calienta: el partido puede empezar a calentar antes de que llegue.
                 foreach ($p->jugadores as $jugador) {
-                    $inicio = max($inicio, $listo[$jugador] ?? PHP_INT_MIN);
+                    $inicio = max($inicio, ($listo[$jugador] ?? PHP_INT_MIN) - $calentamiento);
                 }
                 foreach ($p->dependeDe as $previo) {
                     if (isset($fin[$previo])) {
-                        $inicio = max($inicio, $fin[$previo] + $descanso);
+                        $inicio = max($inicio, $fin[$previo] + $descanso - $calentamiento);
                     }
                 }
                 if ($p->noAntesDe !== null) {
@@ -144,9 +149,9 @@ final readonly class PistasEnDirecto
      *
      * @param  list<PartidoEnDirecto>  $partidos
      */
-    public function sugerencia(array $partidos, int $ahora, int $descansoMinutos, int $umbralMinutos = 20, int $avisoMinutos = 30): ?SugerenciaDeRecolocacion
+    public function sugerencia(array $partidos, int $ahora, int $descansoMinutos, int $umbralMinutos = 20, int $avisoMinutos = 30, int $calentamientoMinutos = 0): ?SugerenciaDeRecolocacion
     {
-        $horas = $this->recalcular($partidos, $ahora, $descansoMinutos);
+        $horas = $this->recalcular($partidos, $ahora, $descansoMinutos, $calentamientoMinutos);
         $retrasos = $this->retrasos($partidos, $horas, $ahora);
         $atrasadas = array_filter($retrasos, fn (int $minutos): bool => $minutos >= $umbralMinutos);
 
@@ -177,7 +182,7 @@ final readonly class PistasEnDirecto
 
                     foreach ($this->huecos($this->cola($actuales, $horas, $hacia, $ahora), $horas, $limite) as $orden) {
                         $prueba = array_map(fn (PartidoEnDirecto $p): PartidoEnDirecto => $p->id === $partido->id ? $p->con($hacia, $p->inicio, $orden, $limite) : $p, $actuales);
-                        $simulado = $this->recalcular($prueba, $ahora, $descansoMinutos);
+                        $simulado = $this->recalcular($prueba, $ahora, $descansoMinutos, $calentamientoMinutos);
                         [$fin, $retraso] = $this->medir($prueba, $simulado);
                         $puntos = 2 * intdiv($finBase - $fin, 60) + intdiv($retrasoBase - $retraso, 60);
 

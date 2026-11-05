@@ -45,8 +45,12 @@ function grupoDeCuatro(int $primerId, int $primeraPareja, int $duracion = 60): a
     return $partidos;
 }
 
-/** Comprueba que nadie juega dos a la vez (ni sin descanso) y que ninguna pista tiene dos partidos a la vez. */
-function sinChoques(PlanDePistas $plan, array $partidos, int $descanso): void
+/**
+ * Comprueba que ninguna pista tiene dos partidos a la vez y que nadie
+ * juega dos a la vez ni sin su descanso: quien viene de jugar no calienta,
+ * así que lo que cuenta es desde que acaba hasta que empieza a jugar.
+ */
+function sinChoques(PlanDePistas $plan, array $partidos, int $descanso, int $calentamiento = 10): void
 {
     $jugadoresDe = [];
     foreach ($partidos as $partido) {
@@ -62,12 +66,37 @@ function sinChoques(PlanDePistas $plan, array $partidos, int $descanso): void
         }
     }
 
-    foreach ([[$porPista, 0], [$porJugador, $descanso * 60]] as [$grupos, $margen]) {
+    foreach ([[$porPista, 0, 0], [$porJugador, $descanso * 60, $calentamiento * 60]] as [$grupos, $margen, $sinCalentar]) {
         foreach ($grupos as $lista) {
             usort($lista, fn (PartidoColocado $x, PartidoColocado $y): int => $x->inicio <=> $y->inicio);
             for ($i = 1; $i < count($lista); $i++) {
-                expect($lista[$i]->inicio->getTimestamp())->toBeGreaterThanOrEqual($lista[$i - 1]->fin->getTimestamp() + $margen);
+                expect($lista[$i]->inicio->getTimestamp() + $sinCalentar)->toBeGreaterThanOrEqual($lista[$i - 1]->fin->getTimestamp() + $margen);
             }
+        }
+    }
+}
+
+/** Ningún jugador juega tres seguidos (con menos de 20 minutos sin jugar entre uno y otro). */
+function sinTresSeguidos(PlanDePistas $plan, array $partidos, int $calentamiento = 10): void
+{
+    $jugadoresDe = [];
+    foreach ($partidos as $partido) {
+        $jugadoresDe[$partido->id] = $partido->jugadores;
+    }
+
+    $porJugador = [];
+    foreach ($plan->colocados as $c) {
+        foreach ($jugadoresDe[$c->partido] as $jugador) {
+            $porJugador[$jugador][] = [$c->inicio->getTimestamp() + $calentamiento * 60, $c->fin->getTimestamp()];
+        }
+    }
+
+    foreach ($porJugador as $lista) {
+        sort($lista);
+        $racha = 1;
+        for ($i = 1; $i < count($lista); $i++) {
+            $racha = $lista[$i][0] - $lista[$i - 1][1] < PlanificadorContinuo::MINUTOS_PARA_DESCANSAR * 60 ? $racha + 1 : 1;
+            expect($racha)->toBeLessThan(3);
         }
     }
 }
@@ -118,8 +147,8 @@ test('la ronda siguiente espera a que acaben, con descanso, los partidos que le 
     expect($plan->conflictos)->toBe([])
         ->and($plan->colocadoDe(1)?->inicio->format('H:i'))->toBe('09:00')
         ->and($plan->colocadoDe(2)?->inicio->format('H:i'))->toBe('09:00')
-        // Acaban a las 10:10; más 30 de descanso.
-        ->and($plan->colocadoDe(3)?->inicio->format('H:i'))->toBe('10:40');
+        // Acaban a las 10:10; con 30 de descanso juegan a las 10:40 (calientan desde las 10:30).
+        ->and($plan->colocadoDe(3)?->inicio->format('H:i'))->toBe('10:30');
 });
 
 test('respeta las horas en que un jugador no puede, lo ya fijado y los bloqueos', function () {
@@ -132,8 +161,8 @@ test('respeta las horas en que un jugador no puede, lo ya fijado y los bloqueos'
     $plan = (new PlanificadorContinuo)->planificar($partidos, pistasDe(2), new RestriccionesDePlanificacion(30, [30 => [new Intervalo(a_las('09:00'), a_las('13:00'))]], 10), $fijos);
 
     expect($plan->conflictos)->toBe([])
-        // El jugador 10 acaba a las 10:10 en el fijo: 30 de descanso.
-        ->and($plan->colocadoDe(1)?->inicio->format('H:i'))->toBe('10:40')
+        // El jugador 10 acaba a las 10:10 en el fijo: con 30 de descanso juega a las 10:40, tras calentar desde las 10:30.
+        ->and($plan->colocadoDe(1)?->inicio->format('H:i'))->toBe('10:30')
         // El jugador 30 no puede hasta las 13:00.
         ->and($plan->colocadoDe(2)?->inicio->format('H:i'))->toBe('13:00');
 });
@@ -155,4 +184,89 @@ test('no coloca nada antes de la hora mínima', function () {
     $plan = (new PlanificadorContinuo)->planificar([encuentro(1, 1, 2)], pistasDe(1), new RestriccionesDePlanificacion(30, [], 10, a_las('12:03')));
 
     expect($plan->colocadoDe(1)?->inicio->format('H:i'))->toBe('12:03');
+});
+
+test('quien viene de jugar no calienta: su siguiente partido puede calentar mientras acaba', function () {
+    // La pista 2 está ocupada hasta las 10:00; la pareja 1 juega en la 1 hasta las 10:10.
+    $partidos = [encuentro(1, 1, 2), encuentro(2, 1, 3)];
+    $fijos = [new OcupacionFija(2, new Intervalo(a_las('09:00'), a_las('10:00')))];
+
+    $plan = (new PlanificadorContinuo)->planificar($partidos, pistasDe(2), new RestriccionesDePlanificacion(0, [], 10), $fijos);
+
+    expect($plan->conflictos)->toBe([])
+        ->and($plan->colocadoDe(1)?->inicio->format('H:i'))->toBe('09:00')
+        // La pareja 3 calienta sola de 10:00 a 10:10; la 1 llega al acabar y juegan a las 10:10.
+        ->and($plan->colocadoDe(2)?->inicio->format('H:i'))->toBe('10:00')
+        ->and($plan->colocadoDe(2)?->pista)->toBe(2);
+});
+
+test('sin descanso no deja la pista parada mientras haya algo que jugar, y nadie juega tres seguidos', function () {
+    $partidos = [...grupoDeCuatro(1, 1), ...grupoDeCuatro(7, 11), ...grupoDeCuatro(13, 21), ...grupoDeCuatro(19, 31)];
+
+    $plan = (new PlanificadorContinuo)->planificar($partidos, pistasDe(4), new RestriccionesDePlanificacion(0, [], 10));
+
+    expect($plan->conflictos)->toBe([])
+        ->and($plan->minutosMuertos)->toBe(0)
+        // 24 partidos de 70 minutos en 4 pistas: 6 por pista, de 09:00 a 16:00.
+        ->and($plan->fin?->format('H:i'))->toBe('16:00');
+    sinChoques($plan, $partidos, 0);
+    sinTresSeguidos($plan, $partidos);
+});
+
+test('un grupo solo no juega tres seguidos aunque la pista tenga que esperar', function () {
+    $partidos = grupoDeCuatro(1, 1);
+
+    $plan = (new PlanificadorContinuo)->planificar($partidos, pistasDe(2), new RestriccionesDePlanificacion(0, [], 10));
+
+    expect($plan->conflictos)->toBe([]);
+    sinChoques($plan, $partidos, 0);
+    sinTresSeguidos($plan, $partidos);
+});
+
+test('cada categoría repite pistas: no anda por todas', function () {
+    $partidos = [];
+    foreach ([1, 2] as $categoria) {
+        foreach ([0, 1] as $g) {
+            $base = 100 * $categoria + 10 * $g;
+            foreach (grupoDeCuatro(1000 * $categoria + 10 * $g, $base) as $p) {
+                $partidos[] = new PartidoAPlanificar($p->id, $categoria, $categoria, null, $p->jornada, $p->local, $p->visitante, $p->jugadores, 60);
+            }
+        }
+    }
+
+    $plan = (new PlanificadorContinuo)->planificar($partidos, pistasDe(4), new RestriccionesDePlanificacion(0, [], 10));
+
+    $pistasDe = [];
+    foreach ($plan->colocados as $c) {
+        $pistasDe[intdiv($c->partido, 1000)][$c->pista] = true;
+    }
+    expect($plan->conflictos)->toBe([])
+        ->and(count($pistasDe[1]))->toBeLessThanOrEqual(2)
+        ->and(count($pistasDe[2]))->toBeLessThanOrEqual(2);
+});
+
+test('en grupos cada pareja juega alguna vez fuera; los cruces del cuadro, dentro', function () {
+    $partidos = [...grupoDeCuatro(1, 1), ...grupoDeCuatro(7, 11)];
+    $partidos[] = new PartidoAPlanificar(50, 1, 1, 1, null, null, null, [], 60, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], false);
+    $partidos[] = new PartidoAPlanificar(51, 1, 1, 1, null, null, null, [], 60, [1, 2, 3, 4, 5, 6, 7, 8, 9, 10, 11, 12], false);
+
+    $plan = (new PlanificadorContinuo)->planificar($partidos, pistasDe(4), new RestriccionesDePlanificacion(0, [], 10, null, [3, 4]));
+
+    $fuera = [];
+    foreach ($plan->colocados as $c) {
+        if ($c->pista >= 3) {
+            foreach ($partidos as $p) {
+                if ($p->id === $c->partido && $p->deGrupos) {
+                    $fuera[$p->local] = true;
+                    $fuera[$p->visitante] = true;
+                }
+            }
+        }
+    }
+    ksort($fuera);
+
+    expect($plan->conflictos)->toBe([])
+        ->and(array_keys($fuera))->toBe([1, 2, 3, 4, 11, 12, 13, 14])
+        ->and($plan->colocadoDe(50)?->pista)->toBeLessThan(3)
+        ->and($plan->colocadoDe(51)?->pista)->toBeLessThan(3);
 });
