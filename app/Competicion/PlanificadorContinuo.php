@@ -19,13 +19,13 @@ use DateTimeImmutable;
  * duración estimada; quien viene de jugar no calienta (acaba su partido
  * mientras el rival calienta solo).
  *
- * Siempre: nadie juega dos a la vez, nadie juega tres seguidos, se
+ * Siempre: nadie juega dos a la vez, nadie juega cuatro seguidos, se
  * respetan la disponibilidad de cada pista, el descanso mínimo (si lo hay),
  * las horas en que un jugador no puede y el orden de las rondas (un partido
  * no empieza hasta que acaban los que le dan sus parejas). Los de cuadro
  * no van a pistas exteriores mientras haya cubiertas.
  *
- * Si se puede: no jugar dos seguidos, que cada categoría repita pistas
+ * Si se puede: no jugar dos seguidos (y menos tres), que cada categoría repita pistas
  * (sin pasar de las que le tocan por lo que juega), que en grupos todas
  * las parejas jueguen alguna vez fuera, y que cada categoría vaya jornada
  * a jornada.
@@ -205,6 +205,7 @@ final readonly class PlanificadorContinuo
 
         $colocados = [];
         $seguidos = 0;
+        $tres = 0;
 
         while ($pendientes !== [] && $libre !== []) {
             $pista = array_keys($libre, min($libre), true)[0];
@@ -250,20 +251,23 @@ final readonly class PlanificadorContinuo
                 }
 
                 $conSeguido = 0;
+                $conTres = 0;
                 foreach ($partido->jugadores as $jugador) {
                     if ($this->solapa($inicio, $fin, $estado['jugador'][$jugador] ?? [], $descanso) || $this->solapa($t, $fin, $estado['noPuede'][$jugador] ?? [], 0)) {
                         continue 2;
                     }
                     $racha = $this->racha($estado['jugador'][$jugador] ?? [], $inicio, $umbral);
-                    if ($racha >= 2) {
+                    if ($racha >= 3) {
                         continue 2;
                     }
                     $conSeguido += $racha;
+                    $conTres += $racha === 2 ? 1 : 0;
                 }
 
                 $paso = $partido->deGrupos ? ($partido->jornada ?? 0) : 100 + ($partido->ronda ?? 0);
                 $puntos = 10 * min(3, $paso - $primera[$partido->categoria])
                     + 6 * $conSeguido
+                    + 15 * $conTres
                     - 6 * $queda[$partido->categoria] / $maximoQueda
                     + $ruido[$partido->id]
                     + $partido->prioridadDeCategoria / 1000;
@@ -285,7 +289,7 @@ final readonly class PlanificadorContinuo
                 }
 
                 if ($mejor === null || $puntos < $mejor[1]) {
-                    $mejor = [$partido, $puntos, $conSeguido];
+                    $mejor = [$partido, $puntos, $conSeguido, $conTres];
                 }
             }
 
@@ -300,7 +304,7 @@ final readonly class PlanificadorContinuo
                 continue;
             }
 
-            [$partido, , $conSeguido] = $mejor;
+            [$partido, , $conSeguido, $conTres] = $mejor;
             $inicio = $t + $calentamiento;
             $fin = $inicio + $partido->duracionMinutos * 60;
 
@@ -322,6 +326,7 @@ final readonly class PlanificadorContinuo
                 }
             }
             $seguidos += $conSeguido > 0 ? 1 : 0;
+            $tres += $conTres > 0 ? 1 : 0;
             $libre[$pista] = $fin;
             unset($pendientes[$partido->id]);
         }
@@ -331,7 +336,7 @@ final readonly class PlanificadorContinuo
             $sinHora = array_values(array_filter($partido->dependeDe, fn (int $previo): bool => ! isset($estado['fin'][$previo])));
             $conflictos[] = $sinHora !== []
                 ? new Conflicto($partido->id, Conflicto::ORDEN_DE_RONDAS, "El partido {$sinHora[0]} tiene que jugarse antes y no tiene hora.")
-                : new Conflicto($partido->id, Conflicto::SIN_FRANJA, 'No queda hueco en ninguna pista con su calentamiento, sin solapar a sus jugadores ni hacerles jugar tres seguidos.');
+                : new Conflicto($partido->id, Conflicto::SIN_FRANJA, 'No queda hueco en ninguna pista con su calentamiento, sin solapar a sus jugadores ni hacerles jugar cuatro seguidos.');
         }
 
         // Las preferencias que no se cumplen: partidos seguidos, parejas de grupos que no salen fuera y pistas de más por categoría.
@@ -359,7 +364,7 @@ final readonly class PlanificadorContinuo
         return [
             'colocados' => $colocados,
             'conflictos' => $conflictos,
-            'puntuacion' => [count($conflictos), intdiv($finDeTodo, 300), $this->muertos($colocados, $estado['tramos']) + 15 * $seguidos + 20 * $sinSalir + 10 * $deMas],
+            'puntuacion' => [count($conflictos), intdiv($finDeTodo, 300), $this->muertos($colocados, $estado['tramos']) + 15 * $seguidos + 40 * $tres + 20 * $sinSalir + 10 * $deMas],
         ];
     }
 

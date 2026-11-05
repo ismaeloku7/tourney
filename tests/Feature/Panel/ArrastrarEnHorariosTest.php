@@ -37,9 +37,9 @@ beforeEach(function () {
     }
 });
 
-function colocadoEn(Fase $fase, Pista $pista, CarbonImmutable $inicio, string $estado = 'programado'): Partido
+function colocadoEn(Fase $fase, Pista $pista, CarbonImmutable $inicio, string $estado = 'programado', array $atributos = []): Partido
 {
-    $partido = Partido::factory()->create(['fase_id' => $fase->id, 'estado' => $estado]);
+    $partido = Partido::factory()->create(['fase_id' => $fase->id, 'estado' => $estado, ...$atributos]);
     $franja = $fase->categoria->torneo->franjas()->create(['pista_id' => $pista->id, 'inicio' => $inicio, 'fin' => $inicio->addMinutes(70), 'inicio_previsto' => $inicio]);
     $partido->update(['franja_id' => $franja->id, 'pista_id' => $pista->id]);
 
@@ -84,4 +84,19 @@ test('soltado sobre otro, se intercambian; lo jugado no se mueve', function () {
     $pagina->call('moverPartido', $jugado->id, $this->uno->id, $this->dia->setTime(12, 0)->getTimestamp())
         ->assertNotified('No se ha movido');
     expect($jugado->refresh()->franja->pista_id)->toBe($this->dos->id);
+});
+
+test('el tercer partido seguido de una pareja lleva un aviso en la vista', function () {
+    $a = colocadoEn($this->fase, $this->uno, $this->dia->setTime(9, 0));
+    $pareja = ['local_id' => $a->local_id];
+    colocadoEn($this->fase, $this->uno, $this->dia->setTime(10, 10), atributos: $pareja);
+
+    Livewire::test(HorariosDelTorneo::class, ['record' => $this->torneo->getRouteKey()])
+        ->assertDontSee('¡Alguien juega su tercer partido seguido!');
+
+    // El tercero en la otra pista, a los 5 minutos de acabar el segundo.
+    colocadoEn($this->fase, $this->dos, $this->dia->setTime(11, 15), atributos: $pareja);
+
+    Livewire::test(HorariosDelTorneo::class, ['record' => $this->torneo->getRouteKey()])
+        ->assertSee('¡Alguien juega su tercer partido seguido!');
 });
