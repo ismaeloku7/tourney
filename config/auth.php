@@ -44,6 +44,8 @@ return [
         'web' => [
             'driver' => 'session',
             'provider' => 'users',
+            // «Mantener la sesión iniciada»: minutos que dura (30 días).
+            'remember' => (int) env('AUTH_RECORDAR_MINUTOS', 43200),
         ],
 
         // Usuarios de la plataforma, en la base central (panel /plataforma).
@@ -56,6 +58,8 @@ return [
         'jugador' => [
             'driver' => 'session',
             'provider' => 'jugadores',
+            // El jugador sigue dentro de su portal 30 días (entra con un enlace al correo).
+            'remember' => (int) env('AUTH_RECORDAR_MINUTOS', 43200),
         ],
     ],
 
