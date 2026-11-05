@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Torneos\Pages;
 
+use App\Actions\Competicion\DuracionesAprendidas;
 use App\Actions\Competicion\HorasEnDirecto;
 use App\Actions\Competicion\PlanificarHorarios;
 use App\Competicion\Datos\DisponibilidadDePista;
@@ -76,8 +77,11 @@ class HorariosDelTorneo extends Page
     {
         $torneo = $this->torneo();
 
+        $medidos = app(DuracionesAprendidas::class)->estimador()->partidosMedidos();
+
         return 'Calentamiento en pista: '.$torneo->margen_entre_partidos_minutos.' min · descanso mínimo: '.$torneo->descanso_minimo_minutos.' min · '
-            .$torneo->torneoPistas()->count().' pistas';
+            .$torneo->torneoPistas()->count().' pistas · '
+            .($medidos > 0 ? "duraciones aprendidas de {$medidos} partidos jugados" : 'duraciones estimadas (aún no hay partidos medidos)');
     }
 
     protected function getHeaderActions(): array

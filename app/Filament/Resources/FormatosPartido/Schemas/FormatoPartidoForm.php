@@ -38,7 +38,7 @@ class FormatoPartidoForm
                             ->placeholder('Sin tie-break')
                             ->helperText('Sin tie-break, el set sigue hasta sacar la diferencia.'),
                         TextInput::make('tie_break_puntos')->label('Puntos del tie-break')->integer()->minValue(5)->maxValue(21)->default(7),
-                        TextInput::make('duracion_estimada')->label('Duración estimada (minutos)')->integer()->minValue(5)->maxValue(600)->default(60)->required()->helperText('Para el planificador.'),
+                        TextInput::make('duracion_estimada')->label('Duración estimada (minutos)')->integer()->minValue(5)->maxValue(600)->default(60)->required()->helperText('Para el planificador, sin el calentamiento. Cuando hay 5 o más partidos de este formato jugados en directo, usa lo que duran de verdad.'),
                     ]),
                 Section::make('Variantes')
                     ->columns(3)
