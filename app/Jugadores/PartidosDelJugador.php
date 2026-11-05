@@ -34,9 +34,9 @@ final class PartidosDelJugador
 
         $inicio = $p->franja->inicio;
         $anterior = Partido::query()
-            ->where('pista_id', $p->pista_id)
+            ->where('partidos.pista_id', $p->pista_id)
             ->whereKeyNot($p->id)
-            ->whereIn('estado', [EstadoPartido::Pendiente->value, EstadoPartido::Programado->value, EstadoPartido::EnJuego->value])
+            ->whereIn('partidos.estado', [EstadoPartido::Pendiente->value, EstadoPartido::Programado->value, EstadoPartido::EnJuego->value])
             ->whereHas('franja', fn (Builder $q) => $q->where('inicio', '<', $inicio)->whereDate('inicio', $inicio->toDateString()))
             ->with(['local', 'visitante', 'fase.categoria.torneo'])
             ->join('franjas', 'franjas.id', '=', 'partidos.franja_id')

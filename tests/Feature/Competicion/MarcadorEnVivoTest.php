@@ -67,7 +67,7 @@ beforeEach(function () {
 /** Los partidos de una pista en orden de hora. */
 function partidosDePista(Pista $pista)
 {
-    return Partido::query()->where('pista_id', $pista->id)->whereNotNull('franja_id')
+    return Partido::query()->where('partidos.pista_id', $pista->id)->whereNotNull('partidos.franja_id')
         ->join('franjas', 'franjas.id', '=', 'partidos.franja_id')->orderBy('franjas.inicio')->select('partidos.*')
         ->with(['local.jugadores', 'visitante.jugadores', 'franja'])->get();
 }
