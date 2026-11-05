@@ -88,6 +88,7 @@ final class RegistrarResultado
                 'validacion_vence_en' => $pendienteDeValidar ? now()->addMinutes($torneo->minutos_para_validar) : null,
                 'validado_en' => $pendienteDeValidar ? null : now(),
                 'validado_por' => $quien instanceof User ? $quien->id : null,
+                'marcador_en_vivo' => null,
             ])->save();
 
             if (! $pendienteDeValidar) {

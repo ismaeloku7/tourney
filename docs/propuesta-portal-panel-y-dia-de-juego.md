@@ -252,16 +252,28 @@ más valor da y menos decisiones pendientes tiene.
 | 3 | Portal del jugador: layout nuevo, Inicio y Mi torneo | Nada | Medio | Hecho |
 | 4 | Portal del jugador: Partidos, Avisos y Mis datos; redirecciones; retirar `PortalDelJugador` | 3 | Pequeño | Hecho, dentro del 3 |
 | 5 | Panel de inicio «Hoy» y línea de estado del torneo | 2 | Pequeño | El inicio del panel ya tenía «Partidos del día» y «Por revisar»; se le añade el salto a «Competición». La línea de estado queda como está (el botón «Estado» de la ficha, con pasar y volver) |
-| 6 | Motor: `Encadenador` y `EstimadorDeHorario` con sus pruebas | Decidir `modo_horario` y calentamientos | Medio | Pendiente |
-| 7 | Partidos encadenados: modelo, acciones, mesa por pista con marcador en vivo, columna de pistas en «Competición», ficha pública y portal | 6 | Grande | Pendiente |
-| 8 | WhatsApp: canal, plantillas, consentimiento, envíos y preferencia del jugador | Cuenta de Meta Business y número | Medio | Pendiente |
+| 6 | Motor: `Encadenador` y `EstimadorDeHorario` con sus pruebas | Decidir `modo_horario` y calentamientos | Medio | Cubierto en `main` por otra vía: el planificador continuo (#31) y `PistasEnDirecto` (#33) hacen lo mismo con las franjas, sin un modo aparte |
+| 7 | Partidos encadenados: modelo, acciones, mesa por pista con marcador en vivo, columna de pistas en «Competición», ficha pública y portal | 6 | Grande | Las horas que se recalculan, los avisos a la cola («a calentar», «sois los siguientes») y la recolocación vienen de `main` (#33, #36). Aquí se añade lo que faltaba: `EmpezarPartido` (hora real de entrada en pista), `AnotarMarcador` (marcador en vivo en mesa, portal, web, tablero y «Competición»), «Terminar» con los sets ya puestos y el aviso por WhatsApp desde la mesa |
+| 8 | WhatsApp: canal, plantillas, consentimiento, envíos y preferencia del jugador | Cuenta de Meta Business y número | Medio | Pendiente. Mientras tanto, la mesa tiene un botón «Avisar por WhatsApp» por jugador (enlace `wa.me` con el mensaje escrito) que abre WhatsApp en el móvil de la mesa: sin número nuevo ni cuenta de Meta |
 
 Lo que no entra, para no crecer sin tope: pasarela de pago, cuentas de
 jugador globales entre organizadores, WebSockets (el tablero y la mesa
 siguen con polling de Livewire cada pocos segundos, que basta para un
 marcador en vivo).
 
-## 5. Qué hay que decidir antes de empezar
+## 5. Decisiones tomadas
+
+- Horarios: los de `main` (planificador continuo con calentamiento en
+  pista y horas que se recalculan tras cada resultado). No hay un modo
+  «encadenado» aparte.
+- El marcador en vivo lo lleva la mesa y, si el torneo deja resultados a
+  los jugadores, también un jugador del partido. El resultado final lo
+  anotan y validan los jugadores como hasta ahora: «Terminar» abre el
+  formulario con los sets del marcador ya puestos.
+- WhatsApp: pendiente de número y de cuenta de Meta. Hasta entonces,
+  push, correo y el botón manual de la mesa.
+
+## 6. Qué quedaba por decidir (ya decidido arriba)
 
 - [ ] `modo_horario` por torneo o encadenado siempre que haya mesa. La
       propuesta es por torneo, con `fijo` por defecto, para no romper lo
