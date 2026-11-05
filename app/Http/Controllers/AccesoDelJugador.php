@@ -40,7 +40,8 @@ class AccesoDelJugador
 
     public static function iniciarSesion(Request $request, Jugador $jugador): void
     {
-        Auth::guard('jugador')->login($jugador);
+        // Sigue dentro de su portal 30 días (auth.guards.jugador.remember).
+        Auth::guard('jugador')->login($jugador, remember: true);
 
         if ($request->hasSession()) {
             $request->session()->regenerate();

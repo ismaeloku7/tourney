@@ -7,6 +7,7 @@ use Database\Seeders\PlanesSeeder;
 use Filament\Facades\Filament;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Livewire;
+use Symfony\Component\HttpFoundation\Cookie as SymfonyCookie;
 
 beforeEach(function () {
     $this->seed(PlanesSeeder::class);
@@ -47,8 +48,29 @@ test('un usuario inactivo no entra aunque la clave sea buena', function () {
     expect(Auth::check())->toBeFalse();
 });
 
-test('no ofrece «recordarme»', function () {
-    Livewire::test(Login::class)->assertFormFieldDoesNotExist('remember');
+test('mantiene la sesión iniciada 30 días si se deja marcado, y está marcado de entrada', function () {
+    $recordar = fn (): ?SymfonyCookie => collect(app('cookie')->getQueuedCookies())->first(fn (SymfonyCookie $c): bool => str_starts_with($c->getName(), 'remember_web_'));
+
+    Livewire::test(Login::class)
+        ->assertFormFieldExists('remember')
+        ->fillForm(['email' => 'ana@example.com', 'password' => 'clave-buena-12'])
+        ->call('authenticate')
+        ->assertHasNoFormErrors();
+
+    $cookie = $recordar();
+    expect($cookie)->not->toBeNull()
+        ->and($cookie->getExpiresTime())->toBeGreaterThan(now()->addDays(29)->getTimestamp())
+        ->and($cookie->getExpiresTime())->toBeLessThan(now()->addDays(31)->getTimestamp());
+});
+
+test('sin marcarlo no deja la sesión recordada', function () {
+    Livewire::test(Login::class)
+        ->fillForm(['email' => 'ana@example.com', 'password' => 'clave-buena-12', 'remember' => false])
+        ->call('authenticate')
+        ->assertHasNoFormErrors();
+
+    expect(Auth::id())->toBe($this->usuario->id)
+        ->and(collect(app('cookie')->getQueuedCookies())->contains(fn (SymfonyCookie $c): bool => str_starts_with($c->getName(), 'remember_web_')))->toBeFalse();
 });
 
 test('tras cinco fallos bloquea también la clave buena', function () {

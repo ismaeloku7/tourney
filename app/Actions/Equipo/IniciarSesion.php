@@ -19,7 +19,10 @@ use LogicException;
  * - Solo encuentra usuarios del organizador del host (el modelo vive en su base).
  * - Un usuario inactivo no entra.
  * - Cinco fallos por organizador, correo e IP bloquean quince minutos.
- * - No hay «recordarme»: la sesión caduca a los 120 minutos sin uso.
+ * - Con «mantener la sesión iniciada», se sigue dentro 30 días (ver
+ *   auth.guards.web.remember); sin él, la sesión caduca a los 120 minutos
+ *   sin uso. Un usuario desactivado no entra aunque lo recuerde
+ *   (User::canAccessPanel).
  */
 class IniciarSesion
 {
@@ -46,7 +49,7 @@ class IniciarSesion
     /**
      * @throws ValidationException
      */
-    public function handle(string $email, #[\SensitiveParameter] string $clave): User
+    public function handle(string $email, #[\SensitiveParameter] string $clave, bool $recordar = false): User
     {
         $llave = $this->llave($email);
 
@@ -62,7 +65,7 @@ class IniciarSesion
 
         $credenciales = ['email' => Str::lower(trim($email)), 'password' => $clave, 'activo' => true];
 
-        if (! $this->guard->attempt($credenciales)) {
+        if (! $this->guard->attempt($credenciales, $recordar)) {
             RateLimiter::hit($llave, self::BLOQUEO_MINUTOS * 60);
 
             throw ValidationException::withMessages(['email' => __('auth.failed')]);
