@@ -446,3 +446,59 @@ test('el cuadro se puede hacer a mano por posiciones y se rellena al cerrar los 
         ->and([$primeraRonda[0]->local_id, $primeraRonda[1]->local_id, $primeraRonda[1]->visitante_id, $primeraRonda[2]->local_id, $primeraRonda[2]->visitante_id, $primeraRonda[3]->visitante_id])
         ->toBe([$quien('1º A'), $quien('2º B'), $quien('2º C'), $quien('1º C'), $quien('2º A'), $quien('1º B')]);
 });
+
+test('en el sorteo se elige el número de grupos: más grupos, más pequeños', function () {
+    fasesDe($this->categoria)
+        ->mountAction(TestAction::make('sortear')->table($this->grupos))
+        ->assertActionDataSet(['numero' => 3])
+        ->setActionData(['modo' => 'aleatorio', 'numero' => 4])
+        ->callMountedAction()
+        ->assertHasNoActionErrors()
+        ->assertNotified('4 grupos y 12 partidos');
+
+    $grupos = $this->grupos->refresh()->grupos()->with('participantes')->get();
+    expect($grupos->map(fn ($g): int => $g->participantes->count())->all())->toBe([3, 3, 3, 3])
+        ->and($this->grupos->configuracionDeGrupos()->numeroDeGrupos)->toBe(4)
+        ->and($this->grupos->configuracionDeGrupos()->tamanoDeGrupo)->toBeNull();
+});
+
+test('después del sorteo se añaden o se quitan grupos', function () {
+    app(SortearGrupos::class)->handle($this->grupos, $this->propietario);
+    app(GenerarPartidos::class)->handle($this->grupos, $this->propietario);
+    $antes = $this->grupos->grupos()->with('participantes')->get()->map(fn ($g): array => array_map('strval', $g->participantes->pluck('id')->all()))->all();
+
+    // Un grupo más, vacío y con todo colocado: no se guarda.
+    fasesDe($this->categoria)
+        ->callAction(TestAction::make('sortear')->table($this->grupos), ['modo' => 'aleatorio', 'numero' => 4])
+        ->assertNotified('No se ha podido sortear');
+    expect($this->grupos->grupos()->count())->toBe(3);
+
+    // Un grupo más con una pareja de cada uno: cuatro de tres.
+    fasesDe($this->categoria)
+        ->callAction(TestAction::make('sortear')->table($this->grupos), [
+            'modo' => 'aleatorio',
+            'numero' => 4,
+            'grupo_0' => array_slice($antes[0], 1),
+            'grupo_1' => array_slice($antes[1], 1),
+            'grupo_2' => array_slice($antes[2], 1),
+            'grupo_3' => [$antes[0][0], $antes[1][0], $antes[2][0]],
+        ])
+        ->assertHasNoActionErrors()
+        ->assertNotified('Grupos guardados');
+
+    $grupos = $this->grupos->refresh()->grupos()->with('participantes')->orderBy('orden')->get();
+    expect($grupos->map(fn ($g): int => $g->participantes->count())->all())->toBe([3, 3, 3, 3])
+        ->and($grupos[3]->nombre)->toBe('D')
+        ->and($this->grupos->partidos()->count())->toBe(12)
+        ->and($this->grupos->configuracionDeGrupos()->numeroDeGrupos)->toBe(4);
+
+    // Dos grupos: las parejas de los que se quitan van al sorteo.
+    fasesDe($this->categoria)
+        ->callAction(TestAction::make('sortear')->table($this->grupos), ['modo' => 'aleatorio', 'numero' => 2])
+        ->assertHasNoActionErrors()
+        ->assertNotified('Grupos guardados');
+
+    $grupos = $this->grupos->refresh()->grupos()->with('participantes')->get();
+    expect($grupos->map(fn ($g): int => $g->participantes->count())->all())->toBe([6, 6])
+        ->and($this->grupos->partidos()->count())->toBe(30);
+});
