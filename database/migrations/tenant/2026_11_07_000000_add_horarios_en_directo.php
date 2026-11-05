@@ -17,23 +17,47 @@ return new class extends Migration
 {
     public function up(): void
     {
-        Schema::table('franjas', function (Blueprint $tabla) {
-            $tabla->dateTime('inicio_previsto')->nullable()->after('fin');
-            $tabla->dropUnique(['pista_id', 'inicio']);
-            $tabla->index(['pista_id', 'inicio']);
-        });
+        // Cada paso se salta si ya está hecho: en MySQL los cambios de tablas no se deshacen si algo falla a medias.
+        if (! Schema::hasColumn('franjas', 'inicio_previsto')) {
+            Schema::table('franjas', function (Blueprint $tabla) {
+                $tabla->dateTime('inicio_previsto')->nullable()->after('fin');
+            });
+        }
 
-        Schema::table('partidos', function (Blueprint $tabla) {
-            $tabla->dateTime('aviso_siguientes_en')->nullable()->after('aviso_proximo_en');
-            $tabla->dateTime('aviso_calentar_en')->nullable()->after('aviso_siguientes_en');
-        });
+        // En MySQL la clave ajena de pista_id se apoya en el índice único: primero el índice normal, luego fuera el único.
+        if (! Schema::hasIndex('franjas', 'franjas_pista_id_inicio_index')) {
+            Schema::table('franjas', function (Blueprint $tabla) {
+                $tabla->index(['pista_id', 'inicio']);
+            });
+        }
+
+        if (Schema::hasIndex('franjas', 'franjas_pista_id_inicio_unique')) {
+            Schema::table('franjas', function (Blueprint $tabla) {
+                $tabla->dropUnique(['pista_id', 'inicio']);
+            });
+        }
+
+        if (! Schema::hasColumn('partidos', 'aviso_siguientes_en')) {
+            Schema::table('partidos', function (Blueprint $tabla) {
+                $tabla->dateTime('aviso_siguientes_en')->nullable()->after('aviso_proximo_en');
+            });
+        }
+
+        if (! Schema::hasColumn('partidos', 'aviso_calentar_en')) {
+            Schema::table('partidos', function (Blueprint $tabla) {
+                $tabla->dateTime('aviso_calentar_en')->nullable()->after('aviso_siguientes_en');
+            });
+        }
     }
 
     public function down(): void
     {
         Schema::table('franjas', function (Blueprint $tabla) {
-            $tabla->dropIndex(['pista_id', 'inicio']);
             $tabla->unique(['pista_id', 'inicio']);
+        });
+
+        Schema::table('franjas', function (Blueprint $tabla) {
+            $tabla->dropIndex(['pista_id', 'inicio']);
             $tabla->dropColumn('inicio_previsto');
         });
 

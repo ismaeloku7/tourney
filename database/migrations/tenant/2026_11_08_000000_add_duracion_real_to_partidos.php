@@ -13,12 +13,24 @@ return new class extends Migration
 {
     public function up(): void
     {
+        // Cada paso se salta si ya está hecho, por si un despliegue se corta a medias.
         Schema::table('partidos', function (Blueprint $tabla) {
-            $tabla->unsignedSmallInteger('minutos_jugados')->nullable()->after('registrado_en');
-            $tabla->unsignedBigInteger('formato_medido_id')->nullable()->after('minutos_jugados');
-            $tabla->boolean('parejas_igualadas')->nullable()->after('formato_medido_id');
-            $tabla->index(['formato_medido_id', 'minutos_jugados']);
+            if (! Schema::hasColumn('partidos', 'minutos_jugados')) {
+                $tabla->unsignedSmallInteger('minutos_jugados')->nullable()->after('registrado_en');
+            }
+            if (! Schema::hasColumn('partidos', 'formato_medido_id')) {
+                $tabla->unsignedBigInteger('formato_medido_id')->nullable()->after('minutos_jugados');
+            }
+            if (! Schema::hasColumn('partidos', 'parejas_igualadas')) {
+                $tabla->boolean('parejas_igualadas')->nullable()->after('formato_medido_id');
+            }
         });
+
+        if (! Schema::hasIndex('partidos', 'partidos_formato_medido_id_minutos_jugados_index')) {
+            Schema::table('partidos', function (Blueprint $tabla) {
+                $tabla->index(['formato_medido_id', 'minutos_jugados']);
+            });
+        }
     }
 
     public function down(): void
