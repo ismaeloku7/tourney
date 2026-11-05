@@ -5,9 +5,9 @@ use App\Enums\Rol;
 use App\Filament\Resources\Categorias\Pages\EditCategoria;
 use App\Filament\Resources\Categorias\RelationManagers\InscripcionesRelationManager;
 use App\Filament\Resources\Torneos\Pages\EditTorneo;
+use App\Livewire\Jugador\Inicio;
 use App\Livewire\Publico\AccesoJugador;
 use App\Livewire\Publico\InscripcionEnTorneo;
-use App\Livewire\Publico\PortalDelJugador;
 use App\Mail\EnlaceDeAcceso;
 use App\Models\Categoria;
 use App\Models\Inscripcion;
@@ -96,7 +96,7 @@ test('la organización inscribe a una pareja con jugadores nuevos y esos jugador
     $this->get('http://norte.saas.test/jugador/entrar/'.$m[1])->assertRedirect(route('jugador.portal'));
     $this->assertAuthenticatedAs($garcia, 'jugador');
 
-    Livewire::test(PortalDelJugador::class)->assertSee($this->torneo->nombre)->assertSee('García / López');
+    Livewire::test(Inicio::class)->assertSee($this->torneo->nombre)->assertSee('García / López');
 });
 
 test('el organizador activa o desactiva la inscripción online desde la ficha del torneo', function () {

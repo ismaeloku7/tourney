@@ -56,7 +56,7 @@ final class DatosDelTorneo
      * Con la fase de grupos abierta y un cuadro detrás que no se sortea,
      * cada línea lleva el cruce previsto («2º B», «Bye») y `cruces` lo dice.
      *
-     * @return list<array{categoria: Categoria, fase: Fase, cruces: bool, grupos: list<array{grupo: Grupo, lineas: list<array{posicion: int, nombre: string, puntos: int, pj: int, pg: int, pp: int, sets: string, juegos: string, clasificado: bool, cruce: string|null}>, partidos: list<array{partido: string, resultado: string, hora: string|null, ganaLocal: bool|null}>}>}>
+     * @return list<array{categoria: Categoria, fase: Fase, cruces: bool, grupos: list<array{grupo: Grupo, lineas: list<array{participante: int, posicion: int, nombre: string, puntos: int, pj: int, pg: int, pp: int, sets: string, juegos: string, clasificado: bool, cruce: string|null}>, partidos: list<array{partido: string, resultado: string, hora: string|null, ganaLocal: bool|null}>}>}>
      */
     public function grupos(): array
     {
@@ -73,6 +73,7 @@ final class DatosDelTorneo
                 $grupos[] = [
                     'grupo' => $grupo,
                     'lineas' => array_values($grupo->clasificaciones->map(fn (Clasificacion $linea): array => [
+                        'participante' => $linea->participante_id,
                         'posicion' => $linea->posicion,
                         'nombre' => (string) NombrePublico::participante($linea->participante, $this->torneo),
                         'puntos' => $linea->puntos, 'pj' => $linea->pj, 'pg' => $linea->pg, 'pp' => $linea->pp,

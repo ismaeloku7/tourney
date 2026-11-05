@@ -10,16 +10,20 @@ use App\Http\Middleware\ExigirJugador;
 use App\Http\Middleware\ExigirOrganizador;
 use App\Http\Middleware\SoloPlataforma;
 use App\Livewire\AltaDeOrganizador;
+use App\Livewire\Jugador\Avisos;
+use App\Livewire\Jugador\Inicio;
+use App\Livewire\Jugador\MisDatos;
+use App\Livewire\Jugador\MisPartidos;
+use App\Livewire\Jugador\MiTorneo;
 use App\Livewire\Mesa\AccesoDeMesa;
 use App\Livewire\Mesa\MesaDeArbitro;
 use App\Livewire\Publico\AccesoJugador;
 use App\Livewire\Publico\FichaDelTorneo;
 use App\Livewire\Publico\InscripcionEnTorneo;
 use App\Livewire\Publico\InvitacionDePareja;
-use App\Livewire\Publico\MiInscripcion;
 use App\Livewire\Publico\PartidosDePista;
-use App\Livewire\Publico\PortalDelJugador;
 use App\Livewire\Publico\Tablero;
+use App\Models\Inscripcion;
 use Illuminate\Support\Facades\Route;
 
 // Landing en el dominio del SaaS; portada del organizador en su host.
@@ -51,8 +55,15 @@ Route::middleware(ExigirOrganizador::class)->group(function (): void {
     Route::get('/jugador/entrar/{token}', [AccesoDelJugador::class, 'entrar'])->middleware('throttle:20,1')->name('jugador.entrar');
     Route::post('/jugador/salir', [AccesoDelJugador::class, 'salir'])->name('jugador.salir');
     Route::get('/invitacion/{token}', InvitacionDePareja::class)->middleware('throttle:20,1')->name('invitacion');
-    Route::get('/jugador', PortalDelJugador::class)->middleware(ExigirJugador::class)->name('jugador.portal');
-    Route::get('/jugador/inscripciones/{inscripcion}', MiInscripcion::class)->middleware(ExigirJugador::class)->name('jugador.inscripcion');
+    Route::middleware(ExigirJugador::class)->prefix('jugador')->name('jugador.')->group(function (): void {
+        Route::get('/', Inicio::class)->name('portal');
+        Route::get('/torneos/{inscripcion}', MiTorneo::class)->name('inscripcion');
+        Route::get('/partidos', MisPartidos::class)->name('partidos');
+        Route::get('/avisos', Avisos::class)->name('avisos');
+        Route::get('/datos', MisDatos::class)->name('datos');
+        // La ruta antigua de la inscripción, por los correos ya enviados.
+        Route::get('/inscripciones/{inscripcion}', fn (Inscripcion $inscripcion) => redirect()->route('jugador.inscripcion', $inscripcion));
+    });
 
     // La mesa de árbitros, con la sesión del equipo.
     Route::get('/mesa/acceso', AccesoDeMesa::class)->name('mesa.acceso');
