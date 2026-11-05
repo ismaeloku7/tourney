@@ -39,7 +39,9 @@ class AvisarProximosPartidos extends Command
                     ->whereIn('estado', [EstadoPartido::Programado->value, EstadoPartido::Pendiente->value])
                     ->whereNotNull('local_id')->whereNotNull('visitante_id')
                     ->whereHas('franja', fn (Builder $q) => $q->where('inicio', '>', now())->where('inicio', '<=', now()->addMinutes(self::MINUTOS)))
-                    ->whereHas('fase.categoria.torneo', fn (Builder $q) => $q->whereNotNull('horarios_publicados_en'))
+                    ->whereHas('fase.categoria.torneo', fn (Builder $q) => $q->whereNotNull('horarios_publicados_en')->where('web_horarios', true))
+                    // De una fase que la organización aún no enseña, ni hora ni aviso.
+                    ->whereHas('fase', fn (Builder $q) => $q->where('visible_en_web', true))
                     ->with(['local.jugadores', 'visitante.jugadores', 'franja', 'pista'])
                     ->get();
 

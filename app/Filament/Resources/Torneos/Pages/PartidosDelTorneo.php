@@ -63,6 +63,11 @@ class PartidosDelTorneo extends Page implements HasTable
     protected function getHeaderActions(): array
     {
         return [
+            Action::make('horarios')
+                ->label('Horarios')
+                ->icon(Heroicon::OutlinedCalendarDays)
+                ->color('gray')
+                ->url(fn (): string => HorariosDelTorneo::getUrl(['record' => $this->torneo()])),
             Action::make('torneo')
                 ->label('Volver al torneo')
                 ->icon(Heroicon::OutlinedArrowUturnLeft)

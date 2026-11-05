@@ -1,6 +1,5 @@
 <?php
 
-use App\Actions\Competicion\GenerarFranjas;
 use App\Actions\Competicion\GenerarPartidos;
 use App\Actions\Competicion\PlanificarHorarios;
 use App\Actions\Competicion\RegistrarResultado;
@@ -57,7 +56,6 @@ test('el PDF de la categoría y el de horarios se generan, y el CSV lleva a las 
     $usuario = User::query()->firstOrFail();
     app(SortearGrupos::class)->handle($this->grupos, $usuario);
     app(GenerarPartidos::class)->handle($this->grupos, $usuario);
-    app(GenerarFranjas::class)->handle($this->torneo);
     app(PlanificarHorarios::class)->handle($this->torneo, $usuario);
     $partido = $this->grupos->partidos()->orderBy('id')->firstOrFail();
     app(RegistrarResultado::class)->handle($partido, new Resultado([new Set(6, 3), new Set(6, 4)]), $usuario);
