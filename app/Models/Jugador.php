@@ -8,8 +8,10 @@ use App\Tenancy\EnLaBaseDelOrganizador;
 use Database\Factories\JugadorFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Attributes\Hidden;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Casts\Attribute;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
+use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\Relations\HasMany;
@@ -111,6 +113,40 @@ class Jugador extends Authenticatable
     public function enlacesMagicos(): HasMany
     {
         return $this->hasMany(EnlaceMagico::class);
+    }
+
+    /** @return HasMany<SuscripcionPush, $this> */
+    public function suscripcionesPush(): HasMany
+    {
+        return $this->hasMany(SuscripcionPush::class);
+    }
+
+    /**
+     * Cómo tiene las notificaciones en el móvil: activadas (algún
+     * dispositivo y no las ha apagado), apagadas (tiene dispositivo pero
+     * las ha quitado en sus avisos) o null (ningún dispositivo).
+     */
+    public function notificacionesEnElMovil(): ?string
+    {
+        if (! $this->suscripcionesPush->isNotEmpty()) {
+            return null;
+        }
+
+        return (bool) ($this->avisos['push'] ?? true) ? 'activadas' : 'apagadas';
+    }
+
+    /**
+     * Solo los que tienen activadas las notificaciones en el móvil.
+     *
+     * @template TModelo of Model
+     *
+     * @param  Builder<TModelo>  $consulta
+     * @return Builder<TModelo>
+     */
+    public static function conNotificacionesActivadas(Builder $consulta): Builder
+    {
+        return $consulta->has('suscripcionesPush')
+            ->where(fn (Builder $q) => $q->whereNull('avisos')->orWhereNull('avisos->push')->orWhere('avisos->push', true));
     }
 
     /** @return HasMany<Disponibilidad, $this> */
