@@ -4,15 +4,20 @@ namespace App\Filament\Resources\Categorias\Schemas;
 
 use App\Competicion\Datos\ConfiguracionDeEliminatoria;
 use App\Competicion\Datos\ConfiguracionDeGrupos;
+use App\Competicion\Datos\Grupo as GrupoDto;
 use App\Competicion\Errores\ConfiguracionInvalida;
 use App\Enums\CriterioDeDesempate;
+use App\Enums\EstadoInscripcion;
+use App\Enums\EstadoParticipante;
 use App\Enums\ModoDeSorteo;
 use App\Enums\OrigenDeConsolacion;
 use App\Enums\ReglaDeCruces;
 use App\Enums\TipoDeFase;
 use App\Models\Categoria;
 use App\Models\Fase;
+use Filament\Actions\Action;
 use Filament\Forms\Components\Radio;
+use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
@@ -103,9 +108,31 @@ class FaseForm
                         ->options([2 => '2 (final)', 4 => '4', 8 => '8', 16 => '16', 32 => '32', 64 => '64', 128 => '128'])
                         ->placeholder('El mínimo en el que caben'),
                     Select::make('configuracion.regla_de_cruces')->label('Cruces')
-                        ->options([ReglaDeCruces::EntreGrupos->value => ReglaDeCruces::EntreGrupos->etiqueta(), ReglaDeCruces::Sorteo->value => ReglaDeCruces::Sorteo->etiqueta()])
-                        ->default(ReglaDeCruces::EntreGrupos->value)->required()
-                        ->helperText('Los cruces manuales se fijan al generar el cuadro.'),
+                        ->options([
+                            ReglaDeCruces::EntreGrupos->value => ReglaDeCruces::EntreGrupos->etiqueta(),
+                            ReglaDeCruces::Sorteo->value => ReglaDeCruces::Sorteo->etiqueta(),
+                            ReglaDeCruces::APosiciones->value => ReglaDeCruces::APosiciones->etiqueta(),
+                        ])
+                        ->default(ReglaDeCruces::EntreGrupos->value)->required()->live(),
+                    Repeater::make('configuracion.cruces_por_posicion')->label('Cruces de la primera ronda')
+                        ->schema(function (RelationManager $livewire, ?Fase $record): array {
+                            $posiciones = self::posiciones($livewire, $record);
+
+                            return [
+                                Select::make('local')->hiddenLabel()->options($posiciones)->placeholder('Bye (pasa sin jugar)'),
+                                Select::make('visitante')->hiddenLabel()->options($posiciones)->placeholder('Bye (pasa sin jugar)'),
+                            ];
+                        })
+                        ->columns(2)->defaultItems(0)->reorderable()->addActionLabel('Añadir cruce')
+                        ->hintAction(Action::make('proponer')->label('Proponer cruces')
+                            ->action(function (Set $set, RelationManager $livewire, ?Fase $record): void {
+                                $set('configuracion.cruces_por_posicion', self::cruceSugerido(array_keys(self::posiciones($livewire, $record))));
+                            }))
+                        ->helperText(fn (RelationManager $livewire, ?Fase $record): string => self::posiciones($livewire, $record) === []
+                            ? 'Añada antes la fase de grupos de la que salen las parejas.'
+                            : 'Una fila por partido, en el orden del cuadro: los ganadores de las filas 1 y 2 se cruzan en la ronda siguiente, los de la 3 y 4 entre sí, y así. Cada posición que pasa tiene que estar en una fila; un hueco vacío es un bye. Se rellena con quien quede en cada posición al cerrar los grupos.')
+                        ->visible(fn (Get $get): bool => $get('configuracion.regla_de_cruces') === ReglaDeCruces::APosiciones->value)
+                        ->columnSpanFull(),
                     Toggle::make('configuracion.evitar_reencuentros')->label('Evitar reencuentros de la fase anterior')->default(true)->inline(false),
                     Toggle::make('configuracion.tercer_y_cuarto_puesto')->label('Partido por el tercer puesto')->default(false)->inline(false),
                     Select::make('configuracion.consolacion')->label('Consolación')
@@ -149,6 +176,16 @@ class FaseForm
                 $configuracion['consolacion'] = OrigenDeConsolacion::Ninguna->value;
             }
 
+            // Las filas del formulario («local», «visitante») como pares; un hueco vacío es un bye.
+            if (($configuracion['regla_de_cruces'] ?? null) === ReglaDeCruces::APosiciones->value) {
+                $configuracion['cruces_por_posicion'] = array_values(array_map(
+                    fn (mixed $fila): array => [filled(((array) $fila)['local'] ?? null) ? (string) ((array) $fila)['local'] : null, filled(((array) $fila)['visitante'] ?? null) ? (string) ((array) $fila)['visitante'] : null],
+                    (array) ($configuracion['cruces_por_posicion'] ?? []),
+                ));
+            } else {
+                unset($configuracion['cruces_por_posicion']);
+            }
+
             $data['configuracion'] = ConfiguracionDeEliminatoria::desdeArray($configuracion)->toArray();
         }
 
@@ -171,6 +208,14 @@ class FaseForm
     {
         $configuracion = (array) ($data['configuracion'] ?? []);
         $data['reparto'] = isset($configuracion['numero_de_grupos']) && ! isset($configuracion['tamano_de_grupo']) ? 'numero' : 'tamano';
+
+        if (is_array($configuracion['cruces_por_posicion'] ?? null)) {
+            $configuracion['cruces_por_posicion'] = array_map(
+                fn (mixed $par): array => ['local' => ((array) $par)[0] ?? null, 'visitante' => ((array) $par)[1] ?? null],
+                array_values($configuracion['cruces_por_posicion']),
+            );
+            $data['configuracion'] = $configuracion;
+        }
 
         return $data;
     }
@@ -201,6 +246,79 @@ class FaseForm
         $tamano = $configuracion->tamanoDeCuadro !== null ? "Cuadro de {$configuracion->tamanoDeCuadro}" : 'Cuadro al tamaño que haga falta';
 
         return $tamano.($configuracion->tercerYCuartoPuesto ? ' · con tercer puesto' : '');
+    }
+
+    /**
+     * Las posiciones que pasan de la fase de grupos anterior: «1A» → «1º
+     * grupo A»…, y los mejores de una posición, «M1» → «Mejor 3º nº 1». Con
+     * los grupos ya sorteados, sus letras; si no, las que saldrán.
+     *
+     * @return array<string, string>
+     */
+    public static function posiciones(RelationManager $livewire, ?Fase $fase): array
+    {
+        $categoria = self::categoria($livewire);
+        $orden = $fase->orden ?? ((int) $categoria->fases()->max('orden') + 1);
+        $grupos = $categoria->fases()->where('orden', '<', $orden)
+            ->whereIn('tipo', [TipoDeFase::Grupos->value, TipoDeFase::Liga->value])
+            ->orderByDesc('orden')->first();
+
+        if ($grupos === null) {
+            return [];
+        }
+
+        try {
+            $configuracion = $grupos->configuracionDeGrupos();
+        } catch (ConfiguracionInvalida) {
+            return [];
+        }
+
+        $letras = $grupos->grupos()->orderBy('orden')->pluck('nombre')->map(fn (mixed $n): string => (string) $n)->all();
+        if ($letras === []) {
+            $parejas = $categoria->participantes()->where('estado', EstadoParticipante::Activo->value)
+                ->whereHas('inscripcion', fn ($q) => $q->where('estado', EstadoInscripcion::Confirmada->value))->count();
+            $cuantos = $configuracion->numeroDeGrupos ?? max(1, intdiv(max(1, $parejas), $configuracion->tamanoDeGrupo ?? 4));
+            $letras = array_map(fn (int $i): string => GrupoDto::nombrePorOrden($i), range(1, $cuantos));
+        }
+
+        $opciones = [];
+        for ($posicion = 1; $posicion <= $configuracion->clasificados->porGrupo; $posicion++) {
+            foreach ($letras as $letra) {
+                $opciones[$posicion.$letra] = $posicion.'º grupo '.$letra;
+            }
+        }
+        for ($k = 1; $k <= $configuracion->clasificados->cuantosMejores; $k++) {
+            $opciones['M'.$k] = ConfiguracionDeEliminatoria::etiquetaDePosicion('M'.$k, $configuracion->clasificados->mejoresDePosicion);
+        }
+
+        return $opciones;
+    }
+
+    /**
+     * Una propuesta de partida: el mejor contra el peor (1º A contra el
+     * último segundo…), con byes a los primeros si no cuadra.
+     *
+     * @param  list<string>  $codigos  En orden: primeros, segundos… y los mejores.
+     * @return list<array{local: string|null, visitante: string|null}>
+     */
+    public static function cruceSugerido(array $codigos): array
+    {
+        $n = count($codigos);
+        if ($n < 2) {
+            return [];
+        }
+
+        $tamano = 2;
+        while ($tamano < $n) {
+            $tamano *= 2;
+        }
+
+        $filas = [];
+        for ($i = 0; $i < $tamano / 2; $i++) {
+            $filas[] = ['local' => $codigos[$i] ?? null, 'visitante' => $codigos[$tamano - 1 - $i] ?? null];
+        }
+
+        return $filas;
     }
 
     private static function tipo(mixed $valor): ?TipoDeFase

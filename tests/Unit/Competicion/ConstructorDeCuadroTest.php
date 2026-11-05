@@ -202,3 +202,45 @@ test('el orden de siembra estándar pone a 1 y 2 en extremos y a 3 y 4 en los cu
         ->and(ConstructorDeCuadro::potenciaDeDos(16))->toBe(16)
         ->and(ConstructorDeCuadro::potenciaDeDos(1))->toBe(2);
 });
+
+/** Clasificados de 3 grupos (A, B, C), 2 por grupo, y los 2 mejores terceros (de B y C). */
+function clasificadosConLetras(): array
+{
+    $lista = [];
+    $orden = 1;
+    foreach ([1, 2] as $posicion) {
+        foreach (['A', 'B', 'C'] as $i => $letra) {
+            $lista[] = new Clasificado(($i + 1) * 10 + $posicion, $i + 1, $posicion, "{$posicion}º {$letra}", $orden++);
+        }
+    }
+    $lista[] = new Clasificado(23, 2, 3, 'mejor 3º (B)', $orden++);
+    $lista[] = new Clasificado(33, 3, 3, 'mejor 3º (C)', $orden);
+
+    return $lista;
+}
+
+test('a mano por posiciones: cada hueco con quien quedó en esa posición', function () {
+    $cuadro = construir(clasificadosConLetras(), [
+        'regla_de_cruces' => 'a_posiciones',
+        'cruces_por_posicion' => [['1A', 'M2'], ['2B', '2C'], ['1C', '2A'], ['M1', '1B']],
+    ]);
+
+    expect($cuadro->tamano)->toBe(8)
+        ->and(primeraRonda($cuadro))->toBe([[11, 33], [22, 32], [31, 12], [23, 21]]);
+});
+
+test('a mano por posiciones admite byes y avisa si falta o sobra alguien', function () {
+    $cuatro = array_slice(clasificadosConLetras(), 0, 3);
+
+    expect(primeraRonda(construir($cuatro, ['regla_de_cruces' => 'a_posiciones', 'cruces_por_posicion' => [['1A', null], ['1B', '1C']]])))->toBe([[11, null], [21, 31]])
+        ->and(fn () => construir($cuatro, ['regla_de_cruces' => 'a_posiciones', 'cruces_por_posicion' => [['1A', '2A'], ['1B', '1C']]]))->toThrow(ConfiguracionInvalida::class, '2º grupo A no pasa')
+        ->and(fn () => construir($cuatro, ['regla_de_cruces' => 'a_posiciones', 'cruces_por_posicion' => [['1A', null], ['1B', null]]]))->toThrow(ConfiguracionInvalida::class, 'no tienen cruce: 1º C');
+});
+
+test('los cruces por posiciones se validan al guardarlos', function () {
+    expect(fn () => ConfiguracionDeEliminatoria::desdeArray(['regla_de_cruces' => 'a_posiciones']))->toThrow(ConfiguracionInvalida::class, 'hay que poner los cruces')
+        ->and(fn () => ConfiguracionDeEliminatoria::desdeArray(['regla_de_cruces' => 'a_posiciones', 'cruces_por_posicion' => [['1A', '2B'], ['1B', '2A'], ['1C', '2C']]]))->toThrow(ConfiguracionInvalida::class, '1, 2, 4, 8')
+        ->and(fn () => ConfiguracionDeEliminatoria::desdeArray(['regla_de_cruces' => 'a_posiciones', 'cruces_por_posicion' => [['1A', '1A']]]))->toThrow(ConfiguracionInvalida::class, 'en dos cruces')
+        ->and(fn () => ConfiguracionDeEliminatoria::desdeArray(['regla_de_cruces' => 'a_posiciones', 'cruces_por_posicion' => [['1A', 'X9']]]))->toThrow(ConfiguracionInvalida::class, 'no existe')
+        ->and(ConfiguracionDeEliminatoria::desdeArray(['regla_de_cruces' => 'a_posiciones', 'cruces_por_posicion' => [['1a', ''], ['1B', '2A']]])->crucesPorPosicion)->toBe([['1A', null], ['1B', '2A']]);
+});
