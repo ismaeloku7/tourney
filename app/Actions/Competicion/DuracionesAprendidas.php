@@ -24,15 +24,14 @@ final class DuracionesAprendidas
 
     public function estimador(): EstimadorDeDuracion
     {
-        $muestras = Partido::query()
+        $muestras = array_values(Partido::query()
             ->whereNotNull('minutos_jugados')
             ->whereNotNull('formato_medido_id')
             ->orderByDesc('registrado_en')
             ->limit(self::MAXIMO)
             ->get(['id', 'formato_medido_id', 'parejas_igualadas', 'minutos_jugados'])
             ->map(fn (Partido $p): array => ['formato' => (int) $p->formato_medido_id, 'igualados' => $p->parejas_igualadas, 'minutos' => (int) $p->minutos_jugados])
-            ->values()
-            ->all();
+            ->all());
 
         return new EstimadorDeDuracion($muestras);
     }
