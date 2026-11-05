@@ -1,10 +1,12 @@
 <?php
 
 use App\Actions\Competicion\HorasEnDirecto;
+use App\Actions\Competicion\PlanificarHorarios;
 use App\Actions\Competicion\RegistrarResultado;
 use App\Competicion\Datos\Resultado;
 use App\Competicion\Datos\Set;
 use App\Enums\EstadoTorneo;
+use App\Enums\ResultadoEspecial;
 use App\Enums\Rol;
 use App\Filament\Resources\Torneos\Pages\HorariosDelTorneo;
 use App\Models\Categoria;
@@ -170,4 +172,35 @@ test('un partido que se alarga empuja a los siguientes sin cambiar su propia dur
     expect($segundo->refresh()->franja->inicio->format('H:i'))->toBe('11:30')
         ->and($tercero->refresh()->franja->inicio->format('H:i'))->toBe('11:30')
         ->and($tercero->franja->fin->format('H:i'))->toBe('12:40');
+});
+
+test('al acabar en directo se mide lo que duró el partido, sin calentamiento ni walkovers', function () {
+    $pista = $this->pistas[0];
+    $jugado = partidoEn($this->fase, $pista, $this->dia->setTime(9, 0));
+    $sinJugar = partidoEn($this->fase, $pista, $this->dia->setTime(10, 10));
+
+    $this->travelTo($this->dia->setTime(10, 25));
+    terminarPartido($jugado, $this->propietario);
+
+    $formato = FormatoPartido::query()->where('es_predeterminado', true)->value('id');
+    expect($jugado->refresh()->minutos_jugados)->toBe(75)
+        ->and($jugado->formato_medido_id)->toBe($formato);
+
+    app(RegistrarResultado::class)->handle($sinJugar->refresh(), new Resultado([], ResultadoEspecial::Walkover, true), $this->propietario);
+    expect($sinJugar->refresh()->minutos_jugados)->toBeNull();
+});
+
+test('el planificador usa lo que duran de verdad los partidos de su formato', function () {
+    $formato = FormatoPartido::query()->where('es_predeterminado', true)->value('id');
+    foreach (range(1, 5) as $i) {
+        Partido::factory()->jugado()->create(['fase_id' => $this->fase->id, 'minutos_jugados' => 90, 'formato_medido_id' => $formato]);
+    }
+    $pendiente = Partido::factory()->create(['fase_id' => $this->fase->id]);
+
+    $plan = app(PlanificarHorarios::class)->proponer($this->torneo->refresh());
+    $colocado = $plan->plan->colocadoDe($pendiente->id);
+
+    // 90 de juego más los 10 de calentamiento.
+    expect($colocado)->not->toBeNull()
+        ->and(intdiv($colocado->fin->getTimestamp() - $colocado->inicio->getTimestamp(), 60))->toBe(100);
 });

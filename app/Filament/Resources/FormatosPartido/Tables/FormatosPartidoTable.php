@@ -2,6 +2,8 @@
 
 namespace App\Filament\Resources\FormatosPartido\Tables;
 
+use App\Actions\Competicion\DuracionesAprendidas;
+use App\Competicion\EstimadorDeDuracion;
 use App\Models\FormatoPartido;
 use Filament\Actions\EditAction;
 use Filament\Tables\Columns\IconColumn;
@@ -17,7 +19,16 @@ class FormatosPartidoTable
             ->columns([
                 TextColumn::make('nombre')->label('Formato')->searchable(),
                 TextColumn::make('resumen')->label('Reglas')->state(fn (FormatoPartido $record): string => self::resumen($record)),
-                TextColumn::make('duracion_estimada')->label('Duración')->suffix(' min'),
+                TextColumn::make('duracion_estimada')->label('Duración estimada')->suffix(' min'),
+                TextColumn::make('duracion_real')->label('Duración real')
+                    ->state(function (FormatoPartido $record): string {
+                        $resumen = app(DuracionesAprendidas::class)->estimador()->resumen($record->id);
+
+                        return $resumen === null
+                            ? 'Aún sin datos'
+                            : $resumen['minutos'].' min (mediana de '.$resumen['partidos'].' partidos)';
+                    })
+                    ->tooltip('Lo que duran de verdad, sin el calentamiento, medido en los partidos jugados en directo. Con '.EstimadorDeDuracion::MINIMO_DE_PARTIDOS.' o más, el planificador usa esta en vez de la estimada.'),
                 IconColumn::make('es_predeterminado')->label('Predeterminado')->boolean(),
             ])
             ->recordActions([

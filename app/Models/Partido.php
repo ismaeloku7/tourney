@@ -49,8 +49,11 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $aviso_proximo_en
  * @property Carbon|null $aviso_siguientes_en
  * @property Carbon|null $aviso_calentar_en
+ * @property int|null $minutos_jugados
+ * @property int|null $formato_medido_id
+ * @property bool|null $parejas_igualadas
  */
-#[Fillable(['fase_id', 'grupo_id', 'jornada', 'ronda', 'posicion', 'es_tercer_puesto', 'local_id', 'visitante_id', 'origen_local', 'origen_visitante', 'formato_partido_id', 'pista_id', 'franja_id', 'estado', 'especial', 'ganador_id', 'registrado_por_jugador_id', 'registrado_en', 'validacion_vence_en', 'validado_en', 'validado_por', 'notas', 'aviso_proximo_en', 'aviso_siguientes_en', 'aviso_calentar_en'])]
+#[Fillable(['fase_id', 'grupo_id', 'jornada', 'ronda', 'posicion', 'es_tercer_puesto', 'local_id', 'visitante_id', 'origen_local', 'origen_visitante', 'formato_partido_id', 'pista_id', 'franja_id', 'estado', 'especial', 'ganador_id', 'registrado_por_jugador_id', 'registrado_en', 'validacion_vence_en', 'validado_en', 'validado_por', 'notas', 'aviso_proximo_en', 'aviso_siguientes_en', 'aviso_calentar_en', 'minutos_jugados', 'formato_medido_id', 'parejas_igualadas'])]
 class Partido extends Model
 {
     /** @use HasFactory<PartidoFactory> */
@@ -73,6 +76,9 @@ class Partido extends Model
             'aviso_proximo_en' => 'datetime',
             'aviso_siguientes_en' => 'datetime',
             'aviso_calentar_en' => 'datetime',
+            'minutos_jugados' => 'integer',
+            'formato_medido_id' => 'integer',
+            'parejas_igualadas' => 'boolean',
         ];
     }
 

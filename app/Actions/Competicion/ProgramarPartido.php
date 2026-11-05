@@ -46,7 +46,7 @@ final class ProgramarPartido
             }
 
             $desde = CarbonImmutable::instance($inicio)->second(0);
-            $hasta = $desde->addMinutes($torneo->margen_entre_partidos_minutos + $partido->formatoEfectivo()->duracion_estimada);
+            $hasta = $desde->addMinutes($torneo->margen_entre_partidos_minutos + app(DuracionesAprendidas::class)->minutosDe($partido));
 
             $choca = Franja::query()->with('partido.local', 'partido.visitante')
                 ->where('torneo_id', $torneo->id)

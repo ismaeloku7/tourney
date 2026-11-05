@@ -77,6 +77,9 @@ final class HorasEnDirecto
             return;
         }
 
+        // Antes de mover nada: su hora de inicio es cuando entró en pista.
+        app(DuracionesAprendidas::class)->medir($partido);
+
         $this->recalcular($torneo);
 
         if ($partido->pista_id === null) {

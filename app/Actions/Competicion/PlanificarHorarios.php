@@ -52,9 +52,13 @@ final class PlanificarHorarios
         $todos = Partido::query()
             ->whereHas('fase.categoria', fn (Builder $consulta) => $consulta->where('torneo_id', $torneo->id))
             ->where('estado', '!=', EstadoPartido::Anulado->value)
-            ->with(['fase.categoria', 'local.participanteJugadores', 'visitante.participanteJugadores', 'franja'])
+            ->with(['fase.categoria', 'local.participanteJugadores', 'visitante.participanteJugadores', 'local.jugadores', 'visitante.jugadores', 'franja'])
             ->get()
             ->keyBy('id');
+
+        // Lo que duran de verdad los partidos ya jugados, mejor que la duración puesta a mano.
+        $duraciones = app(DuracionesAprendidas::class);
+        $estimador = $duraciones->estimador();
 
         $seMueve = fn (Partido $p): bool => $p->estado === EstadoPartido::Pendiente
             || ($rehacer && $p->estado === EstadoPartido::Programado);
@@ -99,7 +103,7 @@ final class PlanificarHorarios
                 $partido->local_id,
                 $partido->visitante_id,
                 $jugadores,
-                $partido->formatoEfectivo()->duracion_estimada,
+                $duraciones->minutosDe($partido, $estimador),
                 $dependeDe,
             );
         }
