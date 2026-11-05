@@ -171,3 +171,24 @@ test('sin servidor propio, el correo de prueba sale por el de la plataforma', fu
         && $correo->servidor === 'el de la plataforma'
         && $correo->hasFrom((string) config('mail.from.address')));
 });
+
+test('al apagar el servidor propio, la prueba sale ya por el de la plataforma aunque la página se abriera con el del club', function () {
+    $deLaPlataforma = config('mail.from.address');
+    configurarServidorDelClub();
+
+    // Una petición nueva: entra con el servidor del club cargado.
+    tenancy()->end();
+    tenancy()->initialize($this->organizador);
+    expect(config('mail.default'))->toBe(CorreoDelOrganizador::MAILER);
+
+    Mail::fake();
+    Livewire::test(Ajustes::class)
+        ->fillForm([Ajuste::CorreoPropio->value => false])
+        ->call('probarCorreo', 'socio@gmail.com')
+        ->assertNotified('Correo de prueba enviado');
+
+    Mail::assertSent(CorreoDePrueba::class, fn (CorreoDePrueba $correo): bool => $correo->hasTo('socio@gmail.com')
+        && $correo->servidor === 'el de la plataforma'
+        && $correo->hasFrom((string) $deLaPlataforma));
+    expect(config('mail.default'))->not->toBe(CorreoDelOrganizador::MAILER);
+});

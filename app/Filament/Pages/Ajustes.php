@@ -319,6 +319,8 @@ class Ajustes extends Page
             $mailer = CorreoDelOrganizador::MAILER;
             $correo = new CorreoDePrueba((string) $servidor['mailer']['host'], $servidor['from']['address'], $servidor['from']['name']);
         } else {
+            // Al empezar la petición se cargó el servidor del club (si lo tenía encendido): se suelta para usar el de la plataforma.
+            app(CorreoDelOrganizador::class)->revert();
             $mailer = (string) config('mail.default');
             $correo = new CorreoDePrueba('el de la plataforma', (string) config('mail.from.address'), (string) (config('mail.from.name') ?: MarcaDelOrganizador::nombre()));
         }
