@@ -245,16 +245,16 @@ Cada bloque es una rama y una pull request, y deja la aplicación
 entera y verde. Están ordenados para que lo que se ve primero sea lo que
 más valor da y menos decisiones pendientes tiene.
 
-| Orden | Bloque | Depende de | Tamaño |
-| --- | --- | --- | --- |
-| 1 | Panel: enlaces cruzados jugador ↔ pareja ↔ torneo, búsqueda global, ficha del jugador con sus torneos | Nada | Pequeño |
-| 2 | Panel: página «Competición» con grupos, cuadro dibujado y clasificados | 1 | Medio |
-| 3 | Portal del jugador: layout nuevo, Inicio y Mi torneo | Nada | Medio |
-| 4 | Portal del jugador: Partidos, Avisos y Mis datos; redirecciones; retirar `PortalDelJugador` | 3 | Pequeño |
-| 5 | Panel de inicio «Hoy» y línea de estado del torneo | 2 | Pequeño |
-| 6 | Motor: `Encadenador` y `EstimadorDeHorario` con sus pruebas | Decidir `modo_horario` y calentamientos | Medio |
-| 7 | Partidos encadenados: modelo, acciones, mesa por pista con marcador en vivo, columna de pistas en «Competición», ficha pública y portal | 6 | Grande |
-| 8 | WhatsApp: canal, plantillas, consentimiento, envíos y preferencia del jugador | Cuenta de Meta Business y número | Medio |
+| Orden | Bloque | Depende de | Tamaño | Estado |
+| --- | --- | --- | --- | --- |
+| 1 | Panel: enlaces cruzados jugador ↔ pareja ↔ torneo, búsqueda global, ficha del jugador con sus torneos | Nada | Pequeño | Hecho |
+| 2 | Panel: página «Competición» con grupos, cuadro dibujado y clasificados | 1 | Medio | Hecho (los clasificados se ven en la tabla de cada grupo, no en una lista aparte) |
+| 3 | Portal del jugador: layout nuevo, Inicio y Mi torneo | Nada | Medio | Hecho |
+| 4 | Portal del jugador: Partidos, Avisos y Mis datos; redirecciones; retirar `PortalDelJugador` | 3 | Pequeño | Hecho, dentro del 3 |
+| 5 | Panel de inicio «Hoy» y línea de estado del torneo | 2 | Pequeño | El inicio del panel ya tenía «Partidos del día» y «Por revisar»; se le añade el salto a «Competición». La línea de estado queda como está (el botón «Estado» de la ficha, con pasar y volver) |
+| 6 | Motor: `Encadenador` y `EstimadorDeHorario` con sus pruebas | Decidir `modo_horario` y calentamientos | Medio | Pendiente |
+| 7 | Partidos encadenados: modelo, acciones, mesa por pista con marcador en vivo, columna de pistas en «Competición», ficha pública y portal | 6 | Grande | Pendiente |
+| 8 | WhatsApp: canal, plantillas, consentimiento, envíos y preferencia del jugador | Cuenta de Meta Business y número | Medio | Pendiente |
 
 Lo que no entra, para no crecer sin tope: pasarela de pago, cuentas de
 jugador globales entre organizadores, WebSockets (el tablero y la mesa

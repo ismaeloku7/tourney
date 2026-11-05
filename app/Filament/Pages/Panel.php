@@ -10,6 +10,7 @@ use App\Enums\EstadoPartido;
 use App\Enums\EstadoTorneo;
 use App\Filament\Avisos;
 use App\Filament\Competicion\Marcador;
+use App\Filament\Resources\Torneos\Pages\CompeticionDelTorneo;
 use App\Filament\Resources\Torneos\Pages\PartidosDelTorneo;
 use App\Filament\Resources\Torneos\TorneoResource;
 use App\Models\Inscripcion;
@@ -154,6 +155,7 @@ class Panel extends Dashboard
             'pendientes' => $pendientes,
             'parejas' => TorneoResource::getUrl('edit', ['record' => $torneo, 'relation' => '1']),
             'ficha' => TorneoResource::getUrl('edit', ['record' => $torneo]),
+            'competicion' => in_array($torneo->estado, [EstadoTorneo::Sorteo, EstadoTorneo::EnJuego], true) ? CompeticionDelTorneo::getUrl(['record' => $torneo]) : null,
         ];
     }
 
