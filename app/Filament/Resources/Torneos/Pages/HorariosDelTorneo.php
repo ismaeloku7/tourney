@@ -381,7 +381,7 @@ class HorariosDelTorneo extends Page
             foreach ($resultado['avisos'] as $aviso) {
                 $partido = $nombres->get($aviso['partido']);
                 $quien = $partido !== null ? Marcador::lado($partido, true).' – '.Marcador::lado($partido, false) : 'P'.$aviso['partido'];
-                $avisos[] = $quien.($aviso['tipo'] === 'a_la_vez' ? ': alguien juega a la vez en otra pista.' : ': alguien juega tres seguidos.');
+                $avisos[] = $quien.': alguien juega a la vez en otra pista.';
             }
         }
 
