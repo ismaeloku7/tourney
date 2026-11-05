@@ -16,6 +16,7 @@ final readonly class ConfiguracionDeEliminatoria
     /**
      * @param  array<int, int>  $formatosPorRonda  Ronda → id de formato de partido.
      * @param  list<array{0: int|null, 1: int|null}>|null  $crucesManuales  Pares de ids (o nulo = bye) de la primera ronda, en orden.
+     * @param  list<array{0: string|null, 1: string|null}>|null  $crucesPorPosicion  Pares de posiciones de la primera ronda, en orden: «1A» (1º del grupo A), «M2» (2º de los mejores de una posición) o nulo (bye).
      */
     public function __construct(
         public ?int $tamanoDeCuadro = null,
@@ -26,7 +27,26 @@ final readonly class ConfiguracionDeEliminatoria
         public array $formatosPorRonda = [],
         public ?array $crucesManuales = null,
         public ?int $semilla = null,
+        public ?array $crucesPorPosicion = null,
     ) {}
+
+    /** Si un código de posición es válido: «1A», «2B», «3AA» o «M1». */
+    public static function esPosicion(string $codigo): bool
+    {
+        return preg_match('/^([1-9]\d?[A-Z]{1,2}|M[1-9]\d?)$/', $codigo) === 1;
+    }
+
+    /** «1A» → «1º grupo A»; «M2» → «Mejor nº 2 de los demás». */
+    public static function etiquetaDePosicion(string $codigo, ?int $posicionDeLosMejores = null): string
+    {
+        if (str_starts_with($codigo, 'M')) {
+            return 'Mejor '.($posicionDeLosMejores !== null ? $posicionDeLosMejores.'º ' : '').'nº '.substr($codigo, 1);
+        }
+
+        preg_match('/^(\d+)([A-Z]+)$/', $codigo, $partes);
+
+        return ($partes[1] ?? '?').'º grupo '.($partes[2] ?? '?');
+    }
 
     /**
      * @param  array<string, mixed>  $datos
@@ -40,7 +60,33 @@ final readonly class ConfiguracionDeEliminatoria
         $regla = ReglaDeCruces::tryFrom((string) ($datos['regla_de_cruces'] ?? 'entre_grupos'));
         $consolacion = OrigenDeConsolacion::tryFrom((string) ($datos['consolacion'] ?? 'ninguna'));
         $cruces = $datos['cruces_manuales'] ?? null;
+        $porPosicion = null;
         $formatos = [];
+
+        if (is_array($datos['cruces_por_posicion'] ?? null)) {
+            $porPosicion = [];
+            $vistas = [];
+            foreach (array_values((array) $datos['cruces_por_posicion']) as $par) {
+                $par = array_values((array) $par);
+                $fila = [];
+                foreach ([0, 1] as $lado) {
+                    $codigo = isset($par[$lado]) && $par[$lado] !== '' ? strtoupper(trim((string) $par[$lado])) : null;
+                    if ($codigo !== null && ! self::esPosicion($codigo)) {
+                        $errores[] = "La posición «{$codigo}» no existe.";
+                    } elseif ($codigo !== null && isset($vistas[$codigo])) {
+                        $errores[] = self::etiquetaDePosicion($codigo).' está en dos cruces.';
+                    }
+                    if ($codigo !== null) {
+                        $vistas[$codigo] = true;
+                    }
+                    $fila[] = $codigo;
+                }
+                if ($fila === [null, null]) {
+                    $errores[] = 'Un cruce no puede tener los dos huecos vacíos.';
+                }
+                $porPosicion[] = [$fila[0], $fila[1]];
+            }
+        }
 
         if ($tamano !== null && ($tamano < 2 || ($tamano & ($tamano - 1)) !== 0)) {
             $errores[] = 'El tamaño del cuadro tiene que ser una potencia de 2: 2, 4, 8, 16, 32…';
@@ -53,6 +99,14 @@ final readonly class ConfiguracionDeEliminatoria
         }
         if ($regla === ReglaDeCruces::Manual && ! is_array($cruces)) {
             $errores[] = 'Con cruces manuales hay que indicar los cruces de la primera ronda.';
+        }
+        if ($regla === ReglaDeCruces::APosiciones) {
+            $cuantos = count($porPosicion ?? []);
+            if ($cuantos === 0) {
+                $errores[] = 'Con los cruces a mano hay que poner los cruces de la primera ronda.';
+            } elseif (($cuantos & ($cuantos - 1)) !== 0) {
+                $errores[] = "Los cruces de la primera ronda tienen que ser 1, 2, 4, 8… y hay {$cuantos}.";
+            }
         }
         foreach ((array) ($datos['formatos_por_ronda'] ?? []) as $ronda => $formato) {
             if (! is_numeric($ronda) || (int) $ronda < 1 || ! is_numeric($formato)) {
@@ -80,6 +134,7 @@ final readonly class ConfiguracionDeEliminatoria
             $formatos,
             $crucesManuales,
             isset($datos['semilla']) ? (int) $datos['semilla'] : null,
+            $regla === ReglaDeCruces::APosiciones ? $porPosicion : null,
         );
     }
 
@@ -95,11 +150,12 @@ final readonly class ConfiguracionDeEliminatoria
             'formatos_por_ronda' => $this->formatosPorRonda,
             'cruces_manuales' => $this->crucesManuales,
             'semilla' => $this->semilla,
+            'cruces_por_posicion' => $this->crucesPorPosicion,
         ];
     }
 
     public function conSemilla(int $semilla): self
     {
-        return new self($this->tamanoDeCuadro, $this->reglaDeCruces, $this->evitarReencuentros, $this->tercerYCuartoPuesto, $this->consolacion, $this->formatosPorRonda, $this->crucesManuales, $semilla);
+        return new self($this->tamanoDeCuadro, $this->reglaDeCruces, $this->evitarReencuentros, $this->tercerYCuartoPuesto, $this->consolacion, $this->formatosPorRonda, $this->crucesManuales, $semilla, $this->crucesPorPosicion);
     }
 }
