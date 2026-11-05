@@ -307,7 +307,7 @@ class HorariosDelTorneo extends Page
                 $filas[] = ['id' => $torneoPista->pista_id, 'nombre' => $torneoPista->pista->nombre.($torneoPista->pista->exterior ? ' · exterior' : ''), 'bloques' => $bloques];
             }
 
-            $dias[] = ['titulo' => ucfirst($desde->translatedFormat('l j \d\e F')), 'desde' => $desde->getTimestamp(), 'minutos' => $total, 'horas' => $horas, 'pistas' => $filas];
+            $dias[] = ['titulo' => ucfirst($desde->translatedFormat('l j \d\e F')), 'desde' => $desde->getTimestamp(), 'minutos' => (int) $total, 'horas' => $horas, 'pistas' => $filas];
         }
 
         return $dias;
@@ -455,7 +455,7 @@ class HorariosDelTorneo extends Page
                 $partido->forceFill(['pista_id' => $nuevo['pista'], 'aviso_siguientes_en' => null, 'aviso_calentar_en' => null])->save();
             }
 
-            RegistroDeCambio::anotar('mover_en_horario', $torneo, $usuario, $antes, array_map(fn (array $c): array => [$c['pista'], date('Y-m-d H:i', $c['inicio'])], $cambios));
+            RegistroDeCambio::anotar('mover_en_horario', $torneo, $usuario, ['partidos' => $antes], ['partidos' => array_map(fn (array $c): array => [$c['pista'], date('Y-m-d H:i', $c['inicio'])], $cambios)]);
         });
     }
 
