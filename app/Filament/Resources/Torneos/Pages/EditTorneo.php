@@ -47,6 +47,11 @@ class EditTorneo extends EditRecord
     protected function getHeaderActions(): array
     {
         return [
+            Action::make('competicion')
+                ->label('Competición')
+                ->icon(Heroicon::OutlinedTrophy)
+                ->color('gray')
+                ->url(fn (): string => CompeticionDelTorneo::getUrl(['record' => $this->torneo()])),
             Action::make('partidos')
                 ->label('Partidos')
                 ->icon(Heroicon::OutlinedTableCells)

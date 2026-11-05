@@ -64,6 +64,11 @@ class PartidosDelTorneo extends Page implements HasTable
     protected function getHeaderActions(): array
     {
         return [
+            Action::make('competicion')
+                ->label('Competición')
+                ->icon(Heroicon::OutlinedTrophy)
+                ->color('gray')
+                ->url(fn (): string => CompeticionDelTorneo::getUrl(['record' => $this->torneo()])),
             Action::make('torneo')
                 ->label('Volver al torneo')
                 ->icon(Heroicon::OutlinedArrowUturnLeft)
