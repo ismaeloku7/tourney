@@ -16,6 +16,7 @@ final readonly class ConfiguracionDeGrupos
     /**
      * @param  list<CriterioDeDesempate>  $criteriosDeDesempate
      * @param  list<list<int>>|null  $gruposManuales  Ids de participante por grupo: en modo manual, todos los grupos; en los demás, los que se fijan a mano antes de sortear el resto.
+     * @param  list<int>  $repartidos  Ids de participante que se reparten al azar entre los grupos, los menos posibles por grupo (por ejemplo, para separar a los fuertes sin numerarlos).
      */
     public function __construct(
         public ?int $numeroDeGrupos = null,
@@ -28,6 +29,7 @@ final readonly class ConfiguracionDeGrupos
         public array $criteriosDeDesempate = [CriterioDeDesempate::Puntos, CriterioDeDesempate::EnfrentamientoDirecto, CriterioDeDesempate::DiferenciaDeSets, CriterioDeDesempate::SetsGanados, CriterioDeDesempate::DiferenciaDeJuegos, CriterioDeDesempate::JuegosGanados, CriterioDeDesempate::Sorteo],
         public ReglaDeClasificados $clasificados = new ReglaDeClasificados,
         public ?array $gruposManuales = null,
+        public array $repartidos = [],
     ) {}
 
     /**
@@ -110,7 +112,9 @@ final readonly class ConfiguracionDeGrupos
             $manuales,
         ));
 
-        return new self($numero, $tamano, $modo ?? ModoDeSorteo::Aleatorio, $semilla, $partidos, $idaYVuelta, $puntuacion, $criterios, $clasificados, $gruposManuales);
+        $repartidos = array_values(array_unique(array_map(fn (mixed $id): int => (int) $id, (array) ($datos['repartidos'] ?? []))));
+
+        return new self($numero, $tamano, $modo ?? ModoDeSorteo::Aleatorio, $semilla, $partidos, $idaYVuelta, $puntuacion, $criterios, $clasificados, $gruposManuales, $repartidos);
     }
 
     /** @return array<string, mixed> */
@@ -127,6 +131,7 @@ final readonly class ConfiguracionDeGrupos
             'criterios_de_desempate' => array_map(fn (CriterioDeDesempate $c): string => $c->value, $this->criteriosDeDesempate),
             'clasificados' => $this->clasificados->toArray(),
             'grupos_manuales' => $this->gruposManuales,
+            'repartidos' => $this->repartidos,
         ];
     }
 
@@ -138,12 +143,23 @@ final readonly class ConfiguracionDeGrupos
      */
     public function conGruposManuales(?array $grupos): self
     {
-        return new self($this->numeroDeGrupos, $this->tamanoDeGrupo, $this->modoDeSorteo, $this->semilla, $this->partidosPorParticipante, $this->idaYVuelta, $this->puntuacion, $this->criteriosDeDesempate, $this->clasificados, $grupos);
+        return new self($this->numeroDeGrupos, $this->tamanoDeGrupo, $this->modoDeSorteo, $this->semilla, $this->partidosPorParticipante, $this->idaYVuelta, $this->puntuacion, $this->criteriosDeDesempate, $this->clasificados, $grupos, $this->repartidos);
     }
 
     /** Una copia con la semilla fijada (para persistir el sorteo). */
     public function conSemilla(int $semilla): self
     {
-        return new self($this->numeroDeGrupos, $this->tamanoDeGrupo, $this->modoDeSorteo, $semilla, $this->partidosPorParticipante, $this->idaYVuelta, $this->puntuacion, $this->criteriosDeDesempate, $this->clasificados, $this->gruposManuales);
+        return new self($this->numeroDeGrupos, $this->tamanoDeGrupo, $this->modoDeSorteo, $semilla, $this->partidosPorParticipante, $this->idaYVuelta, $this->puntuacion, $this->criteriosDeDesempate, $this->clasificados, $this->gruposManuales, $this->repartidos);
+    }
+
+    /**
+     * Una copia con los participantes que se reparten al azar entre los
+     * grupos.
+     *
+     * @param  list<int>  $repartidos
+     */
+    public function conRepartidos(array $repartidos): self
+    {
+        return new self($this->numeroDeGrupos, $this->tamanoDeGrupo, $this->modoDeSorteo, $this->semilla, $this->partidosPorParticipante, $this->idaYVuelta, $this->puntuacion, $this->criteriosDeDesempate, $this->clasificados, $this->gruposManuales, $repartidos);
     }
 }
