@@ -84,10 +84,6 @@ final readonly class PlanificadorContinuo
             }
         }
 
-        if ($mejor === null) {
-            return new PlanDePistas([]);
-        }
-
         return $this->plan($mejor, $base, $partidos);
     }
 
