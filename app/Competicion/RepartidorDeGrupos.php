@@ -53,6 +53,8 @@ final readonly class RepartidorDeGrupos
             $this->colocarCabezas($participantes, $tamanos, $grupos, $colocados);
         }
 
+        $this->colocarRepartidos($ids, $configuracion->repartidos, $tamanos, $grupos, $colocados, $semilla);
+
         $resto = $this->barajar(array_values(array_filter($ids, fn (int $id): bool => ! in_array($id, $colocados, true))), $semilla);
 
         foreach ($resto as $id) {
@@ -172,6 +174,46 @@ final readonly class RepartidorDeGrupos
             if (count($grupos[$i]) > $tamanos[$i]) {
                 throw new ConfiguracionInvalida(["En el grupo {$nombre} caben {$tamanos[$i]} parejas y se han fijado ".count($grupos[$i]).'.']);
             }
+        }
+    }
+
+    /**
+     * Los que se reparten al azar entre los grupos: en orden aleatorio,
+     * cada uno al grupo con hueco que menos de ellos tiene (si empatan,
+     * uno al azar). Así salen uno por grupo y, si hay más que grupos, lo
+     * más equilibrado posible. Los ya colocados (fijados o cabezas de
+     * serie) se saltan.
+     *
+     * @param  list<int>  $ids
+     * @param  list<int>  $repartidos
+     * @param  list<int>  $tamanos
+     * @param  array<int, list<int>>  $grupos
+     * @param  list<int>  $colocados
+     */
+    private function colocarRepartidos(array $ids, array $repartidos, array $tamanos, array &$grupos, array &$colocados, int $semilla): void
+    {
+        foreach ($repartidos as $id) {
+            if (! in_array($id, $ids, true)) {
+                throw new ConfiguracionInvalida(["El participante {$id} no está en esta fase (¿no está confirmado?)."]);
+            }
+        }
+
+        $lista = $this->barajar(array_values(array_filter($repartidos, fn (int $id): bool => ! in_array($id, $colocados, true))), $semilla + 1);
+        $cuantos = array_fill(0, count($tamanos), 0);
+
+        foreach ($lista as $id) {
+            $conHueco = array_keys(array_filter($tamanos, fn (int $tamano, int $i): bool => count($grupos[$i]) < $tamano, ARRAY_FILTER_USE_BOTH));
+            if ($conHueco === []) {
+                return;
+            }
+
+            $minimo = min(array_map(fn (int $i): int => $cuantos[$i], $conHueco));
+            $empatados = array_values(array_filter($conHueco, fn (int $i): bool => $cuantos[$i] === $minimo));
+            $grupo = $empatados[mt_rand(0, count($empatados) - 1)];
+
+            $grupos[$grupo][] = $id;
+            $colocados[] = $id;
+            $cuantos[$grupo]++;
         }
     }
 

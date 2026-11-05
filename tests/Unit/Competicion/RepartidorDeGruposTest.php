@@ -121,3 +121,28 @@ test('fijar más parejas de las que caben, en un grupo que no existe o dos veces
         ->and(fn () => repartir(participantes(8), ['numero_de_grupos' => 2, 'grupos_manuales' => [[1], [1]]]))->toThrow(ParticipanteDuplicado::class)
         ->and(fn () => repartir(participantes(8), ['numero_de_grupos' => 2, 'grupos_manuales' => [[99]]]))->toThrow(ConfiguracionInvalida::class, 'no está');
 });
+
+test('las parejas a repartir caen una por grupo y, si hay más que grupos, equilibradas', function () {
+    $porGrupo = fn ($reparto, array $ids): array => array_map(fn (Grupo $g): int => count(array_intersect($g->participantes, $ids)), $reparto->grupos);
+
+    expect($porGrupo(repartir(participantes(12), ['numero_de_grupos' => 3, 'repartidos' => [10, 11, 12]]), [10, 11, 12]))->toBe([1, 1, 1])
+        ->and($porGrupo(repartir(participantes(12), ['numero_de_grupos' => 3, 'repartidos' => [1, 2, 3, 4, 5, 6]]), [1, 2, 3, 4, 5, 6]))->toBe([2, 2, 2]);
+
+    // Con cabezas de serie: una cabeza y una repartida en cada grupo.
+    $reparto = repartir(participantes(12, 3), ['numero_de_grupos' => 3, 'modo_de_sorteo' => 'cabezas_de_serie', 'repartidos' => [4, 5, 6]]);
+    expect($porGrupo($reparto, [1, 2, 3]))->toBe([1, 1, 1])
+        ->and($porGrupo($reparto, [4, 5, 6]))->toBe([1, 1, 1])
+        ->and(array_merge(...array_map(fn (Grupo $g): array => $g->participantes, $reparto->grupos)))->toEqualCanonicalizing(range(1, 12));
+});
+
+test('a qué grupo cae cada repartida lo decide el azar, y con la misma semilla se repite', function () {
+    $grupoDe10 = fn (int $semilla): string => collect(repartir(participantes(12), ['numero_de_grupos' => 3, 'repartidos' => [10, 11, 12], 'semilla' => $semilla])->grupos)
+        ->first(fn (Grupo $g): bool => in_array(10, $g->participantes, true))->nombre;
+
+    expect($grupoDe10(5))->toBe($grupoDe10(5))
+        ->and(collect(range(1, 20))->map($grupoDe10)->unique()->count())->toBeGreaterThan(1);
+});
+
+test('una pareja a repartir que no está en la fase lanza', function () {
+    expect(fn () => repartir(participantes(8), ['numero_de_grupos' => 2, 'repartidos' => [99]]))->toThrow(ConfiguracionInvalida::class, 'no está');
+});

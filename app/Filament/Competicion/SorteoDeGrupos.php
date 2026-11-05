@@ -145,6 +145,7 @@ final class SorteoDeGrupos
             foreach ($configuracion->gruposManuales ?? [] as $i => $ids) {
                 $datos["grupo_{$i}"] = array_map(fn (int $id): string => (string) $id, $ids);
             }
+            $datos['repartidos'] = array_map(fn (int $id): string => (string) $id, $configuracion->repartidos);
         }
 
         return $datos;
@@ -172,6 +173,11 @@ final class SorteoDeGrupos
                 ->visible(fn (Get $get): bool => $get('modo') === ModoDeSorteo::CabezasDeSerie->value)
                 ->helperText('La primera que elijas es la 1, la segunda la 2… Cada una encabeza un grupo y se reparten en serpiente; también cuentan para el cuadro.');
         }
+
+        $campos[] = Select::make('repartidos')->label('Repartir al azar entre los grupos')
+            ->multiple()->searchable()->optionsLimit(1000)->options($opciones)
+            ->placeholder('Ninguna')
+            ->helperText('Estas parejas caen en grupos al azar, una por grupo (si hay más que grupos, lo más repartidas posible). Por ejemplo, para separar a las más fuertes sin numerarlas.');
 
         $campos[] = Actions::make([
             Action::make('huecos')->label('Sortear los huecos')->icon(Heroicon::OutlinedSparkles)
@@ -249,7 +255,7 @@ final class SorteoDeGrupos
         $modo = ModoDeSorteo::tryFrom((string) $get('modo')) ?? $fase->configuracionDeGrupos()->modoDeSorteo;
 
         try {
-            $reparto = self::repartir($fase, $fijos, $modo, $modo === ModoDeSorteo::CabezasDeSerie ? self::ids($get('cabezas')) : []);
+            $reparto = self::repartir($fase, $fijos, $modo, $modo === ModoDeSorteo::CabezasDeSerie ? self::ids($get('cabezas')) : [], self::ids($get('repartidos')));
         } catch (ErrorDeCompeticion $e) {
             Avisos::error('No se han podido sortear los huecos', [$e->getMessage()]);
 
@@ -259,21 +265,25 @@ final class SorteoDeGrupos
         for ($i = 0; $i < $total; $i++) {
             $set("grupo_{$i}", array_map(fn (int $id): string => (string) $id, $reparto->grupos[$i]->participantes ?? []));
         }
+        // Ya están en sus grupos: a partir de aquí se retocan a mano.
+        $set('repartidos', []);
 
         Avisos::hecho('Huecos sorteados', 'Revisa y cambia lo que quieras: no se guarda hasta pulsar «Guardar».');
     }
 
     /**
      * Un sorteo de lo que falta por colocar entre las confirmadas (y las
-     * pendientes ya elegidas), respetando lo fijado y, con cabezas de
-     * serie, su orden.
+     * pendientes ya elegidas), respetando lo fijado, con cabezas de serie
+     * su orden, y repartiendo al azar entre los grupos las elegidas para
+     * ello.
      *
      * @param  list<list<int>>  $fijos
      * @param  list<int>  $cabezas
+     * @param  list<int>  $repartidos
      */
-    private static function repartir(Fase $fase, array $fijos, ModoDeSorteo $modo, array $cabezas): RepartoDeGrupos
+    private static function repartir(Fase $fase, array $fijos, ModoDeSorteo $modo, array $cabezas, array $repartidos = []): RepartoDeGrupos
     {
-        $elegidas = [...array_merge(...$fijos), ...$cabezas];
+        $elegidas = [...array_merge(...$fijos), ...$cabezas, ...$repartidos];
 
         $participantes = array_values(self::parejas($fase)
             ->filter(fn (Participante $p): bool => $p->inscripcion?->estado === EstadoInscripcion::Confirmada || in_array($p->id, $elegidas, true))
@@ -290,6 +300,7 @@ final class SorteoDeGrupos
             'modo_de_sorteo' => ($modo === ModoDeSorteo::Manual ? ModoDeSorteo::Aleatorio : $modo)->value,
             'semilla' => null,
             'grupos_manuales' => $fijos,
+            'repartidos' => $repartidos,
         ]));
     }
 
@@ -328,9 +339,10 @@ final class SorteoDeGrupos
         }
 
         $cabezas = $modo === ModoDeSorteo::CabezasDeSerie ? self::ids($data['cabezas'] ?? []) : null;
+        $repartidos = self::ids($data['repartidos'] ?? []);
 
-        // Las pendientes que se ponen en un grupo o como cabeza de serie entran: se confirman.
-        $elegidas = array_unique([...array_keys($vistos), ...($cabezas ?? [])]);
+        // Las pendientes que se ponen en un grupo, como cabeza de serie o para repartir entran: se confirman.
+        $elegidas = array_unique([...array_keys($vistos), ...($cabezas ?? []), ...$repartidos]);
         foreach (Inscripcion::query()->whereIn('participante_id', $elegidas)->where('estado', EstadoInscripcion::Pendiente->value)->get() as $inscripcion) {
             app(CambiarEstadoDeInscripcion::class)->handle($inscripcion, EstadoInscripcion::Confirmada, $usuario, avisar: false);
         }
@@ -351,7 +363,7 @@ final class SorteoDeGrupos
 
         // Sin grupos todavía y con huecos: el sorteo de siempre (con su semilla).
         if ($faltan !== [] && $modo !== ModoDeSorteo::Manual && $fase->grupos()->doesntExist()) {
-            $reparto = app(SortearGrupos::class)->handle($fase->refresh(), $usuario, fijos: $fijos);
+            $reparto = app(SortearGrupos::class)->handle($fase->refresh(), $usuario, fijos: $fijos, repartidos: $repartidos);
             $partidos = app(GenerarPartidos::class)->handle($fase->refresh(), $usuario);
 
             return [count($reparto->grupos).' grupos y '.$partidos.' partidos', $reparto->avisos === [] ? null : implode(' ', $reparto->avisos)];
@@ -359,7 +371,7 @@ final class SorteoDeGrupos
 
         // Con grupos ya hechos, los huecos se sortean y solo se rehacen los grupos que cambian.
         if ($faltan !== [] && $modo !== ModoDeSorteo::Manual) {
-            $fijos = array_map(fn (Grupo $g): array => $g->participantes, self::repartir($fase->refresh(), $fijos, $modo, $cabezas ?? [])->grupos);
+            $fijos = array_map(fn (Grupo $g): array => $g->participantes, self::repartir($fase->refresh(), $fijos, $modo, $cabezas ?? [], $repartidos)->grupos);
         }
 
         $resultado = app(EditarGrupos::class)->handle($fase->refresh(), $fijos, $usuario);

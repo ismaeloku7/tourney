@@ -381,3 +381,17 @@ test('con grupos hechos, una pareja confirmada después entra en un hueco sin re
         // Los partidos de los otros dos grupos siguen siendo los mismos.
         ->and($this->grupos->partidos()->where('grupo_id', '!=', $suyo->id)->pluck('id')->diff($partidosAntes)->all())->toBe([]);
 });
+
+test('en el sorteo se eligen parejas que se reparten al azar, una por grupo', function () {
+    $ids = $this->categoria->participantes()->orderBy('id')->pluck('id')->all();
+    $repartidas = array_slice($ids, 9, 3);
+
+    fasesDe($this->categoria)
+        ->callAction(TestAction::make('sortear')->table($this->grupos), ['repartidos' => array_map('strval', $repartidas)])
+        ->assertHasNoActionErrors()
+        ->assertNotified('3 grupos y 18 partidos');
+
+    $grupos = $this->grupos->refresh()->grupos()->with('participantes')->get();
+    expect($grupos->map(fn ($g): int => count(array_intersect($g->participantes->pluck('id')->all(), $repartidas)))->all())->toBe([1, 1, 1])
+        ->and($this->grupos->configuracionDeGrupos()->repartidos)->toBe($repartidas);
+});
