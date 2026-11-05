@@ -29,9 +29,53 @@
         .hor-leyenda { display: flex; gap: 1rem; font-size: .75rem; color: #8a939b; flex-wrap: wrap; }
         .hor-leyenda i { display: inline-block; width: 1.25rem; height: .75rem; border-radius: .2rem; vertical-align: middle; margin-right: .25rem; }
         .hor-vacio { font-size: .875rem; color: #8a939b; }
+        .hor-directo { width: 100%; font-size: .8125rem; border-collapse: collapse; }
+        .hor-directo th { text-align: left; color: #8a939b; font-weight: 600; padding: .25rem .5rem; border-bottom: 1px solid #e6e8eb; }
+        .hor-directo td { padding: .4rem .5rem; border-bottom: 1px solid #f3f4f6; }
+        .hor-suave { color: #8a939b; }
+        .hor-tarde { color: #d9480f; font-weight: 700; }
+        .hor-bien { color: #2f9e44; }
     </style>
 
     <div class="hor">
+        @if ($directo !== null)
+            <div class="hor-dia">
+                <h3>En directo</h3>
+                @if ($sugerencia !== null)
+                    <div class="hor-aviso" style="margin-bottom: .75rem">
+                        <strong>{{ $sugerencia['texto'] }}</strong>
+                        {{ $sugerencia['ganancia'] }}
+                        <div style="margin-top: .5rem; display: flex; gap: .5rem">
+                            <x-filament::button size="sm" color="success" wire:click="aplicarSugerencia('{{ $sugerencia['clave'] }}')" wire:confirm="Se cambia el partido de pista y se avisa a sus parejas y a las que cambian de hora. ¿Seguimos?">Aplicar y avisar</x-filament::button>
+                            <x-filament::button size="sm" color="gray" wire:click="ignorarSugerencia('{{ $sugerencia['clave'] }}')">Ignorar</x-filament::button>
+                        </div>
+                    </div>
+                @endif
+                <table class="hor-directo">
+                    <thead><tr><th>Pista</th><th>Va</th><th>En pista</th><th>Siguiente</th><th>Quedan</th></tr></thead>
+                    <tbody>
+                        @foreach ($directo as $fila)
+                            <tr>
+                                <td><strong>{{ $fila['pista'] }}</strong></td>
+                                <td>
+                                    @if ($fila['retraso'] === null) <span class="hor-suave">—</span>
+                                    @elseif ($fila['retraso'] >= $retrasoMinimo) <span class="hor-tarde">{{ $fila['retraso'] }} min tarde</span>
+                                    @elseif ($fila['retraso'] > 0) {{ $fila['retraso'] }} min tarde
+                                    @elseif ($fila['retraso'] < 0) <span class="hor-bien">{{ -$fila['retraso'] }} min antes</span>
+                                    @else <span class="hor-bien">en hora</span>
+                                    @endif
+                                </td>
+                                <td>{{ $fila['enPista'] ?? '—' }}</td>
+                                <td>{!! $fila['siguiente'] !== null ? e($fila['siguiente']).' <span class="hor-suave">hacia las '.e($fila['hora']).'</span>' : '—' !!}</td>
+                                <td>{{ $fila['quedan'] }}</td>
+                            </tr>
+                        @endforeach
+                    </tbody>
+                </table>
+                <p class="hor-suave" style="margin-top: .5rem">Tras cada resultado se recalculan las horas de lo que falta y se avisa a la pista: «a calentar» a la siguiente pareja y «sois los siguientes» a la de después.</p>
+            </div>
+        @endif
+
         @if ($esPropuesta)
             <div class="hor-aviso">
                 <strong>Plan propuesto, todavía sin guardar.</strong>

@@ -225,7 +225,7 @@ class PortalDelJugador extends Component
     /**
      * Lo que el portal enseña de un partido y lo que el jugador puede hacer.
      *
-     * @return array{id: int, torneo: string, categoria: string, texto: string, local: string, visitante: string, resultado: string, hora: string|null, estado: EstadoPartido, puedeAnotar: bool, puedeValidar: bool}
+     * @return array{id: int, torneo: string, categoria: string, texto: string, local: string, visitante: string, resultado: string, hora: string|null, anterior: string|null, estado: EstadoPartido, puedeAnotar: bool, puedeValidar: bool}
      */
     private function filaDePartido(Partido $p, Jugador $yo): array
     {
@@ -247,12 +247,45 @@ class PortalDelJugador extends Component
             'visitante' => $visitante,
             'resultado' => $datos['resultado'] !== '' ? $datos['resultado'] : ($p->estado === EstadoPartido::PendienteValidacion ? Marcador::resultado($p).' (sin validar)' : ''),
             'hora' => $datos['hora'],
+            'anterior' => $datos['hora'] !== null ? $this->anteriorEnLaPista($p) : null,
             'estado' => $p->estado,
             'puedeAnotar' => $torneo->resultados_por_jugadores !== ResultadosPorJugadores::Desactivado
                 && in_array($p->estado, [EstadoPartido::Pendiente, EstadoPartido::Programado, EstadoPartido::EnJuego], true)
                 && $p->local_id !== null && $p->visitante_id !== null,
             'puedeValidar' => $p->estado === EstadoPartido::PendienteValidacion && $registrador !== null && $miLadoEsLocal !== $ladoDelRegistradorEsLocal,
         ];
+    }
+
+    /**
+     * «Después de García / López – Ruiz / Sanz»: el partido que se juega
+     * antes en su pista, mientras no haya acabado. Los jugadores tienen
+     * que estar pendientes de que termine.
+     */
+    private function anteriorEnLaPista(Partido $p): ?string
+    {
+        if ($p->pista_id === null || $p->franja === null || ! in_array($p->estado, [EstadoPartido::Pendiente, EstadoPartido::Programado], true)) {
+            return null;
+        }
+
+        $inicio = $p->franja->inicio;
+        $anterior = Partido::query()
+            ->where('pista_id', $p->pista_id)
+            ->whereKeyNot($p->id)
+            ->whereIn('estado', [EstadoPartido::Pendiente->value, EstadoPartido::Programado->value, EstadoPartido::EnJuego->value])
+            ->whereHas('franja', fn (Builder $q) => $q->where('inicio', '<', $inicio)->whereDate('inicio', $inicio->toDateString()))
+            ->with(['local', 'visitante', 'fase.categoria.torneo'])
+            ->join('franjas', 'franjas.id', '=', 'partidos.franja_id')
+            ->orderByDesc('franjas.inicio')
+            ->select('partidos.*')
+            ->first();
+
+        if ($anterior === null) {
+            return 'Primer partido de la pista';
+        }
+
+        $torneo = $anterior->fase->categoria->torneo;
+
+        return 'Después de '.(NombrePublico::participante($anterior->local, $torneo) ?? Marcador::lado($anterior, true)).' – '.(NombrePublico::participante($anterior->visitante, $torneo) ?? Marcador::lado($anterior, false));
     }
 
     /** @return Builder<Partido> */

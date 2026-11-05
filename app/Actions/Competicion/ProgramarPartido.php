@@ -65,7 +65,7 @@ final class ProgramarPartido
                 throw new OperacionNoPermitida('La pista está ocupada de '.$choca->inicio->format('H:i').' a '.$choca->fin->format('H:i').' por '.$que.'.');
             }
 
-            $datos = ['torneo_id' => $torneo->id, 'pista_id' => $pista, 'inicio' => $desde, 'fin' => $hasta, 'bloqueada' => false];
+            $datos = ['torneo_id' => $torneo->id, 'pista_id' => $pista, 'inicio' => $desde, 'fin' => $hasta, 'inicio_previsto' => $desde, 'bloqueada' => false];
             $franja = $franjaAnterior !== null ? Franja::query()->find($franjaAnterior) : null;
             if ($franja !== null) {
                 $franja->update($datos);

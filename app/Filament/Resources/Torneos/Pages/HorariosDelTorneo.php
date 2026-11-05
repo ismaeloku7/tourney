@@ -2,9 +2,11 @@
 
 namespace App\Filament\Resources\Torneos\Pages;
 
+use App\Actions\Competicion\HorasEnDirecto;
 use App\Actions\Competicion\PlanificarHorarios;
 use App\Competicion\Datos\DisponibilidadDePista;
 use App\Competicion\Datos\PropuestaDeHorarios;
+use App\Competicion\Datos\SugerenciaDeRecolocacion;
 use App\Competicion\Errores\ConfiguracionInvalida;
 use App\Competicion\Errores\ErrorDeCompeticion;
 use App\Filament\Avisos;
@@ -12,6 +14,7 @@ use App\Filament\Competicion\Marcador;
 use App\Filament\Resources\Torneos\TorneoResource;
 use App\Models\Franja;
 use App\Models\Partido;
+use App\Models\Pista;
 use App\Models\Torneo;
 use App\Models\TorneoPista;
 use App\Models\User;
@@ -47,6 +50,13 @@ class HorariosDelTorneo extends Page
      * @var array<string, mixed>|null
      */
     public ?array $propuesta = null;
+
+    /**
+     * Las sugerencias de recolocación que se han ignorado en esta visita.
+     *
+     * @var list<string>
+     */
+    public array $ignoradas = [];
 
     /** Colores de las categorías en la línea de tiempo, por su orden. */
     private const COLORES = ['#3a8ee0', '#f26b3a', '#2fb380', '#9b6bd6', '#f5b62f', '#e0547a', '#3bb3c4', '#6d7a84'];
@@ -95,6 +105,15 @@ class HorariosDelTorneo extends Page
                     } else {
                         Avisos::hecho('Plan calculado: revísalo y aplícalo', "{$colocados} partidos colocados".($plan->conflictos !== [] ? ', '.count($plan->conflictos).' sin sitio' : '').'.');
                     }
+                }),
+            Action::make('recalcular')
+                ->label('Recalcular horas')
+                ->icon(Heroicon::OutlinedArrowPath)
+                ->color('gray')
+                ->visible(fn (): bool => $this->propuesta === null && HorasEnDirecto::activo($this->torneo()) && Gate::allows('update', $this->torneo()))
+                ->action(function (): void {
+                    $cambios = app(HorasEnDirecto::class)->recalcular($this->torneo());
+                    Avisos::hecho($cambios === [] ? 'Las horas ya estaban al día' : count($cambios).' partidos con nueva hora estimada');
                 }),
             Action::make('aplicar')
                 ->label('Aplicar')
@@ -157,7 +176,13 @@ class HorariosDelTorneo extends Page
     {
         $propuesta = $this->propuesta !== null ? PropuestaDeHorarios::desdeArray($this->propuesta) : null;
 
+        $directo = $propuesta === null && HorasEnDirecto::activo($this->torneo());
+        $sugerencia = $directo ? app(HorasEnDirecto::class)->sugerencia($this->torneo()) : null;
+
         return [
+            'directo' => $directo ? app(HorasEnDirecto::class)->estado($this->torneo()) : null,
+            'sugerencia' => $sugerencia !== null && ! in_array($sugerencia->clave(), $this->ignoradas, true) ? $this->describir($sugerencia) : null,
+            'retrasoMinimo' => HorasEnDirecto::RETRASO_MINUTOS,
             'esPropuesta' => $propuesta !== null,
             'resumen' => $propuesta !== null ? self::resumen($propuesta) : null,
             'dias' => $this->dias($propuesta),
@@ -273,6 +298,42 @@ class HorariosDelTorneo extends Page
         }
 
         return $dias;
+    }
+
+    public function aplicarSugerencia(string $clave): void
+    {
+        abort_unless(Gate::allows('update', $this->torneo()), 403);
+
+        try {
+            app(HorasEnDirecto::class)->aplicar($this->torneo(), $clave, $this->usuario());
+        } catch (ErrorDeCompeticion $e) {
+            Avisos::error('No se ha recolocado', [$e->getMessage()]);
+
+            return;
+        }
+
+        Avisos::hecho('Partido recolocado', 'Se ha avisado a sus parejas y a las que cambian de hora.');
+    }
+
+    public function ignorarSugerencia(string $clave): void
+    {
+        $this->ignoradas[] = $clave;
+    }
+
+    /** @return array{clave: string, texto: string, ganancia: string} */
+    private function describir(SugerenciaDeRecolocacion $sugerencia): array
+    {
+        $partido = Partido::query()->with(['local', 'visitante', 'franja', 'fase.categoria'])->find($sugerencia->partido);
+        $pistas = Pista::query()->whereIn('id', [$sugerencia->desdePista, $sugerencia->haciaPista])->pluck('nombre', 'id');
+        $quien = $partido !== null ? Marcador::lado($partido, true).' – '.Marcador::lado($partido, false).' ('.$partido->fase->categoria->nombre.')' : 'P'.$sugerencia->partido;
+
+        return [
+            'clave' => $sugerencia->clave(),
+            'texto' => $pistas->get($sugerencia->desdePista).' va '.$sugerencia->retrasoDeLaPista.' min tarde. Propuesta: pasar '.$quien
+                .($partido?->franja !== null ? ' (ahora hacia las '.$partido->franja->inicio->format('H:i').')' : '')
+                .' a '.$pistas->get($sugerencia->haciaPista).' hacia las '.now()->setTimestamp($sugerencia->inicio)->format('H:i').'.',
+            'ganancia' => 'Ahorra '.$sugerencia->ganaRetraso.' min de espera entre todas las parejas'.($sugerencia->ganaFinal > 0 ? ' y adelanta el final '.$sugerencia->ganaFinal.' min' : '').'.',
+        ];
     }
 
     /** @return list<string> */

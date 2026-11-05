@@ -162,6 +162,7 @@ final class PlanificarHorarios
                     'pista_id' => $colocado->pista,
                     'inicio' => $colocado->inicio,
                     'fin' => $colocado->fin,
+                    'inicio_previsto' => $colocado->inicio,
                     'bloqueada' => false,
                 ]);
 
@@ -169,6 +170,8 @@ final class PlanificarHorarios
                     'franja_id' => $franja->id,
                     'pista_id' => $colocado->pista,
                     'estado' => EstadoPartido::Programado->value,
+                    'aviso_siguientes_en' => null,
+                    'aviso_calentar_en' => null,
                 ]);
             }
 
