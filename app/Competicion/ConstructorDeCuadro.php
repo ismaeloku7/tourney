@@ -45,7 +45,9 @@ final readonly class ConstructorDeCuadro
             throw new ParticipanteDuplicado((int) current(array_diff_assoc($ids, array_unique($ids))));
         }
 
-        $tamano = $configuracion->tamanoDeCuadro ?? self::potenciaDeDos($n);
+        $tamano = $configuracion->reglaDeCruces === ReglaDeCruces::APosiciones
+            ? 2 * count($configuracion->crucesPorPosicion ?? [])
+            : $configuracion->tamanoDeCuadro ?? self::potenciaDeDos($n);
 
         if ($tamano < $n) {
             throw new CuadroDemasiadoPequeno($tamano, $n);
@@ -56,6 +58,7 @@ final readonly class ConstructorDeCuadro
 
         $huecos = match ($configuracion->reglaDeCruces) {
             ReglaDeCruces::Manual => $this->huecosManuales($clasificados, $tamano, $configuracion),
+            ReglaDeCruces::APosiciones => $this->huecosPorPosicion($clasificados, $configuracion),
             ReglaDeCruces::Sorteo => $this->huecosPorSorteo($clasificados, $tamano, $configuracion),
             ReglaDeCruces::EntreGrupos => $this->huecosEntreGrupos($clasificados, $tamano, $configuracion, $avisos),
         };
@@ -253,6 +256,51 @@ final readonly class ConstructorDeCuadro
         $faltan = array_diff($ids, $vistos);
         if ($faltan !== []) {
             throw new ConfiguracionInvalida(['Faltan en los cruces los participantes '.implode(', ', $faltan).'.']);
+        }
+
+        return $huecos;
+    }
+
+    /**
+     * Los cruces que el organizador dejó puestos por posiciones («1º A
+     * contra 2º C»), con quien haya quedado en cada una. Los mejores de una
+     * posición («M1», «M2»…) van por su orden entre ellos.
+     *
+     * @param  list<Clasificado>  $clasificados
+     * @return list<int|null>
+     */
+    private function huecosPorPosicion(array $clasificados, ConfiguracionDeEliminatoria $configuracion): array
+    {
+        $porCodigo = [];
+        $mejores = 0;
+        foreach ($clasificados as $clasificado) {
+            if (str_starts_with($clasificado->origen, 'mejor ')) {
+                $porCodigo['M'.(++$mejores)] = $clasificado;
+            } elseif (preg_match('/^(\d+)º (.+)$/u', $clasificado->origen, $partes) === 1) {
+                $porCodigo[$partes[1].strtoupper($partes[2])] = $clasificado;
+            }
+        }
+
+        $huecos = [];
+        $colocados = [];
+        foreach ($configuracion->crucesPorPosicion ?? [] as $par) {
+            foreach ($par as $codigo) {
+                if ($codigo === null) {
+                    $huecos[] = null;
+
+                    continue;
+                }
+                if (! isset($porCodigo[$codigo])) {
+                    throw new ConfiguracionInvalida([ConfiguracionDeEliminatoria::etiquetaDePosicion($codigo).' no pasa al cuadro: revise los cruces o cuántos pasan por grupo.']);
+                }
+                $huecos[] = $porCodigo[$codigo]->participante;
+                $colocados[] = $porCodigo[$codigo]->participante;
+            }
+        }
+
+        $sinCruce = array_filter($clasificados, fn (Clasificado $c): bool => ! in_array($c->participante, $colocados, true));
+        if ($sinCruce !== []) {
+            throw new ConfiguracionInvalida(['Pasan al cuadro y no tienen cruce: '.implode(', ', array_map(fn (Clasificado $c): string => $c->origen, $sinCruce)).'.']);
         }
 
         return $huecos;
