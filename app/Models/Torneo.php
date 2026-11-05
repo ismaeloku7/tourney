@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Enums\EstadoTorneo;
+use App\Enums\ModoDeHorario;
 use App\Enums\ResultadosPorJugadores;
 use App\Models\Concerns\VaALaPapelera;
 use App\Tenancy\EnLaBaseDelOrganizador;
@@ -43,6 +44,9 @@ use Illuminate\Database\Eloquent\Relations\HasManyThrough;
  * @property string|null $contacto
  * @property int $descanso_minimo_minutos
  * @property int $margen_entre_partidos_minutos
+ * @property ModoDeHorario $modo_horario
+ * @property int $calentamiento_primero
+ * @property int $calentamiento_resto
  * @property array<string, mixed>|null $campos_extra
  * @property CarbonInterface|null $publicado_en
  * @property CarbonInterface|null $horarios_publicados_en
@@ -50,7 +54,7 @@ use Illuminate\Database\Eloquent\Relations\HasManyThrough;
  * @property CarbonInterface|null $archivado_en
  * @property int|null $creado_por
  */
-#[Fillable(['nombre', 'slug', 'deporte', 'sede_id', 'direccion', 'fecha_inicio', 'fecha_fin', 'inscripcion_desde', 'inscripcion_hasta', 'inscripcion_online', 'web_inscritos', 'web_horarios', 'estado', 'listado_en_plataforma', 'resultados_por_jugadores', 'minutos_para_validar', 'privacidad_alias', 'cartel_path', 'normativa', 'contacto', 'descanso_minimo_minutos', 'margen_entre_partidos_minutos', 'campos_extra', 'publicado_en', 'horarios_publicados_en', 'finalizado_en', 'archivado_en', 'creado_por'])]
+#[Fillable(['nombre', 'slug', 'deporte', 'sede_id', 'direccion', 'fecha_inicio', 'fecha_fin', 'inscripcion_desde', 'inscripcion_hasta', 'inscripcion_online', 'web_inscritos', 'web_horarios', 'estado', 'listado_en_plataforma', 'resultados_por_jugadores', 'minutos_para_validar', 'privacidad_alias', 'cartel_path', 'normativa', 'contacto', 'descanso_minimo_minutos', 'margen_entre_partidos_minutos', 'modo_horario', 'calentamiento_primero', 'calentamiento_resto', 'campos_extra', 'publicado_en', 'horarios_publicados_en', 'finalizado_en', 'archivado_en', 'creado_por'])]
 class Torneo extends Model
 {
     /** @use HasFactory<TorneoFactory> */
@@ -76,12 +80,21 @@ class Torneo extends Model
             'privacidad_alias' => 'boolean',
             'descanso_minimo_minutos' => 'integer',
             'margen_entre_partidos_minutos' => 'integer',
+            'modo_horario' => ModoDeHorario::class,
+            'calentamiento_primero' => 'integer',
+            'calentamiento_resto' => 'integer',
             'campos_extra' => 'array',
             'publicado_en' => 'datetime',
             'horarios_publicados_en' => 'datetime',
             'finalizado_en' => 'datetime',
             'archivado_en' => 'datetime',
         ];
+    }
+
+    /** Los partidos van uno detrás de otro por pista, con hora estimada. */
+    public function encadenado(): bool
+    {
+        return $this->modo_horario === ModoDeHorario::Encadenado;
     }
 
     /** @return BelongsTo<Sede, $this> */

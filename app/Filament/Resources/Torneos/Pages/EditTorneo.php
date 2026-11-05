@@ -4,6 +4,7 @@ namespace App\Filament\Resources\Torneos\Pages;
 
 use App\Actions\Avisos\EnviarComunicacion;
 use App\Actions\Competicion\CambiarEstadoDelTorneo;
+use App\Actions\Competicion\EncadenarPartidos;
 use App\Actions\Competicion\GenerarFranjas;
 use App\Actions\Competicion\PlanificarHorarios;
 use App\Actions\Inscripciones\ImportarParejas;
@@ -71,6 +72,7 @@ class EditTorneo extends EditRecord
 
                     $colocados = count($planificacion->asignaciones);
                     $conflictos = $planificacion->conflictos;
+                    app(EncadenarPartidos::class)->handle($torneo->refresh(), $this->usuario());
 
                     if ($conflictos === []) {
                         Avisos::hecho($colocados === 0 ? 'No había partidos que colocar' : "{$colocados} partidos con hora y pista", $franjas > 0 ? "Se han creado {$franjas} franjas nuevas." : null);

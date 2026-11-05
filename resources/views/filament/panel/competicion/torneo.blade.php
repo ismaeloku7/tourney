@@ -86,12 +86,15 @@
                                                 <span class="font-medium">{{ Marcador::lado($p, true) }} – {{ Marcador::lado($p, false) }}</span>
                                                 <span class="block text-xs text-gray-500 dark:text-gray-400">
                                                     @if ($p->jornada) Jornada {{ $p->jornada }} @endif
-                                                    @if ($p->franja) · {{ $p->franja->inicio->translatedFormat('D j/n H:i') }}@if ($p->pista) · {{ $p->pista->nombre }}@endif @endif
+                                                    @if ($torneo->encadenado() && $p->inicio_estimado) · ~{{ $p->inicio_estimado->translatedFormat('D j/n H:i') }}@if ($p->pista) · {{ $p->pista->nombre }}@endif @if ($p->orden_en_pista) ({{ $p->orden_en_pista }}º) @endif
+                                                    @elseif ($p->franja) · {{ $p->franja->inicio->translatedFormat('D j/n H:i') }}@if ($p->pista) · {{ $p->pista->nombre }}@endif @endif
                                                 </span>
                                             </div>
                                             <div class="flex items-center gap-3">
                                                 @if ($p->cerrado() || $p->estado === EstadoPartido::PendienteValidacion)
                                                     <span class="tabular-nums font-medium">{{ Marcador::resultado($p) }}</span>
+                                                @elseif ($p->estado === EstadoPartido::EnJuego && \App\Actions\Competicion\AnotarMarcador::texto($p) !== '')
+                                                    <span class="tabular-nums font-medium text-primary-600">va {{ \App\Actions\Competicion\AnotarMarcador::texto($p) }}</span>
                                                 @endif
                                                 <x-filament::badge :color="$p->estado->color()" size="sm">{{ $p->estado->etiqueta() }}</x-filament::badge>
                                                 {{ ($this->resultadoAction)(['partido' => $p->id]) }}

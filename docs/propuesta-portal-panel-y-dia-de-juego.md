@@ -252,16 +252,30 @@ más valor da y menos decisiones pendientes tiene.
 | 3 | Portal del jugador: layout nuevo, Inicio y Mi torneo | Nada | Medio | Hecho |
 | 4 | Portal del jugador: Partidos, Avisos y Mis datos; redirecciones; retirar `PortalDelJugador` | 3 | Pequeño | Hecho, dentro del 3 |
 | 5 | Panel de inicio «Hoy» y línea de estado del torneo | 2 | Pequeño | El inicio del panel ya tenía «Partidos del día» y «Por revisar»; se le añade el salto a «Competición». La línea de estado queda como está (el botón «Estado» de la ficha, con pasar y volver) |
-| 6 | Motor: `Encadenador` y `EstimadorDeHorario` con sus pruebas | Decidir `modo_horario` y calentamientos | Medio | Pendiente |
-| 7 | Partidos encadenados: modelo, acciones, mesa por pista con marcador en vivo, columna de pistas en «Competición», ficha pública y portal | 6 | Grande | Pendiente |
-| 8 | WhatsApp: canal, plantillas, consentimiento, envíos y preferencia del jugador | Cuenta de Meta Business y número | Medio | Pendiente |
+| 6 | Motor: `Encadenador` y `EstimadorDeHorario` con sus pruebas | Decidir `modo_horario` y calentamientos | Medio | Hecho. No hay `Encadenador` aparte: `EncadenarPartidos` convierte la planificación por franjas en colas por pista (el orden es el de la hora de cada franja) y `EstimadorDeHorario` pone las horas |
+| 7 | Partidos encadenados: modelo, acciones, mesa por pista con marcador en vivo, columna de pistas en «Competición», ficha pública y portal | 6 | Grande | Hecho en su mayor parte: `modo_horario` y calentamientos por torneo, `EmpezarPartido`, `AnotarMarcador`, reestimación al empezar y al cerrar, avisos a la pareja siguiente (al empezar, en el último set y al acabar), marcador en la mesa y en el portal (si el torneo deja a los jugadores), hora estimada con «~» en la web, el tablero, el portal y la página «Competición». Queda la columna de pistas en «Competición» y reordenar la cola a mano |
+| 8 | WhatsApp: canal, plantillas, consentimiento, envíos y preferencia del jugador | Cuenta de Meta Business y número | Medio | Pendiente. Mientras tanto, la mesa tiene un botón «Avisar por WhatsApp» por jugador (enlace `wa.me` con el mensaje escrito) que abre WhatsApp en el móvil de la mesa: sin número nuevo ni cuenta de Meta |
 
 Lo que no entra, para no crecer sin tope: pasarela de pago, cuentas de
 jugador globales entre organizadores, WebSockets (el tablero y la mesa
 siguen con polling de Livewire cada pocos segundos, que basta para un
 marcador en vivo).
 
-## 5. Qué hay que decidir antes de empezar
+## 5. Decisiones tomadas
+
+- `modo_horario` por torneo, con `fijo` por defecto.
+- Calentamientos configurables por torneo: 15 minutos antes del primer
+  partido de una pareja y 5 cuando las dos ya han jugado.
+- El marcador en vivo lo lleva la mesa y, si el torneo deja resultados a
+  los jugadores, también un jugador del partido. El resultado final lo
+  anotan y validan los jugadores como hasta ahora: «Terminar» abre el
+  formulario con los sets del marcador ya puestos.
+- Dos avisos a la pareja siguiente (al empezar el partido anterior y
+  cuando entra en el último set) y un tercero al acabar («os toca»).
+- WhatsApp: pendiente de número y de cuenta de Meta. Hasta entonces,
+  push, correo y el botón manual de la mesa.
+
+## 6. Qué quedaba por decidir (ya decidido arriba)
 
 - [ ] `modo_horario` por torneo o encadenado siempre que haya mesa. La
       propuesta es por torneo, con `fijo` por defecto, para no romper lo

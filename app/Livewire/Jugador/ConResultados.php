@@ -8,17 +8,20 @@ use App\Competicion\Errores\ErrorDeCompeticion;
 use App\Competicion\Errores\ResultadoInvalido;
 use App\Enums\EstadoPartido;
 use App\Jugadores\PartidosDelJugador;
-use App\Livewire\Concerns\FormularioDeResultado;
+use App\Livewire\Concerns\MarcadorEnVivo;
+use App\Models\Jugador;
 use App\Models\Partido;
+use App\Models\User;
 use Illuminate\Database\Eloquent\Builder;
 
 /**
  * Anotar y validar resultados desde el portal, en las páginas que
- * enseñan partidos. Solo sobre los partidos del propio jugador.
+ * enseñan partidos, y llevar el marcador en vivo si el torneo lo permite.
+ * Solo sobre los partidos del propio jugador.
  */
 trait ConResultados
 {
-    use FormularioDeResultado;
+    use MarcadorEnVivo;
 
     public function guardarResultado(RegistrarResultado $registrar): void
     {
@@ -49,6 +52,19 @@ trait ConResultados
         abort_if($encontrado === null, 404);
 
         $this->accion(fn () => $validar->handle($encontrado, $this->yo()), 'Resultado validado.');
+    }
+
+    protected function partidoEnVivo(int $id): Partido
+    {
+        $partido = $this->misPartidos()->whereKey($id)->first();
+        abort_if($partido === null, 404);
+
+        return $partido;
+    }
+
+    protected function quienMarca(): User|Jugador
+    {
+        return $this->yo();
     }
 
     /** @return Builder<Partido> */

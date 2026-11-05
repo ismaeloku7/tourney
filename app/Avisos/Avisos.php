@@ -3,6 +3,7 @@
 namespace App\Avisos;
 
 use App\Enums\EstadoInscripcion;
+use App\Enums\EstadoPartido;
 use App\Filament\Competicion\Marcador;
 use App\Models\Comunicacion;
 use App\Models\Fase;
@@ -17,6 +18,7 @@ use App\Notifications\HorariosPublicados;
 use App\Notifications\InscripcionConfirmada;
 use App\Notifications\ResultadoDelPartido;
 use App\Notifications\ResultadoPorValidar;
+use App\Notifications\SiguienteEnPista;
 use App\Publico\DatosDelTorneo;
 use App\Push\Push;
 use Illuminate\Database\Eloquent\Builder;
@@ -110,6 +112,53 @@ class Avisos
                 Notification::send($this->jugadoresDe($participante), new CruceAsignado($partido));
             }
         }
+    }
+
+    /**
+     * A la pareja que juega después en la pista de `$partido`: que el
+     * anterior empieza, que va por el último set, o que les toca. Cada
+     * motivo una sola vez por partido; sin siguiente, nada.
+     */
+    public function siguienteEnPista(Partido $partido, string $motivo): void
+    {
+        $siguiente = self::siguienteDe($partido);
+        if ($siguiente === null) {
+            return;
+        }
+
+        $avisos = $siguiente->avisos_siguiente ?? [];
+        if (isset($avisos[$motivo])) {
+            return;
+        }
+
+        $siguiente->forceFill(['avisos_siguiente' => [...$avisos, $motivo => now()->toIso8601String()]])->saveQuietly();
+
+        $jugadores = [];
+        foreach ([$siguiente->local, $siguiente->visitante] as $participante) {
+            if ($participante !== null) {
+                $jugadores = [...$jugadores, ...$this->jugadoresDe($participante)];
+            }
+        }
+
+        Notification::send($jugadores, new SiguienteEnPista($siguiente, $partido, $motivo));
+    }
+
+    /** El partido que va después en la misma pista y el mismo día, aún sin jugar. */
+    public static function siguienteDe(Partido $partido): ?Partido
+    {
+        if ($partido->pista_id === null || $partido->orden_en_pista === null || $partido->franja === null) {
+            return null;
+        }
+
+        return Partido::query()
+            ->where('pista_id', $partido->pista_id)
+            ->where('orden_en_pista', '>', $partido->orden_en_pista)
+            ->whereHas('franja', fn (Builder $q) => $q->whereDate('inicio', $partido->franja->inicio->toDateString()))
+            ->whereIn('estado', [EstadoPartido::Pendiente->value, EstadoPartido::Programado->value])
+            ->whereNotNull('local_id')->whereNotNull('visitante_id')
+            ->with(['local.jugadores', 'visitante.jugadores', 'pista', 'fase.categoria.torneo'])
+            ->orderBy('orden_en_pista')
+            ->first();
     }
 
     /** Un aviso libre: a los inscritos (no de baja) del torneo o de su categoría. Devuelve a cuántos jugadores. */

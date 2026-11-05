@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Torneos\Schemas;
 
+use App\Enums\ModoDeHorario;
 use App\Enums\ResultadosPorJugadores;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\DateTimePicker;
@@ -123,6 +124,21 @@ class TorneoForm
                             ->options([0 => 'Sin margen', 5 => '5 minutos', 10 => '10 minutos'])
                             ->default(0)
                             ->required(),
+                        Select::make('modo_horario')
+                            ->label('Cómo se juegan los partidos')
+                            ->options(ModoDeHorario::opciones())
+                            ->default(ModoDeHorario::Fijo->value)
+                            ->required()
+                            ->live()
+                            ->helperText('Encadenados: cada pista lleva su cola, la hora es estimada y se recalcula sola; la mesa empieza cada partido y lleva el marcador, y se avisa a la pareja siguiente.'),
+                        TextInput::make('calentamiento_primero')
+                            ->label('Calentamiento antes del primer partido (minutos)')
+                            ->integer()->minValue(0)->maxValue(60)->default(15)
+                            ->visible(fn (Get $get): bool => $get('modo_horario') === ModoDeHorario::Encadenado->value),
+                        TextInput::make('calentamiento_resto')
+                            ->label('Calentamiento cuando las dos parejas ya han jugado (minutos)')
+                            ->integer()->minValue(0)->maxValue(60)->default(5)
+                            ->visible(fn (Get $get): bool => $get('modo_horario') === ModoDeHorario::Encadenado->value),
                     ]),
             ]);
     }

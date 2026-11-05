@@ -2,6 +2,7 @@
 
 namespace App\Publico;
 
+use App\Actions\Competicion\AnotarMarcador;
 use App\Actions\Competicion\ProyectarCruces;
 use App\Enums\EstadoInscripcion;
 use App\Enums\EstadoPartido;
@@ -56,7 +57,7 @@ final class DatosDelTorneo
      * Con la fase de grupos abierta y un cuadro detrás que no se sortea,
      * cada línea lleva el cruce previsto («2º B», «Bye») y `cruces` lo dice.
      *
-     * @return list<array{categoria: Categoria, fase: Fase, cruces: bool, grupos: list<array{grupo: Grupo, lineas: list<array{participante: int, posicion: int, nombre: string, puntos: int, pj: int, pg: int, pp: int, sets: string, juegos: string, clasificado: bool, cruce: string|null}>, partidos: list<array{partido: string, resultado: string, hora: string|null, ganaLocal: bool|null}>}>}>
+     * @return list<array{categoria: Categoria, fase: Fase, cruces: bool, grupos: list<array{grupo: Grupo, lineas: list<array{participante: int, posicion: int, nombre: string, puntos: int, pj: int, pg: int, pp: int, sets: string, juegos: string, clasificado: bool, cruce: string|null}>, partidos: list<array{partido: string, resultado: string, hora: string|null, enVivo: string, ganaLocal: bool|null}>}>}>
      */
     public function grupos(): array
     {
@@ -93,7 +94,7 @@ final class DatosDelTorneo
     }
 
     /**
-     * @return list<array{categoria: Categoria, fase: Fase, rondas: list<array{nombre: string, partidos: list<array{partido: string, resultado: string, hora: string|null, ganaLocal: bool|null}>}>}>
+     * @return list<array{categoria: Categoria, fase: Fase, rondas: list<array{nombre: string, partidos: list<array{partido: string, resultado: string, hora: string|null, enVivo: string, ganaLocal: bool|null}>}>}>
      */
     public function cuadros(): array
     {
@@ -168,16 +169,23 @@ final class DatosDelTorneo
             ->select('partidos.*');
     }
 
-    /** @return array{partido: string, resultado: string, hora: string|null, ganaLocal: bool|null} */
+    /**
+     * Con partidos encadenados la hora es la estimada, marcada con «~», y
+     * un partido en juego lleva cómo va.
+     *
+     * @return array{partido: string, resultado: string, hora: string|null, enVivo: string, ganaLocal: bool|null}
+     */
     public function partido(Partido $p): array
     {
         $local = NombrePublico::participante($p->local, $this->torneo) ?? Marcador::lado($p, true);
         $visitante = NombrePublico::participante($p->visitante, $this->torneo) ?? Marcador::lado($p, false);
+        $hora = $this->torneo->encadenado() && $p->inicio_estimado !== null ? '~'.$p->inicio_estimado->translatedFormat('D j/n H:i') : $p->franja?->inicio->translatedFormat('D j/n H:i');
 
         return [
             'partido' => "{$local} – {$visitante}",
             'resultado' => $p->cerrado() ? Marcador::resultado($p) : '',
-            'hora' => $p->franja !== null && $this->horariosVisibles() ? $p->franja->inicio->translatedFormat('D j/n H:i').($p->pista !== null ? ' · '.$p->pista->nombre : '') : null,
+            'hora' => $p->franja !== null && $this->horariosVisibles() ? $hora.($p->pista !== null ? ' · '.$p->pista->nombre : '') : null,
+            'enVivo' => $p->estado === EstadoPartido::EnJuego ? AnotarMarcador::texto($p) : '',
             'ganaLocal' => $p->ganador_id === null ? null : $p->ganador_id === $p->local_id,
         ];
     }
