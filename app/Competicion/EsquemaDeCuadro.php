@@ -26,7 +26,7 @@ final readonly class EsquemaDeCuadro
 
     /**
      * @param  list<string>  $codigos  Quién pasa, en orden: «1A», «1B»… «2A»… «M1», o «CS1»… sin fase de grupos.
-     * @return array{rondas: list<array{nombre: string, partidos: list<array{codigo: string, local: string, visitante: string, localBye: bool, visitanteBye: bool}>}>, tercero: array{codigo: string, local: string, visitante: string}|null, error: string|null}
+     * @return array{rondas: list<array{nombre: string, partidos: list<array{codigo: string, local: string, visitante: string, localBye: bool, visitanteBye: bool, localCodigo: string|null, visitanteCodigo: string|null}>}>, tercero: array{codigo: string, local: string, visitante: string}|null, error: string|null}
      */
     public function armar(array $codigos, ConfiguracionDeEliminatoria $configuracion, ?int $mejoresDePosicion = null): array
     {
@@ -87,7 +87,16 @@ final readonly class EsquemaDeCuadro
                 [$local, $localBye] = $hueco($partido->local, $partido->local === null ? $partido->origenLocal : null, $ronda);
                 [$visitante, $visitanteBye] = $hueco($partido->visitante, $partido->visitante === null ? $partido->origenVisitante : null, $ronda);
 
-                $partidos[] = ['codigo' => $nombreDe[(int) $partido->id], 'local' => $local, 'visitante' => $visitante, 'localBye' => $localBye, 'visitanteBye' => $visitanteBye];
+                $partidos[] = [
+                    'codigo' => $nombreDe[(int) $partido->id],
+                    'local' => $local,
+                    'visitante' => $visitante,
+                    'localBye' => $localBye,
+                    'visitanteBye' => $visitanteBye,
+                    // De qué posición sale cada uno («1A», «M1»), si ya se sabe.
+                    'localCodigo' => $partido->local !== null ? ($codigoDe[$partido->local] ?? null) : null,
+                    'visitanteCodigo' => $partido->visitante !== null ? ($codigoDe[$partido->visitante] ?? null) : null,
+                ];
             }
             $rondas[] = ['nombre' => self::nombreDeRonda(count($partidos)), 'partidos' => $partidos];
         }
