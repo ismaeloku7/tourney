@@ -146,3 +146,36 @@ test('a qué grupo cae cada repartida lo decide el azar, y con la misma semilla 
 test('una pareja a repartir que no está en la fase lanza', function () {
     expect(fn () => repartir(participantes(8), ['numero_de_grupos' => 2, 'repartidos' => [99]]))->toThrow(ConfiguracionInvalida::class, 'no está');
 });
+
+test('por tandas: cada tanda cae una por grupo sin tocar lo ya colocado ni sortear a nadie más', function () {
+    $repartidor = new RepartidorDeGrupos;
+    $config = fn (array $fijos, array $tanda): ConfiguracionDeGrupos => ConfiguracionDeGrupos::desdeArray(['numero_de_grupos' => 4, 'grupos_manuales' => $fijos, 'repartidos' => $tanda]);
+    $deTanda = fn ($reparto, array $tanda): array => array_map(fn (Grupo $g): int => count(array_intersect($g->participantes, $tanda)), $reparto->grupos);
+
+    // Cuatro tandas de cuatro parejas en cuatro grupos: cada grupo, una de cada tanda.
+    $fijos = [];
+    foreach (array_chunk(range(1, 16), 4) as $tanda) {
+        $reparto = $repartidor->colocarTanda(participantes(16), $config($fijos, $tanda));
+        expect($deTanda($reparto, $tanda))->toBe([1, 1, 1, 1]);
+
+        foreach ($fijos as $i => $miembros) {
+            expect(array_slice($reparto->grupos[$i]->participantes, 0, count($miembros)))->toBe($miembros);
+        }
+        $fijos = array_map(fn (Grupo $g): array => $g->participantes, $reparto->grupos);
+    }
+
+    expect(array_map('count', $fijos))->toBe([4, 4, 4, 4])
+        ->and(array_merge(...$fijos))->toEqualCanonicalizing(range(1, 16));
+
+    // Una tanda sola no coloca a nadie más.
+    $solo = $repartidor->colocarTanda(participantes(16), $config([], [1, 2]));
+    expect(count(array_merge(...array_map(fn (Grupo $g): array => $g->participantes, $solo->grupos))))->toBe(2);
+});
+
+test('por tandas se respeta un grupo llenado de más a mano y la tanda va a los que tienen hueco', function () {
+    $reparto = (new RepartidorDeGrupos)->colocarTanda(participantes(12), ConfiguracionDeGrupos::desdeArray(['numero_de_grupos' => 3, 'grupos_manuales' => [[1, 2, 3, 4, 5]], 'repartidos' => [6, 7]]));
+
+    expect($reparto->grupos[0]->participantes)->toBe([1, 2, 3, 4, 5])
+        ->and(count(array_intersect($reparto->grupos[1]->participantes, [6, 7])))->toBe(1)
+        ->and(count(array_intersect($reparto->grupos[2]->participantes, [6, 7])))->toBe(1);
+});

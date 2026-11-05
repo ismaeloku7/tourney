@@ -145,7 +145,6 @@ final class SorteoDeGrupos
             foreach ($configuracion->gruposManuales ?? [] as $i => $ids) {
                 $datos["grupo_{$i}"] = array_map(fn (int $id): string => (string) $id, $ids);
             }
-            $datos['repartidos'] = array_map(fn (int $id): string => (string) $id, $configuracion->repartidos);
         }
 
         return $datos;
@@ -174,12 +173,17 @@ final class SorteoDeGrupos
                 ->helperText('La primera que elijas es la 1, la segunda la 2… Cada una encabeza un grupo y se reparten en serpiente; también cuentan para el cuadro.');
         }
 
-        $campos[] = Select::make('repartidos')->label('Repartir al azar entre los grupos')
-            ->multiple()->searchable()->optionsLimit(1000)->options($opciones)
-            ->placeholder('Ninguna')
-            ->helperText('Estas parejas caen en grupos al azar, una por grupo (si hay más que grupos, lo más repartidas posible). Por ejemplo, para separar a las más fuertes sin numerarlas.');
+        $visibles = fn (Get $get): int => $esManual($get) ? $total : $alSorteo;
+
+        $campos[] = Select::make('tanda')->label('Tanda')
+            ->multiple()->searchable()->optionsLimit(1000)
+            ->options(fn (Get $get): array => array_diff_key($opciones, array_flip(self::enOtrosGrupos($get, -1, $total))))
+            ->placeholder('Elige las parejas de esta tanda')
+            ->helperText('Por bombos: pon aquí unas cuantas parejas y pulsa «Repartir la tanda»; caen en grupos al azar, una por grupo. Luego la siguiente tanda, y así hasta colocarlas todas.');
 
         $campos[] = Actions::make([
+            Action::make('repartirTanda')->label('Repartir la tanda')->icon(Heroicon::OutlinedArrowsPointingOut)
+                ->action(fn (Get $get, Set $set) => self::repartirTanda($fase, $get, $set, $total, $visibles($get))),
             Action::make('huecos')->label('Sortear los huecos')->icon(Heroicon::OutlinedSparkles)
                 ->action(fn (Get $get, Set $set) => self::sortearHuecos($fase, $get, $set, $total)),
             Action::make('vaciar')->label('Vaciar los grupos')->icon(Heroicon::OutlinedTrash)->color('gray')
@@ -255,7 +259,7 @@ final class SorteoDeGrupos
         $modo = ModoDeSorteo::tryFrom((string) $get('modo')) ?? $fase->configuracionDeGrupos()->modoDeSorteo;
 
         try {
-            $reparto = self::repartir($fase, $fijos, $modo, $modo === ModoDeSorteo::CabezasDeSerie ? self::ids($get('cabezas')) : [], self::ids($get('repartidos')));
+            $reparto = self::repartir($fase, $fijos, $modo, $modo === ModoDeSorteo::CabezasDeSerie ? self::ids($get('cabezas')) : [], self::ids($get('tanda')));
         } catch (ErrorDeCompeticion $e) {
             Avisos::error('No se han podido sortear los huecos', [$e->getMessage()]);
 
@@ -265,10 +269,69 @@ final class SorteoDeGrupos
         for ($i = 0; $i < $total; $i++) {
             $set("grupo_{$i}", array_map(fn (int $id): string => (string) $id, $reparto->grupos[$i]->participantes ?? []));
         }
-        // Ya están en sus grupos: a partir de aquí se retocan a mano.
-        $set('repartidos', []);
+        // La tanda que hubiera ya está en sus grupos: a partir de aquí se retoca a mano.
+        $set('tanda', []);
 
         Avisos::hecho('Huecos sorteados', 'Revisa y cambia lo que quieras: no se guarda hasta pulsar «Guardar».');
+    }
+
+    /**
+     * Reparte la tanda elegida en los grupos del formulario, una pareja
+     * por grupo y al azar, sin tocar lo ya colocado. No guarda nada.
+     */
+    private static function repartirTanda(Fase $fase, Get $get, Set $set, int $total, int $visibles): void
+    {
+        $tanda = self::ids($get('tanda'));
+        if ($tanda === []) {
+            Avisos::aviso('Elige primero las parejas de la tanda');
+
+            return;
+        }
+
+        $fijos = [];
+        for ($i = 0; $i < $total; $i++) {
+            $fijos[] = self::ids($get("grupo_{$i}"));
+        }
+        while ($fijos !== [] && end($fijos) === []) {
+            array_pop($fijos);
+        }
+
+        $elegidas = [...array_merge(...$fijos), ...$tanda];
+        $participantes = array_values(self::parejas($fase)
+            ->filter(fn (Participante $p): bool => $p->inscripcion?->estado === EstadoInscripcion::Confirmada || in_array($p->id, $elegidas, true))
+            ->sortBy('id')
+            ->map(fn (Participante $p): ParticipanteDto => new ParticipanteDto($p->id, $p->nombre, null, $p->idsDeJugadores()))
+            ->all());
+
+        try {
+            $reparto = (new RepartidorDeGrupos)->colocarTanda($participantes, ConfiguracionDeGrupos::desdeArray([
+                ...$fase->configuracion,
+                'modo_de_sorteo' => ModoDeSorteo::Aleatorio->value,
+                'numero_de_grupos' => max($visibles, count($fijos)),
+                'tamano_de_grupo' => null,
+                'semilla' => null,
+                'grupos_manuales' => $fijos,
+                'repartidos' => $tanda,
+            ]));
+        } catch (ErrorDeCompeticion $e) {
+            Avisos::error('No se ha podido repartir la tanda', [$e->getMessage()]);
+
+            return;
+        }
+
+        $nombres = self::parejas($fase)->pluck('nombre', 'id');
+        $donde = [];
+        foreach ($reparto->grupos as $i => $grupo) {
+            if ($i < $total) {
+                $set("grupo_{$i}", array_map(fn (int $id): string => (string) $id, $grupo->participantes));
+            }
+            foreach (array_intersect($grupo->participantes, $tanda) as $id) {
+                $donde[] = $grupo->nombre.': '.$nombres->get($id, (string) $id);
+            }
+        }
+        $set('tanda', []);
+
+        Avisos::hecho('Tanda repartida', implode(' · ', $donde).'. Elige la siguiente tanda o guarda.');
     }
 
     /**
@@ -339,7 +402,8 @@ final class SorteoDeGrupos
         }
 
         $cabezas = $modo === ModoDeSorteo::CabezasDeSerie ? self::ids($data['cabezas'] ?? []) : null;
-        $repartidos = self::ids($data['repartidos'] ?? []);
+        // Una tanda elegida y sin repartir se reparte al guardar.
+        $repartidos = self::ids($data['tanda'] ?? []);
 
         // Las pendientes que se ponen en un grupo, como cabeza de serie o para repartir entran: se confirman.
         $elegidas = array_unique([...array_keys($vistos), ...($cabezas ?? []), ...$repartidos]);

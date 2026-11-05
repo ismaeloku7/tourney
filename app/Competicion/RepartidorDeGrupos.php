@@ -86,6 +86,66 @@ final readonly class RepartidorDeGrupos
     }
 
     /**
+     * Coloca solo una tanda: respeta lo ya fijado en cada grupo
+     * (gruposManuales) y reparte al azar las parejas de la tanda
+     * (repartidos), una por grupo; no sortea a nadie más. Para hacer el
+     * sorteo por bombos, tanda a tanda.
+     *
+     * @param  list<Participante>  $participantes
+     *
+     * @throws ConfiguracionInvalida
+     * @throws ParticipanteDuplicado
+     */
+    public function colocarTanda(array $participantes, ConfiguracionDeGrupos $configuracion): RepartoDeGrupos
+    {
+        $ids = [];
+        foreach ($participantes as $participante) {
+            if (in_array($participante->id, $ids, true)) {
+                throw new ParticipanteDuplicado($participante->id);
+            }
+            $ids[] = $participante->id;
+        }
+
+        if ($ids === []) {
+            throw new ConfiguracionInvalida(['No hay participantes que repartir.']);
+        }
+
+        $tamanos = $this->tamanos(count($ids), $configuracion);
+        $semilla = $configuracion->semilla ?? random_int(1, PHP_INT_MAX >> 1);
+        $grupos = array_fill(0, count($tamanos), []);
+        $colocados = [];
+
+        // Lo ya colocado se respeta tal cual, aunque a mano se haya llenado un grupo de más.
+        foreach ($configuracion->gruposManuales ?? [] as $i => $miembros) {
+            if ($miembros === []) {
+                continue;
+            }
+            if (! isset($tamanos[$i])) {
+                throw new ConfiguracionInvalida(['Salen '.count($tamanos).' grupos: no hay grupo '.Grupo::nombrePorOrden($i + 1).'.']);
+            }
+            foreach ($miembros as $id) {
+                if (! in_array($id, $ids, true)) {
+                    throw new ConfiguracionInvalida(["El participante {$id} no está en esta fase (¿no está confirmado?)."]);
+                }
+                if (in_array($id, $colocados, true)) {
+                    throw new ParticipanteDuplicado($id);
+                }
+                $grupos[$i][] = $id;
+                $colocados[] = $id;
+            }
+            $tamanos[$i] = max($tamanos[$i], count($grupos[$i]));
+        }
+
+        $this->colocarRepartidos($ids, $configuracion->repartidos, $tamanos, $grupos, $colocados, $semilla);
+
+        return new RepartoDeGrupos(
+            array_map(fn (int $i, array $miembros): Grupo => new Grupo(Grupo::nombrePorOrden($i + 1), $i + 1, $miembros), array_keys($grupos), $grupos),
+            [],
+            $semilla,
+        );
+    }
+
+    /**
      * Tamaños equilibrados: `n` en `g` grupos, los primeros `n mod g` con
      * uno más. Por tamaño `t`, se hacen `n div t` grupos y el resto se
      * reparte entre los primeros (13 en tamaño 4: 5, 4 y 4).
@@ -179,10 +239,10 @@ final readonly class RepartidorDeGrupos
 
     /**
      * Los que se reparten al azar entre los grupos: en orden aleatorio,
-     * cada uno al grupo con hueco que menos de ellos tiene (si empatan,
-     * uno al azar). Así salen uno por grupo y, si hay más que grupos, lo
-     * más equilibrado posible. Los ya colocados (fijados o cabezas de
-     * serie) se saltan.
+     * cada uno al grupo con hueco que menos de ellos tiene (si empatan, al
+     * que menos parejas tiene en total, y si aún empatan, uno al azar). Así
+     * salen uno por grupo y, si hay más que grupos, lo más equilibrado
+     * posible. Los ya colocados (fijados o cabezas de serie) se saltan.
      *
      * @param  list<int>  $ids
      * @param  list<int>  $repartidos
@@ -207,8 +267,9 @@ final readonly class RepartidorDeGrupos
                 return;
             }
 
-            $minimo = min(array_map(fn (int $i): int => $cuantos[$i], $conHueco));
-            $empatados = array_values(array_filter($conHueco, fn (int $i): bool => $cuantos[$i] === $minimo));
+            $clave = fn (int $i): int => $cuantos[$i] * 1000 + count($grupos[$i]);
+            $minimo = min(array_map($clave, $conHueco));
+            $empatados = array_values(array_filter($conHueco, fn (int $i): bool => $clave($i) === $minimo));
             $grupo = $empatados[mt_rand(0, count($empatados) - 1)];
 
             $grupos[$grupo][] = $id;
