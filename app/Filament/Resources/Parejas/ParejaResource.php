@@ -18,8 +18,10 @@ use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
+use Illuminate\Contracts\Support\Htmlable;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
+use Illuminate\Database\Eloquent\Model;
 use UnitEnum;
 
 /**
@@ -114,6 +116,29 @@ class ParejaResource extends Resource
         return [
             'index' => ListParejas::route('/'),
             'edit' => EditPareja::route('/{record}/editar'),
+        ];
+    }
+
+    /** En la búsqueda global, por el nombre de la pareja o de cualquiera de sus jugadores. */
+    public static function getGloballySearchableAttributes(): array
+    {
+        return ['participante.nombre', 'participante.jugadores.nombre', 'participante.jugadores.apellidos'];
+    }
+
+    public static function getGlobalSearchResultTitle(Model $record): string|Htmlable
+    {
+        assert($record instanceof Inscripcion);
+
+        return $record->participante->nombre;
+    }
+
+    public static function getGlobalSearchResultDetails(Model $record): array
+    {
+        assert($record instanceof Inscripcion);
+
+        return [
+            'Torneo' => $record->categoria->torneo->nombre.' · '.$record->categoria->nombre,
+            'Estado' => $record->estado->etiqueta(),
         ];
     }
 

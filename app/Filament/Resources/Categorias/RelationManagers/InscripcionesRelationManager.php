@@ -12,6 +12,7 @@ use App\Enums\Genero;
 use App\Enums\OrigenInscripcion;
 use App\Filament\Avisos;
 use App\Filament\ConfirmarCompletas;
+use App\Filament\Resources\Parejas\ColumnasDePareja;
 use App\Filament\Resources\Parejas\CompaneroDePareja;
 use App\Filament\Resources\Parejas\NivelesDePareja;
 use App\Filament\Resources\Parejas\ParejaResource;
@@ -60,9 +61,7 @@ class InscripcionesRelationManager extends RelationManager
             ->emptyStateDescription('Apunte las parejas a mano, o abra la inscripción online del torneo cuando esté lista (fase 3).')
             ->columns([
                 TextColumn::make('participante.nombre')->label('Pareja')->searchable()->weight('bold'),
-                TextColumn::make('jugadores')->label('Jugadores')
-                    ->state(fn (Inscripcion $record): array => $record->participante->jugadores->map(fn (Jugador $j): string => $j->nombre_completo)->all())
-                    ->listWithLineBreaks(),
+                ColumnasDePareja::jugadores(),
                 TextColumn::make('niveles')->label('Nivel')
                     ->state(fn (Inscripcion $record): array => $record->participante->jugadores->map(fn (Jugador $j): string => $j->nivel_declarado ?? '—')->all())
                     ->listWithLineBreaks()
