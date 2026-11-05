@@ -295,7 +295,7 @@ class HorariosDelTorneo extends Page
                     ];
                 }
 
-                $filas[] = ['nombre' => $torneoPista->pista->nombre, 'bloques' => $bloques];
+                $filas[] = ['nombre' => $torneoPista->pista->nombre.($torneoPista->pista->exterior ? ' · exterior' : ''), 'bloques' => $bloques];
             }
 
             $dias[] = ['titulo' => ucfirst($desde->translatedFormat('l j \d\e F')), 'horas' => $horas, 'pistas' => $filas];

@@ -16,6 +16,7 @@ class PistaForm
             Select::make('sede_id')->label('Sede')->relationship('sede', 'nombre')->placeholder('Sin sede'),
             TextInput::make('orden')->label('Orden')->integer()->minValue(0)->default(0),
             Toggle::make('activa')->label('Activa')->default(true)->helperText('Una pista inactiva no se ofrece a los torneos nuevos.'),
+            Toggle::make('exterior')->label('Exterior')->default(false)->helperText('Al aire libre. En la fase de grupos se procura que todas las parejas jueguen alguna vez fuera; los cuadros se juegan dentro.'),
         ]);
     }
 }

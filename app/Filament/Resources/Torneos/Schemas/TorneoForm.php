@@ -117,7 +117,8 @@ class TorneoForm
                             ->integer()
                             ->minValue(0)
                             ->maxValue(600)
-                            ->default(30),
+                            ->default(0)
+                            ->helperText('Desde que una pareja acaba hasta que vuelve a jugar. Con 0, enlaza: no calienta y el rival calienta solo. Nunca se juegan tres seguidos.'),
                         Select::make('margen_entre_partidos_minutos')
                             ->label('Calentamiento en pista')
                             ->options([0 => 'Sin calentamiento', 5 => '5 minutos', 10 => '10 minutos', 15 => '15 minutos'])

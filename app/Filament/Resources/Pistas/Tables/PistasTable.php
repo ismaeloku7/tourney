@@ -18,6 +18,7 @@ class PistasTable
                 TextColumn::make('nombre')->label('Pista')->searchable(),
                 TextColumn::make('sede.nombre')->label('Sede')->placeholder('—'),
                 IconColumn::make('activa')->label('Activa')->boolean(),
+                IconColumn::make('exterior')->label('Exterior')->boolean(),
             ])
             ->recordActions([
                 EditAction::make(),

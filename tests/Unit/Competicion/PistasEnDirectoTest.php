@@ -123,3 +123,21 @@ test('sin pistas con 20 minutos de retraso no propone nada', function () {
 
     expect((new PistasEnDirecto)->sugerencia($partidos, hs('10:20'), 30))->toBeNull();
 });
+
+test('quien viene de jugar no calienta: su siguiente partido calienta mientras acaba', function () {
+    $partidos = [
+        // La pareja 1-2 juega en la pista 1 hasta las 10:10.
+        enPista(1, 1, '09:00', [1, 2, 3, 4]),
+        // La pista 2 queda libre a las 09:30 y su siguiente es de 1-2 contra 5-6.
+        enPista(2, 2, '09:00', [5, 6, 7, 8], acabo: '09:30'),
+        enPista(3, 2, '10:10', [1, 2, 5, 6]),
+    ];
+
+    // Sin calentamiento que saltarse, espera a que 1-2 acaben.
+    $sin = (new PistasEnDirecto)->recalcular($partidos, hs('09:30'), 0);
+    // Con 10 de calentamiento, 5-6 calientan desde las 10:00 y 1-2 llegan a las 10:10 a jugar.
+    $con = (new PistasEnDirecto)->recalcular($partidos, hs('09:30'), 0, 10);
+
+    expect(date('H:i', $sin[3][0]))->toBe('10:10')
+        ->and(date('H:i', $con[3][0]))->toBe('10:00');
+});
