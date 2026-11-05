@@ -213,7 +213,7 @@ test('sin descanso no deja la pista parada mientras haya algo que jugar, y nadie
     sinTresSeguidos($plan, $partidos);
 });
 
-test('un grupo solo juega sus tres partidos seguidos antes que dejar la pista parada, pero nunca cuatro', function () {
+test('un grupo solo juega sus partidos seguidos antes que dejar la pista parada', function () {
     $partidos = grupoDeCuatro(1, 1);
 
     $plan = (new PlanificadorContinuo)->planificar($partidos, pistasDe(2), new RestriccionesDePlanificacion(0, [], 10));
@@ -222,12 +222,13 @@ test('un grupo solo juega sus tres partidos seguidos antes que dejar la pista pa
         ->and($plan->minutosMuertos)->toBe(0)
         ->and($plan->fin?->format('H:i'))->toBe('12:30');
     sinChoques($plan, $partidos, 0);
-    sinTresSeguidos($plan, $partidos, maximo: 4);
 
-    // Con otro partido de una de esas parejas, el cuarto espera a que descanse.
+    // Con otro partido de una de esas parejas, juega el cuarto seguido antes que parar la pista.
     $conOtro = [...$partidos, encuentro(7, 1, 9)];
-    $plan = (new PlanificadorContinuo)->planificar($conOtro, pistasDe(2), new RestriccionesDePlanificacion(0, [], 10));
-    sinTresSeguidos($plan, $conOtro, maximo: 4);
+    $plan = (new PlanificadorContinuo)->planificar($conOtro, pistasDe(1), new RestriccionesDePlanificacion(0, [], 10));
+    expect($plan->conflictos)->toBe([])
+        ->and($plan->minutosMuertos)->toBe(0);
+    sinChoques($plan, $conOtro, 0);
 });
 
 test('cada categoría repite pistas: no anda por todas', function () {

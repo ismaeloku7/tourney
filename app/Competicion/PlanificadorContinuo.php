@@ -19,13 +19,13 @@ use DateTimeImmutable;
  * duración estimada; quien viene de jugar no calienta (acaba su partido
  * mientras el rival calienta solo).
  *
- * Siempre: nadie juega dos a la vez, nadie juega cuatro seguidos, se
+ * Siempre: nadie juega dos a la vez, se
  * respetan la disponibilidad de cada pista, el descanso mínimo (si lo hay),
  * las horas en que un jugador no puede y el orden de las rondas (un partido
  * no empieza hasta que acaban los que le dan sus parejas). Los de cuadro
  * no van a pistas exteriores mientras haya cubiertas.
  *
- * Si se puede: no jugar dos seguidos (y menos tres), que cada categoría repita pistas
+ * Si se puede: no jugar dos seguidos (y menos tres o más), que cada categoría repita pistas
  * (sin pasar de las que le tocan por lo que juega), que en grupos todas
  * las parejas jueguen alguna vez fuera, y que cada categoría vaya jornada
  * a jornada.
@@ -257,11 +257,8 @@ final readonly class PlanificadorContinuo
                         continue 2;
                     }
                     $racha = $this->racha($estado['jugador'][$jugador] ?? [], $inicio, $umbral);
-                    if ($racha >= 3) {
-                        continue 2;
-                    }
                     $conSeguido += $racha;
-                    $conTres += $racha === 2 ? 1 : 0;
+                    $conTres += $racha >= 2 ? 1 : 0;
                 }
 
                 $paso = $partido->deGrupos ? ($partido->jornada ?? 0) : 100 + ($partido->ronda ?? 0);
@@ -336,7 +333,7 @@ final readonly class PlanificadorContinuo
             $sinHora = array_values(array_filter($partido->dependeDe, fn (int $previo): bool => ! isset($estado['fin'][$previo])));
             $conflictos[] = $sinHora !== []
                 ? new Conflicto($partido->id, Conflicto::ORDEN_DE_RONDAS, "El partido {$sinHora[0]} tiene que jugarse antes y no tiene hora.")
-                : new Conflicto($partido->id, Conflicto::SIN_FRANJA, 'No queda hueco en ninguna pista con su calentamiento, sin solapar a sus jugadores ni hacerles jugar cuatro seguidos.');
+                : new Conflicto($partido->id, Conflicto::SIN_FRANJA, 'No queda hueco en ninguna pista con su calentamiento, sin solapar a sus jugadores.');
         }
 
         // Las preferencias que no se cumplen: partidos seguidos, parejas de grupos que no salen fuera y pistas de más por categoría.
