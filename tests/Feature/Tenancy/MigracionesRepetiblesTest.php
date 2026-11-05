@@ -2,6 +2,7 @@
 
 use App\Models\FormatoPartido;
 use App\Models\Organizador;
+use Database\Seeders\Organizador\BaseDelOrganizadorSeeder;
 use Database\Seeders\PlanesSeeder;
 use Illuminate\Support\Facades\Schema;
 
@@ -51,4 +52,30 @@ test('todos los organizadores tienen el formato «Dos sets + super tie-break», 
         ->and($formato->juegos_por_set)->toBe(6)
         ->and($formato->super_tie_break_final)->toBeTrue()
         ->and($formato->super_tie_break_puntos)->toBe(10);
+});
+
+test('las duraciones de serie se ajustan solo si nadie las ha cambiado a mano', function () {
+    $this->seed(PlanesSeeder::class);
+    usarOrganizador(Organizador::factory()->create());
+    (new BaseDelOrganizadorSeeder)->run();
+    $minutos = fn (string $nombre): int => (int) FormatoPartido::query()->where('nombre', $nombre)->value('duracion_estimada');
+
+    // Uno nuevo nace con las nuevas.
+    expect($minutos('Un set a 6 con tie-break'))->toBe(40)
+        ->and($minutos('Un set a 9'))->toBe(50)
+        ->and($minutos('Dos sets + super tie-break'))->toBe(75)
+        ->and($minutos('Al mejor de 3 sets a 6'))->toBe(90);
+
+    // Uno antiguo: las de serie de antes cambian; la puesta a mano, no.
+    FormatoPartido::query()->where('nombre', 'Un set a 9')->update(['duracion_estimada' => 60]);
+    FormatoPartido::query()->where('nombre', 'Dos sets + super tie-break')->update(['duracion_estimada' => 60]);
+    FormatoPartido::query()->where('nombre', 'Al mejor de 3 sets a 6')->update(['duracion_estimada' => 100]);
+
+    $migracion = require database_path('migrations/tenant/2026_11_11_000000_ajustar_duraciones_de_formatos.php');
+    $migracion->up();
+    $migracion->up();
+
+    expect($minutos('Un set a 9'))->toBe(50)
+        ->and($minutos('Dos sets + super tie-break'))->toBe(75)
+        ->and($minutos('Al mejor de 3 sets a 6'))->toBe(100);
 });
