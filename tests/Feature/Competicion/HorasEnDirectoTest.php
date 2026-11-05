@@ -55,7 +55,7 @@ function partidoEn(Fase $fase, Pista $pista, CarbonImmutable $inicio): Partido
     return $partido->refresh();
 }
 
-function resultadoDe(Partido $partido, User $quien): void
+function terminarPartido(Partido $partido, User $quien): void
 {
     app(RegistrarResultado::class)->handle($partido->refresh(), new Resultado([new Set(6, 2), new Set(6, 1)]), $quien);
 }
@@ -68,7 +68,7 @@ test('al acabar un partido antes de tiempo, el siguiente de la pista pasa a cale
 
     Notification::fake();
     $this->travelTo($this->dia->setTime(9, 50));
-    resultadoDe($primero, $this->propietario);
+    terminarPartido($primero, $this->propietario);
 
     // El segundo entra a las 9:50 (20 minutos antes) y el tercero detrás.
     expect($segundo->refresh()->franja->inicio->format('H:i'))->toBe('09:50')
@@ -83,7 +83,7 @@ test('al acabar un partido antes de tiempo, el siguiente de la pista pasa a cale
 
     // Cuando acaba el segundo (tarde, a las 11:15), al tercero le toca calentar; no se le repite «sois los siguientes».
     $this->travelTo($this->dia->setTime(11, 15));
-    resultadoDe($segundo, $this->propietario);
+    terminarPartido($segundo, $this->propietario);
 
     expect($tercero->refresh()->franja->inicio->format('H:i'))->toBe('11:15');
     Notification::assertSentTo($tercero->local->jugadores->first(), ACalentar::class);
@@ -98,7 +98,7 @@ test('de una fase oculta no se avisa a nadie, aunque las horas se recalculen', f
 
     Notification::fake();
     $this->travelTo($this->dia->setTime(9, 50));
-    resultadoDe($primero, $this->propietario);
+    terminarPartido($primero, $this->propietario);
 
     expect($segundo->refresh()->franja->inicio->format('H:i'))->toBe('09:50');
     Notification::assertNotSentTo($segundo->local->jugadores, ACalentar::class);
@@ -117,9 +117,9 @@ test('si una pista va 20 minutos tarde, la página de horarios lo propone y al a
 
     Notification::fake();
     $this->travelTo($this->dia->setTime(9, 50));
-    resultadoDe($a, $this->propietario);
+    terminarPartido($a, $this->propietario);
     $this->travelTo($this->dia->setTime(10, 40));
-    resultadoDe($d, $this->propietario);
+    terminarPartido($d, $this->propietario);
 
     $sugerencia = app(HorasEnDirecto::class)->sugerencia($this->torneo->refresh());
     expect($sugerencia)->not->toBeNull()
