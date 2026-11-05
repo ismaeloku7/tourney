@@ -90,7 +90,12 @@ test('la ficha enseña datos, categorías, inscritos, grupos y horarios sin corr
     $ficha = Livewire::test(FichaDelTorneo::class, ['torneo' => $torneo]);
 
     $ficha->call('ver', 'inscritos')->assertSee('García / López')->assertDontSee('ana@example.com')->assertDontSee('600111222');
-    $ficha->call('ver', 'grupos')->assertSee('Grupo A')->assertSee('6-3 6-4');
+    // Sin cuadro detrás, la tabla no adelanta cruces.
+    $ficha->call('ver', 'grupos')->assertSee('Grupo A')->assertSee('6-3 6-4')->assertDontSee('Cruce');
+
+    // Con un cuadro por cruces entre grupos, cada pareja ve contra quién jugaría.
+    Fase::factory()->eliminatoria()->create(['categoria_id' => $torneo->categorias()->sole()->id]);
+    Livewire::test(FichaDelTorneo::class, ['torneo' => $torneo])->call('ver', 'grupos')->assertSee('Cruce')->assertSee('vs 2º A')->assertSee('vs 1º A');
     $ficha->call('ver', 'horarios')->assertSee('Central');
     $ficha->call('ver', 'cuadro')->assertSee('El cuadro se llena');
 

@@ -2,6 +2,7 @@
 
 namespace App\Exportaciones;
 
+use App\Actions\Competicion\ProyectarCruces;
 use App\Enums\TipoDeFase;
 use App\Filament\Competicion\Marcador;
 use App\Filament\MarcaDelOrganizador;
@@ -22,6 +23,7 @@ final class PdfDeCategoria
 
         $fases = $categoria->fases->map(fn (Fase $fase): array => [
             'fase' => $fase,
+            'cruces' => $fase->tipo->esDeGrupos() ? app(ProyectarCruces::class)->handle($fase) : [],
             'cuadro' => $fase->tipo->esDeCuadro() ? $this->rondas($fase) : [],
         ])->all();
 

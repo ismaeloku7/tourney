@@ -1,11 +1,13 @@
 {{--
     La clasificación de una fase de grupos, un grupo por tabla: posición,
     pareja, puntos, partidos, sets y juegos, y por qué desempató. Los
-    clasificados van marcados.
+    clasificados van marcados. Si la fase siguiente es un cuadro que no se
+    sortea, cada pareja lleva el cruce que tendría si la tabla acabase así.
 --}}
 @php
     /** @var \App\Models\Fase $fase */
     $grupos = $fase->grupos()->with(['clasificaciones.participante', 'participantes'])->get();
+    $cruces = app(\App\Actions\Competicion\ProyectarCruces::class)->handle($fase);
 @endphp
 <div class="clasificacion">
     <style>
@@ -27,7 +29,7 @@
                 <table>
                     <thead>
                         <tr>
-                            <th class="n">#</th><th>Pareja</th><th class="n">Pts</th><th class="n">PJ</th><th class="n">PG</th><th class="n">PP</th><th class="n">Sets</th><th class="n">Juegos</th><th></th>
+                            <th class="n">#</th><th>Pareja</th><th class="n">Pts</th><th class="n">PJ</th><th class="n">PG</th><th class="n">PP</th><th class="n">Sets</th><th class="n">Juegos</th>@if ($cruces !== [])<th>Cruce previsto</th>@endif<th></th>
                         </tr>
                     </thead>
                     <tbody>
@@ -41,6 +43,9 @@
                                 <td class="n">{{ $linea->pp }}</td>
                                 <td class="n">{{ $linea->sets_favor }}-{{ $linea->sets_contra }}</td>
                                 <td class="n">{{ $linea->juegos_favor }}-{{ $linea->juegos_contra }}</td>
+                                @if ($cruces !== [])
+                                    <td class="suave">@isset ($cruces[$linea->participante_id]) vs {{ $cruces[$linea->participante_id]->etiqueta() }} @endisset</td>
+                                @endif
                                 <td class="suave">
                                     @if ($linea->clasificado_como !== null) {{ $linea->clasificado_como }} @endif
                                     @if ($linea->desempate_aplicado !== null) · {{ $linea->desempate_aplicado->etiqueta() }} @endif
@@ -54,4 +59,7 @@
     @empty
         <p class="suave">La fase aún no se ha sorteado.</p>
     @endforelse
+    @if ($cruces !== [])
+        <p class="suave">Cruces de la primera ronda del cuadro si la clasificación acabase así; cambian con cada resultado.</p>
+    @endif
 </div>

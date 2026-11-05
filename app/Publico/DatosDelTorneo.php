@@ -2,6 +2,7 @@
 
 namespace App\Publico;
 
+use App\Actions\Competicion\ProyectarCruces;
 use App\Enums\EstadoInscripcion;
 use App\Enums\EstadoPartido;
 use App\Filament\Competicion\Marcador;
@@ -52,7 +53,10 @@ final class DatosDelTorneo
     }
 
     /**
-     * @return list<array{categoria: Categoria, fase: Fase, grupos: list<array{grupo: Grupo, lineas: list<array{posicion: int, nombre: string, puntos: int, pj: int, pg: int, pp: int, sets: string, juegos: string, clasificado: bool}>, partidos: list<array{partido: string, resultado: string, hora: string|null, ganaLocal: bool|null}>}>}>
+     * Con la fase de grupos abierta y un cuadro detrás que no se sortea,
+     * cada línea lleva el cruce previsto («2º B», «Bye») y `cruces` lo dice.
+     *
+     * @return list<array{categoria: Categoria, fase: Fase, cruces: bool, grupos: list<array{grupo: Grupo, lineas: list<array{posicion: int, nombre: string, puntos: int, pj: int, pg: int, pp: int, sets: string, juegos: string, clasificado: bool, cruce: string|null}>, partidos: list<array{partido: string, resultado: string, hora: string|null, ganaLocal: bool|null}>}>}>
      */
     public function grupos(): array
     {
@@ -63,6 +67,7 @@ final class DatosDelTorneo
                 continue;
             }
 
+            $cruces = app(ProyectarCruces::class)->handle($fase);
             $grupos = [];
             foreach ($fase->grupos as $grupo) {
                 $grupos[] = [
@@ -74,12 +79,13 @@ final class DatosDelTorneo
                         'sets' => "{$linea->sets_favor}-{$linea->sets_contra}",
                         'juegos' => "{$linea->juegos_favor}-{$linea->juegos_contra}",
                         'clasificado' => $linea->clasificado_como !== null,
+                        'cruce' => isset($cruces[$linea->participante_id]) ? $cruces[$linea->participante_id]->etiqueta() : null,
                     ])->all()),
                     'partidos' => array_values($grupo->partidos->map(fn (Partido $p): array => $this->partido($p))->all()),
                 ];
             }
 
-            $salida[] = ['categoria' => $fase->categoria, 'fase' => $fase, 'grupos' => $grupos];
+            $salida[] = ['categoria' => $fase->categoria, 'fase' => $fase, 'cruces' => $cruces !== [], 'grupos' => $grupos];
         }
 
         return $salida;

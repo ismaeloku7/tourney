@@ -86,11 +86,11 @@
                         <section class="tarjeta p-4">
                             <h3 class="font-semibold">Grupo {{ $g['grupo']->nombre }}</h3>
                             <table class="mt-2 w-full text-sm">
-                                <thead class="text-left text-neutral-500"><tr><th class="py-1">#</th><th>Pareja</th><th class="text-right">Pts</th><th class="text-right">PJ</th><th class="text-right">Sets</th><th class="text-right">Juegos</th></tr></thead>
+                                <thead class="text-left text-neutral-500"><tr><th class="py-1">#</th><th>Pareja</th><th class="text-right">Pts</th><th class="text-right">PJ</th><th class="text-right">Sets</th><th class="text-right">Juegos</th>@if ($bloque['cruces'])<th class="text-right">Cruce</th>@endif</tr></thead>
                                 <tbody>
                                     @foreach ($g['lineas'] as $l)
                                         <tr @class(['border-t border-neutral-100', 'font-semibold' => $l['clasificado']])>
-                                            <td class="py-1">{{ $l['posicion'] }}</td><td>{{ $l['nombre'] }}</td><td class="text-right">{{ $l['puntos'] }}</td><td class="text-right">{{ $l['pj'] }}</td><td class="text-right">{{ $l['sets'] }}</td><td class="text-right">{{ $l['juegos'] }}</td>
+                                            <td class="py-1">{{ $l['posicion'] }}</td><td>{{ $l['nombre'] }}</td><td class="text-right">{{ $l['puntos'] }}</td><td class="text-right">{{ $l['pj'] }}</td><td class="text-right">{{ $l['sets'] }}</td><td class="text-right">{{ $l['juegos'] }}</td>@if ($bloque['cruces'])<td class="whitespace-nowrap text-right text-neutral-500">{{ $l['cruce'] !== null ? 'vs '.$l['cruce'] : '' }}</td>@endif
                                         </tr>
                                     @endforeach
                                 </tbody>
@@ -103,6 +103,9 @@
                         </section>
                     @endforeach
                 </div>
+                @if ($bloque['cruces'])
+                    <p class="mt-2 text-xs text-neutral-500">Cruce: la primera ronda del cuadro si la clasificación acabase así. Cambia con cada resultado.</p>
+                @endif
             @empty
                 <p class="text-neutral-600">Los grupos salen cuando la organización hace el sorteo.</p>
             @endforelse

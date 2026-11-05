@@ -6,9 +6,11 @@ use App\Actions\Competicion\CerrarFase;
 use App\Actions\Competicion\GenerarFranjas;
 use App\Actions\Competicion\GenerarPartidos;
 use App\Actions\Competicion\PlanificarHorarios;
+use App\Actions\Competicion\ProyectarCruces;
 use App\Actions\Competicion\RegistrarResultado;
 use App\Actions\Competicion\SortearGrupos;
 use App\Actions\Competicion\ValidarResultado;
+use App\Competicion\Datos\CruceProyectado;
 use App\Competicion\Datos\Resultado;
 use App\Competicion\Datos\Set;
 use App\Competicion\Errores\AvanceNoReversible;
@@ -279,4 +281,37 @@ test('el torneo de pruebas pasa a en juego cuando tiene horarios', function () {
 
     expect($this->torneo->refresh())->estado->toBe(EstadoTorneo::EnJuego)
         ->and($this->torneo->horarios_publicados_en)->not->toBeNull();
+});
+
+test('con la fase de grupos abierta se adelanta el cruce de cada pareja, y coincide con el cuadro que sale al cerrar', function () {
+    app(SortearGrupos::class)->handle($this->grupos, $this->propietario);
+    app(GenerarPartidos::class)->handle($this->grupos, $this->propietario);
+
+    // Desde el sorteo, aunque no haya resultados: 8 clasificados previstos con su cruce.
+    $previstos = app(ProyectarCruces::class)->handle($this->grupos->refresh());
+    expect($previstos)->toHaveCount(8);
+
+    jugarTodos($this->grupos, $this->propietario);
+    $previstos = app(ProyectarCruces::class)->handle($this->grupos->refresh());
+    expect($previstos)->toHaveCount(8)
+        ->and(array_filter($previstos, fn (CruceProyectado $c): bool => $c->esBye()))->toBe([]);
+
+    app(CerrarFase::class)->handle($this->grupos, $this->propietario);
+
+    // Lo previsto es exactamente la primera ronda del cuadro real.
+    foreach ($this->cuadro->refresh()->partidos()->where('ronda', 1)->get() as $partido) {
+        expect($previstos[$partido->local_id]->rival)->toBe($partido->visitante_id)
+            ->and($previstos[$partido->visitante_id]->rival)->toBe($partido->local_id);
+    }
+
+    // Con la fase cerrada ya no hay nada que adelantar: el cuadro es real.
+    expect(app(ProyectarCruces::class)->handle($this->grupos->refresh()))->toBe([]);
+});
+
+test('con sorteo puro en el cuadro no se adelanta ningún cruce', function () {
+    $this->cuadro->update(['configuracion' => [...$this->cuadro->configuracion, 'regla_de_cruces' => 'sorteo']]);
+    app(SortearGrupos::class)->handle($this->grupos, $this->propietario);
+    app(GenerarPartidos::class)->handle($this->grupos, $this->propietario);
+
+    expect(app(ProyectarCruces::class)->handle($this->grupos->refresh()))->toBe([]);
 });
