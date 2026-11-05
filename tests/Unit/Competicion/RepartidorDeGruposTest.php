@@ -179,3 +179,37 @@ test('por tandas se respeta un grupo llenado de más a mano y la tanda va a los 
         ->and(count(array_intersect($reparto->grupos[1]->participantes, [6, 7])))->toBe(1)
         ->and(count(array_intersect($reparto->grupos[2]->participantes, [6, 7])))->toBe(1);
 });
+
+/** Parejas 1…n con nivel igual a su id (la 12 es la de más nivel). */
+function conNiveles(int $n): array
+{
+    return array_map(fn (int $i): Participante => new Participante($i, "Pareja {$i}", null, [], (float) $i), range(1, $n));
+}
+
+test('por niveles: bombos de más a menos nivel, una pareja de cada bombo en cada grupo', function () {
+    $reparto = repartir(conNiveles(12), ['numero_de_grupos' => 3, 'modo_de_sorteo' => 'por_niveles']);
+
+    foreach ([[12, 11, 10], [9, 8, 7], [6, 5, 4], [3, 2, 1]] as $bombo) {
+        expect(array_map(fn (Grupo $g): int => count(array_intersect($g->participantes, $bombo)), $reparto->grupos))->toBe([1, 1, 1]);
+    }
+    expect(array_merge(...array_map(fn (Grupo $g): array => $g->participantes, $reparto->grupos)))->toEqualCanonicalizing(range(1, 12));
+});
+
+test('por niveles: dentro de cada bombo decide el azar, y la misma semilla repite el sorteo', function () {
+    $grupoDe12 = fn (int $semilla): string => collect(repartir(conNiveles(12), ['numero_de_grupos' => 3, 'modo_de_sorteo' => 'por_niveles', 'semilla' => $semilla])->grupos)
+        ->first(fn (Grupo $g): bool => in_array(12, $g->participantes, true))->nombre;
+
+    expect($grupoDe12(9))->toBe($grupoDe12(9))
+        ->and(collect(range(1, 20))->map($grupoDe12)->unique()->count())->toBeGreaterThan(1);
+});
+
+test('por niveles: las parejas sin nivel van al último bombo y lo fijado a mano se respeta', function () {
+    $parejas = [...conNiveles(9), new Participante(10, 'Sin nivel', null, [], null), new Participante(11, 'Sin nivel 2', null, [], null), new Participante(12, 'Sin nivel 3', null, [], null)];
+    $reparto = repartir($parejas, ['numero_de_grupos' => 3, 'modo_de_sorteo' => 'por_niveles']);
+    expect(array_map(fn (Grupo $g): int => count(array_intersect($g->participantes, [10, 11, 12])), $reparto->grupos))->toBe([1, 1, 1]);
+
+    $conFija = repartir($parejas, ['numero_de_grupos' => 3, 'modo_de_sorteo' => 'por_niveles', 'grupos_manuales' => [[1]]]);
+    expect($conFija->grupos[0]->participantes)->toContain(1)
+        ->and(array_map(fn (Grupo $g): int => count(array_intersect($g->participantes, [9, 8, 7])), $conFija->grupos))->toBe([1, 1, 1])
+        ->and(array_map(fn (Grupo $g): int => $g->tamano(), $conFija->grupos))->toBe([4, 4, 4]);
+});

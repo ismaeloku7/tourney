@@ -165,8 +165,12 @@ final class SorteoDeGrupos
                 ->options([
                     ModoDeSorteo::Aleatorio->value => 'Al azar',
                     ModoDeSorteo::CabezasDeSerie->value => 'Con cabezas de serie',
+                    ModoDeSorteo::PorNiveles->value => 'Por niveles (bombos)',
                     ModoDeSorteo::Manual->value => 'Todo a mano',
-                ]);
+                ])
+                ->helperText(fn (Get $get): ?string => $get('modo') === ModoDeSorteo::PorNiveles->value
+                    ? 'De más a menos nivel medio, en bombos de una pareja por grupo: el primer bombo (las de más nivel) hace de cabezas de serie y cada bombo cae al azar, una por grupo. Las parejas sin nivel van al final.'
+                    : null);
             $campos[] = Select::make('cabezas')->label('Cabezas de serie, en orden')
                 ->multiple()->searchable()->optionsLimit(1000)->options($opciones)
                 ->visible(fn (Get $get): bool => $get('modo') === ModoDeSorteo::CabezasDeSerie->value)
@@ -354,7 +358,7 @@ final class SorteoDeGrupos
             ->map(function (Participante $p) use ($cabezas): ParticipanteDto {
                 $posicion = array_search($p->id, $cabezas, true);
 
-                return new ParticipanteDto($p->id, $p->nombre, $posicion === false ? null : $posicion + 1, $p->idsDeJugadores());
+                return new ParticipanteDto($p->id, $p->nombre, $posicion === false ? null : $posicion + 1, $p->idsDeJugadores(), $p->nivelMedio());
             })
             ->all());
 

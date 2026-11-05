@@ -15,10 +15,12 @@ use App\Filament\Competicion\Marcador;
 use App\Filament\Competicion\SorteoDeGrupos;
 use App\Filament\Resources\Categorias\Pages\EditCategoria;
 use App\Filament\Resources\Categorias\RelationManagers\FasesRelationManager;
+use App\Filament\Resources\Categorias\Schemas\FaseForm;
 use App\Filament\Resources\Torneos\Pages\EditTorneo;
 use App\Filament\Resources\Torneos\Pages\HorariosDelTorneo;
 use App\Filament\Resources\Torneos\Pages\PartidosDelTorneo;
 use App\Models\Categoria;
+use App\Models\Clasificacion;
 use App\Models\Fase;
 use App\Models\FormatoPartido;
 use App\Models\Inscripcion;
@@ -394,4 +396,53 @@ test('una tanda elegida y sin repartir se reparte al guardar, una por grupo', fu
     $grupos = $this->grupos->refresh()->grupos()->with('participantes')->get();
     expect($grupos->map(fn ($g): int => count(array_intersect($g->participantes->pluck('id')->all(), $repartidas)))->all())->toBe([1, 1, 1])
         ->and($this->grupos->configuracionDeGrupos()->repartidos)->toBe($repartidas);
+});
+
+test('el sorteo por niveles reparte por bombos según el nivel medio de cada pareja', function () {
+    $parejas = $this->categoria->participantes()->with('jugadores')->orderBy('id')->get()->values();
+    foreach ($parejas as $i => $pareja) {
+        foreach ($pareja->jugadores as $jugador) {
+            $jugador->update(['nivel_declarado' => (string) (1 + $i * 0.5)]);
+        }
+    }
+    // Las tres de más nivel son las tres últimas creadas.
+    $mejores = $parejas->slice(9)->pluck('id')->all();
+
+    fasesDe($this->categoria)
+        ->callAction(TestAction::make('sortear')->table($this->grupos), ['modo' => 'por_niveles'])
+        ->assertHasNoActionErrors()
+        ->assertNotified('3 grupos y 18 partidos');
+
+    $grupos = $this->grupos->refresh()->grupos()->with('participantes')->get();
+    expect($grupos->map(fn ($g): int => count(array_intersect($g->participantes->pluck('id')->all(), $mejores)))->all())->toBe([1, 1, 1])
+        ->and($this->grupos->configuracionDeGrupos()->modoDeSorteo)->toBe(ModoDeSorteo::PorNiveles);
+});
+
+test('el cuadro se puede hacer a mano por posiciones y se rellena al cerrar los grupos', function () {
+    // Las posiciones que se ofrecen: los 2 primeros de cada grupo (A, B, C) y los 2 mejores terceros.
+    $posiciones = FaseForm::posiciones(fasesDe($this->categoria)->instance(), $this->cuadro);
+    expect(array_keys($posiciones))->toBe(['1A', '1B', '1C', '2A', '2B', '2C', 'M1', 'M2'])
+        ->and($posiciones['2C'])->toBe('2º grupo C')
+        ->and($posiciones['M1'])->toBe('Mejor 3º nº 1')
+        ->and(FaseForm::cruceSugerido(array_keys($posiciones)))->toHaveCount(4);
+
+    // Lo que guarda el formulario: filas «local»/«visitante» → pares; y al editar, al revés.
+    $filas = [['local' => '1A', 'visitante' => 'M2'], ['local' => '2B', 'visitante' => '2C'], ['local' => '1C', 'visitante' => '2A'], ['local' => 'M1', 'visitante' => '1B']];
+    $datos = FaseForm::normalizar(['tipo' => 'eliminatoria', 'nombre' => 'Cuadro', 'orden' => 2, 'configuracion' => ['regla_de_cruces' => 'a_posiciones', 'cruces_por_posicion' => $filas]]);
+    expect($datos['configuracion']['cruces_por_posicion'])->toBe([['1A', 'M2'], ['2B', '2C'], ['1C', '2A'], ['M1', '1B']])
+        ->and(FaseForm::alRellenar($datos)['configuracion']['cruces_por_posicion'])->toBe($filas);
+
+    $this->cuadro->update(['configuracion' => $datos['configuracion']]);
+
+    app(SortearGrupos::class)->handle($this->grupos, $this->propietario);
+    app(GenerarPartidos::class)->handle($this->grupos, $this->propietario);
+    jugarTodosLosPartidosDe($this->grupos, $this->propietario);
+    fasesDe($this->categoria)->callAction(TestAction::make('cerrar')->table($this->grupos))->assertNotified('Fase cerrada');
+
+    $quien = fn (string $como): int => (int) Clasificacion::query()->where('fase_id', $this->grupos->id)->where('clasificado_como', $como)->value('participante_id');
+    $primeraRonda = $this->cuadro->partidos()->where('ronda', 1)->orderBy('posicion')->get();
+
+    expect($primeraRonda)->toHaveCount(4)
+        ->and([$primeraRonda[0]->local_id, $primeraRonda[1]->local_id, $primeraRonda[1]->visitante_id, $primeraRonda[2]->local_id, $primeraRonda[2]->visitante_id, $primeraRonda[3]->visitante_id])
+        ->toBe([$quien('1º A'), $quien('2º B'), $quien('2º C'), $quien('1º C'), $quien('2º A'), $quien('1º B')]);
 });
