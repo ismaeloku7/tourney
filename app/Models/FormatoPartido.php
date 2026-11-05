@@ -81,7 +81,7 @@ class FormatoPartido extends Model
             ['nombre' => 'Al mejor de 3 sets a 6', 'sets' => 3, 'juegos_por_set' => 6, 'tie_break_en' => 6, 'duracion_estimada' => 75, 'es_predeterminado' => true],
             ['nombre' => 'Un set a 6 con tie-break', 'sets' => 1, 'juegos_por_set' => 6, 'tie_break_en' => 6, 'duracion_estimada' => 40],
             ['nombre' => 'Un set a 9', 'sets' => 1, 'juegos_por_set' => 9, 'tie_break_en' => 8, 'duracion_estimada' => 60],
-            ['nombre' => 'Al mejor de 3 con super tie-break', 'sets' => 3, 'juegos_por_set' => 6, 'tie_break_en' => 6, 'super_tie_break_final' => true, 'duracion_estimada' => 60],
+            ['nombre' => 'Dos sets + super tie-break', 'sets' => 3, 'juegos_por_set' => 6, 'tie_break_en' => 6, 'super_tie_break_final' => true, 'super_tie_break_puntos' => 10, 'duracion_estimada' => 60],
         ];
     }
 }

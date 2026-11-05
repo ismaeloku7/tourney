@@ -42,7 +42,7 @@ class FormatoPartidoFactory extends Factory
 
     public function conSuperTieBreak(): static
     {
-        return $this->state(['nombre' => 'Al mejor de 3 con super tie-break', 'super_tie_break_final' => true, 'duracion_estimada' => 60]);
+        return $this->state(['nombre' => 'Dos sets + super tie-break', 'super_tie_break_final' => true, 'duracion_estimada' => 60]);
     }
 
     public function porTiempo(int $minutos): static
