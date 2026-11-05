@@ -154,7 +154,7 @@ tie-break), `tie_break_puntos` tinyint (7), `super_tie_break_final` bool,
 `por_tiempo_minutos` smallint nullable, `duracion_estimada` smallint
 (minutos), `es_predeterminado` bool, timestamps. El seeder base del tenant
 crea «Al mejor de 3 sets a 6», «Un set a 6 con tie-break», «Un set a 9»
-y «Al mejor de 3 con super tie-break».
+y «Dos sets + super tie-break» (si van 1-1, super tie-break a 10).
 
 ### Torneo y categorías
 
