@@ -228,9 +228,10 @@ final class ImportarParejas
             }
         }
 
+        // Un teléfono es cualquier cosa con dígitos, con o sin prefijo y del largo que sea (Andorra tiene seis cifras).
         $original = $telefono;
         $telefono = preg_replace('/[\s.\-()]/', '', $telefono) ?? '';
-        if ($telefono !== '' && preg_match('/^\+?\d{6,15}$/', $telefono) !== 1) {
+        if ($telefono !== '' && preg_match('/^\+?\d{3,20}$/', $telefono) !== 1) {
             $informe->avisos[] = "Fila {$numero}: el teléfono «{$original}» de {$nombre} {$apellidos} no es un teléfono; se deja vacío.";
             $telefono = '';
         }

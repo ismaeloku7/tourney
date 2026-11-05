@@ -162,6 +162,8 @@ test('el enlace de WhatsApp normaliza el teléfono y falta sin teléfono', funct
     expect(EnlaceDeWhatsApp::numero('600 11 22 33'))->toBe('34600112233')
         ->and(EnlaceDeWhatsApp::numero('+34 600112233'))->toBe('34600112233')
         ->and(EnlaceDeWhatsApp::numero('0033 612345678'))->toBe('33612345678')
+        ->and(EnlaceDeWhatsApp::numero('+376 334 388'))->toBe('376334388')
+        ->and(EnlaceDeWhatsApp::numero('334388'))->toBe('334388')
         ->and(EnlaceDeWhatsApp::numero('12345'))->toBeNull()
         ->and(EnlaceDeWhatsApp::para(Jugador::factory()->make(['nombre' => 'Ana', 'telefono' => null]), 'Hola'))->toBeNull()
         ->and(EnlaceDeWhatsApp::para(Jugador::factory()->make(['telefono' => '600112233']), 'Hola Ana'))->toBe('https://wa.me/34600112233?text=Hola%20Ana');
