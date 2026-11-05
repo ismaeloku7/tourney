@@ -517,7 +517,7 @@ test('al configurar el cuadro se ve su esquema: rondas, cruces y quién llega a 
         ['local' => '1A', 'visitante' => 'M2'], ['local' => '2B', 'visitante' => '2C'], ['local' => '1C', 'visitante' => '2A'], ['local' => 'M1', 'visitante' => '1B'],
     ]]);
     expect($aMano)->toContain('Mejor 3º nº 2')->toContain('Ganador S1')->not->toContain('Orientativo')
-        ->and($esquema(['regla_de_cruces' => 'a_posiciones']))->toContain('Proponer cruces')
+        ->and($esquema(['regla_de_cruces' => 'a_posiciones']))->toContain('Partir del cuadro automático')
         ->and($esquema(['regla_de_cruces' => 'sorteo', 'tercer_y_cuarto_puesto' => true]))->toContain('Sorteo')->toContain('Tercer puesto')->toContain('Perdedor S1');
 
     // Y el formulario de la fase se abre y se guarda con el esquema dentro.
