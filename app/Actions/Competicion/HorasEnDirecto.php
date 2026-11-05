@@ -254,7 +254,9 @@ final class HorasEnDirecto
     }
 
     /**
-     * Guarda las horas que cambian (un minuto o más).
+     * Guarda las horas que cambian (un minuto o más). Solo se mueve el
+     * partido: su duración prevista no cambia aunque el que está en pista
+     * se alargue (eso solo empuja a los siguientes).
      *
      * @param  array<int, array{0: int, 1: int}>  $horas
      * @param  Collection<int, Partido>  $modelos
@@ -264,18 +266,19 @@ final class HorasEnDirecto
     {
         $cambios = [];
 
-        foreach ($horas as $id => [$inicio, $fin]) {
+        foreach ($horas as $id => [$inicio]) {
             $franja = $modelos->get($id)?->franja;
             if ($franja === null) {
                 continue;
             }
 
             $antes = $franja->inicio->getTimestamp();
-            if (abs($antes - $inicio) < 60 && abs($franja->fin->getTimestamp() - $fin) < 60) {
+            if (abs($antes - $inicio) < 60) {
                 continue;
             }
 
-            $franja->forceFill(['inicio' => now()->setTimestamp($inicio)->second(0), 'fin' => now()->setTimestamp($fin)->second(0)])->save();
+            $duracion = $franja->fin->getTimestamp() - $antes;
+            $franja->forceFill(['inicio' => now()->setTimestamp($inicio)->second(0), 'fin' => now()->setTimestamp($inicio + $duracion)->second(0)])->save();
             $cambios[$id] = [$antes, $inicio];
         }
 

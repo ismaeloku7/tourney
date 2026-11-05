@@ -144,3 +144,30 @@ test('si una pista va 20 minutos tarde, la página de horarios lo propone y al a
         ->call('aplicarSugerencia', $sugerencia->clave())
         ->assertNotified('No se ha recolocado');
 });
+
+test('un partido que se alarga empuja a los siguientes sin cambiar su propia duración, y dos resultados seguidos no chocan', function () {
+    [$uno, $dos] = [$this->pistas[0], $this->pistas[1]];
+    $largo = partidoEn($this->fase, $dos, $this->dia->setTime(9, 0));
+    $detras = partidoEn($this->fase, $dos, $this->dia->setTime(10, 10));
+    $primero = partidoEn($this->fase, $uno, $this->dia->setTime(9, 0));
+    $segundo = partidoEn($this->fase, $uno, $this->dia->setTime(10, 10));
+    $tercero = partidoEn($this->fase, $uno, $this->dia->setTime(11, 20));
+
+    Notification::fake();
+
+    // A las 11:30 el de la pista 2 sigue jugando: el de detrás espera, pero el largo no pasa a durar más.
+    $this->travelTo($this->dia->setTime(11, 30));
+    terminarPartido($primero, $this->propietario);
+
+    expect($largo->refresh()->franja->inicio->format('H:i'))->toBe('09:00')
+        ->and($largo->franja->fin->format('H:i'))->toBe('10:10')
+        ->and($detras->refresh()->franja->inicio->format('H:i'))->toBe('11:30')
+        ->and($detras->franja->fin->format('H:i'))->toBe('12:40');
+
+    // Un walkover justo después, en la misma pista y el mismo minuto: el tercero entra ya, sin chocar con el segundo.
+    terminarPartido($segundo, $this->propietario);
+
+    expect($segundo->refresh()->franja->inicio->format('H:i'))->toBe('11:30')
+        ->and($tercero->refresh()->franja->inicio->format('H:i'))->toBe('11:30')
+        ->and($tercero->franja->fin->format('H:i'))->toBe('12:40');
+});
