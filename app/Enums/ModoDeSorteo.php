@@ -11,6 +11,7 @@ enum ModoDeSorteo: string
     case Aleatorio = 'aleatorio';
     case CabezasDeSerie = 'cabezas_de_serie';
     case Manual = 'manual';
+    case PorNiveles = 'por_niveles';
 
     public function etiqueta(): string
     {
@@ -18,6 +19,7 @@ enum ModoDeSorteo: string
             self::Aleatorio => 'Aleatorio',
             self::CabezasDeSerie => 'Con cabezas de serie',
             self::Manual => 'Manual',
+            self::PorNiveles => 'Por niveles (bombos)',
         };
     }
 }

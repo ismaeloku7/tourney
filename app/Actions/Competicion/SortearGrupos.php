@@ -44,10 +44,10 @@ final class SortearGrupos
         $participantes = $fase->categoria->participantes()
             ->where('estado', EstadoParticipante::Activo->value)
             ->whereHas('inscripcion', fn ($consulta) => $consulta->where('estado', EstadoInscripcion::Confirmada->value))
-            ->with('participanteJugadores')
+            ->with(['participanteJugadores', 'jugadores'])
             ->orderBy('id')
             ->get()
-            ->map(fn (Participante $p): ParticipanteDto => new ParticipanteDto($p->id, $p->nombre, $p->cabeza_de_serie, $p->idsDeJugadores()))
+            ->map(fn (Participante $p): ParticipanteDto => new ParticipanteDto($p->id, $p->nombre, $p->cabeza_de_serie, $p->idsDeJugadores(), $p->nivelMedio()))
             ->all();
         $participantes = array_values($participantes);
 

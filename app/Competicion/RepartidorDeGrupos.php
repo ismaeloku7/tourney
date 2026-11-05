@@ -53,6 +53,10 @@ final readonly class RepartidorDeGrupos
             $this->colocarCabezas($participantes, $tamanos, $grupos, $colocados);
         }
 
+        if ($configuracion->modoDeSorteo === ModoDeSorteo::PorNiveles) {
+            $this->colocarPorNiveles($participantes, $tamanos, $grupos, $colocados, $semilla);
+        }
+
         $this->colocarRepartidos($ids, $configuracion->repartidos, $tamanos, $grupos, $colocados, $semilla);
 
         $resto = $this->barajar(array_values(array_filter($ids, fn (int $id): bool => ! in_array($id, $colocados, true))), $semilla);
@@ -234,6 +238,34 @@ final readonly class RepartidorDeGrupos
             if (count($grupos[$i]) > $tamanos[$i]) {
                 throw new ConfiguracionInvalida(["En el grupo {$nombre} caben {$tamanos[$i]} parejas y se han fijado ".count($grupos[$i]).'.']);
             }
+        }
+    }
+
+    /**
+     * Por niveles, como por bombos: de más a menos nivel medio, en tandas
+     * de tantas parejas como grupos; cada tanda cae al azar, una por grupo.
+     * La primera tanda hace de cabezas de serie. Empates de nivel, al azar;
+     * las parejas sin nivel, al final.
+     *
+     * @param  list<Participante>  $participantes
+     * @param  list<int>  $tamanos
+     * @param  array<int, list<int>>  $grupos
+     * @param  list<int>  $colocados
+     */
+    private function colocarPorNiveles(array $participantes, array $tamanos, array &$grupos, array &$colocados, int $semilla): void
+    {
+        $ids = array_map(fn (Participante $p): int => $p->id, $participantes);
+        $pendientes = array_values(array_filter($participantes, fn (Participante $p): bool => ! in_array($p->id, $colocados, true)));
+
+        mt_srand($semilla + 7);
+        $azar = [];
+        foreach ($pendientes as $p) {
+            $azar[$p->id] = mt_rand();
+        }
+        usort($pendientes, fn (Participante $a, Participante $b): int => [$a->nivel === null ? 1 : 0, -($a->nivel ?? 0), $azar[$a->id]] <=> [$b->nivel === null ? 1 : 0, -($b->nivel ?? 0), $azar[$b->id]]);
+
+        foreach (array_chunk(array_map(fn (Participante $p): int => $p->id, $pendientes), max(1, count($tamanos))) as $k => $bombo) {
+            $this->colocarRepartidos($ids, $bombo, $tamanos, $grupos, $colocados, $semilla + 100 + $k);
         }
     }
 
