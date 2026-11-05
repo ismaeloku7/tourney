@@ -13,11 +13,13 @@ use App\Competicion\Errores\ResultadoInvalido;
 use App\Enums\EstadoPartido;
 use App\Enums\ResultadoEspecial;
 use App\Filament\Avisos;
-use App\Models\Franja;
 use App\Models\Partido;
+use App\Models\TorneoPista;
 use App\Models\User;
+use Carbon\CarbonImmutable;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
+use Filament\Forms\Components\DateTimePicker;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Repeater;
 use Filament\Forms\Components\Select;
@@ -25,7 +27,6 @@ use Filament\Forms\Components\TextInput;
 use Filament\Forms\Components\Toggle;
 use Filament\Schemas\Components\Utilities\Get;
 use Filament\Support\Icons\Heroicon;
-use Illuminate\Database\Eloquent\Builder;
 
 /**
  * Lo que la organización hace con un partido desde cualquier tabla del
@@ -138,23 +139,23 @@ final class AccionesDePartido
             ->icon(Heroicon::OutlinedClock)
             ->color('gray')
             ->visible(fn (Partido $record): bool => in_array($record->estado, [EstadoPartido::Pendiente, EstadoPartido::Programado], true))
-            ->fillForm(fn (Partido $record): array => ['franja_id' => $record->franja_id])
+            ->fillForm(fn (Partido $record): array => ['pista_id' => $record->pista_id, 'inicio' => $record->franja?->inicio])
             ->schema([
-                Select::make('franja_id')->label('Franja')->searchable()->preload()
-                    ->options(fn (Partido $record): array => Franja::query()->with('pista')
-                        ->where('torneo_id', $record->fase->categoria->torneo_id)
-                        ->where('bloqueada', false)
-                        ->where(fn (Builder $q) => $q->whereDoesntHave('partido')->orWhere('id', $record->franja_id))
-                        ->orderBy('inicio')->orderBy('pista_id')->get()
-                        ->mapWithKeys(fn (Franja $f): array => [$f->id => $f->inicio->translatedFormat('D j/n H:i').' · '.$f->pista->nombre])->all())
+                Select::make('pista_id')->label('Pista')
+                    ->options(fn (Partido $record): array => $record->fase->categoria->torneo->torneoPistas()->with('pista')->get()
+                        ->mapWithKeys(fn (TorneoPista $tp): array => [$tp->pista_id => $tp->pista->nombre])->all())
                     ->placeholder('Sin hora')
-                    ->helperText('Solo salen las franjas libres. En blanco, el partido queda sin hora y el planificador lo volverá a colocar.'),
+                    ->requiredWith('inicio'),
+                DateTimePicker::make('inicio')->label('Hora (con el calentamiento)')->seconds(false)->minutesStep(5)
+                    ->requiredWith('pista_id')
+                    ->helperText(fn (Partido $record): string => 'Reserva la pista '.($record->fase->categoria->torneo->margen_entre_partidos_minutos + $record->formatoEfectivo()->duracion_estimada).' minutos. En blanco, el partido queda sin hora y el planificador lo volverá a colocar.'),
             ])
             ->action(function (Partido $record, array $data, Action $action): void {
-                $franja = filled($data['franja_id']) ? Franja::query()->findOrFail((int) $data['franja_id']) : null;
+                $pista = filled($data['pista_id'] ?? null) ? (int) $data['pista_id'] : null;
+                $inicio = filled($data['inicio'] ?? null) ? CarbonImmutable::parse((string) $data['inicio']) : null;
 
                 try {
-                    app(ProgramarPartido::class)->handle($record, $franja, self::usuario());
+                    app(ProgramarPartido::class)->handle($record, $pista, $inicio, self::usuario());
                 } catch (ErrorDeCompeticion $e) {
                     Avisos::error('No se ha podido programar', [$e->getMessage()]);
                     $action->halt();
@@ -162,7 +163,7 @@ final class AccionesDePartido
                     return;
                 }
 
-                Avisos::hecho($franja === null ? 'Partido sin hora' : 'Partido programado', $franja?->inicio->translatedFormat('l j/n H:i'));
+                Avisos::hecho($inicio === null ? 'Partido sin hora' : 'Partido programado', $inicio?->translatedFormat('l j/n H:i'));
             });
     }
 

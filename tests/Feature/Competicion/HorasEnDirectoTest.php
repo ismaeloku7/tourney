@@ -1,0 +1,206 @@
+<?php
+
+use App\Actions\Competicion\HorasEnDirecto;
+use App\Actions\Competicion\PlanificarHorarios;
+use App\Actions\Competicion\RegistrarResultado;
+use App\Competicion\Datos\Resultado;
+use App\Competicion\Datos\Set;
+use App\Enums\EstadoTorneo;
+use App\Enums\ResultadoEspecial;
+use App\Enums\Rol;
+use App\Filament\Resources\Torneos\Pages\HorariosDelTorneo;
+use App\Models\Categoria;
+use App\Models\Fase;
+use App\Models\FormatoPartido;
+use App\Models\Organizador;
+use App\Models\Partido;
+use App\Models\Pista;
+use App\Models\Torneo;
+use App\Models\User;
+use App\Notifications\ACalentar;
+use App\Notifications\CambioDePista;
+use App\Notifications\SoisLosSiguientes;
+use Carbon\CarbonImmutable;
+use Database\Seeders\PlanesSeeder;
+use Filament\Facades\Filament;
+use Illuminate\Support\Facades\Notification;
+use Livewire\Livewire;
+
+/**
+ * Un torneo en juego con los horarios publicados, dos pistas y partidos de
+ * 70 minutos (10 de calentamiento y 60 de juego) colocados a mano.
+ */
+beforeEach(function () {
+    $this->seed(PlanesSeeder::class);
+    usarOrganizador(Organizador::factory()->create());
+    Filament::setCurrentPanel('panel');
+    FormatoPartido::factory()->predeterminado()->create(['duracion_estimada' => 60]);
+
+    $this->propietario = User::factory()->rol(Rol::Propietario)->create();
+    $this->torneo = Torneo::factory()->create(['estado' => EstadoTorneo::EnJuego, 'horarios_publicados_en' => now(), 'descanso_minimo_minutos' => 30, 'margen_entre_partidos_minutos' => 10]);
+    $this->categoria = Categoria::factory()->create(['torneo_id' => $this->torneo->id]);
+    $this->fase = Fase::factory()->create(['categoria_id' => $this->categoria->id, 'estado' => 'en_juego']);
+    $this->dia = CarbonImmutable::parse($this->torneo->fecha_inicio->toDateString());
+    $this->pistas = Pista::factory()->count(2)->create();
+    foreach ($this->pistas as $pista) {
+        $this->torneo->torneoPistas()->create(['pista_id' => $pista->id, 'orden' => $pista->id, 'disponibilidad' => [['fecha' => $this->dia->toDateString(), 'desde' => '09:00', 'hasta' => '21:00']]]);
+    }
+});
+
+/** Un partido de dos parejas nuevas en esa pista a esa hora (prevista igual). */
+function partidoEn(Fase $fase, Pista $pista, CarbonImmutable $inicio): Partido
+{
+    $partido = Partido::factory()->create(['fase_id' => $fase->id, 'estado' => 'programado']);
+    $franja = $fase->categoria->torneo->franjas()->create(['pista_id' => $pista->id, 'inicio' => $inicio, 'fin' => $inicio->addMinutes(70), 'inicio_previsto' => $inicio]);
+    $partido->update(['franja_id' => $franja->id, 'pista_id' => $pista->id]);
+
+    return $partido->refresh();
+}
+
+function terminarPartido(Partido $partido, User $quien): void
+{
+    app(RegistrarResultado::class)->handle($partido->refresh(), new Resultado([new Set(6, 2), new Set(6, 1)]), $quien);
+}
+
+test('al acabar un partido antes de tiempo, el siguiente de la pista pasa a calentar ya y el de después es el siguiente', function () {
+    $pista = $this->pistas[0];
+    $primero = partidoEn($this->fase, $pista, $this->dia->setTime(9, 0));
+    $segundo = partidoEn($this->fase, $pista, $this->dia->setTime(10, 10));
+    $tercero = partidoEn($this->fase, $pista, $this->dia->setTime(11, 20));
+
+    Notification::fake();
+    $this->travelTo($this->dia->setTime(9, 50));
+    terminarPartido($primero, $this->propietario);
+
+    // El segundo entra a las 9:50 (20 minutos antes) y el tercero detrás.
+    expect($segundo->refresh()->franja->inicio->format('H:i'))->toBe('09:50')
+        ->and($tercero->refresh()->franja->inicio->format('H:i'))->toBe('11:00')
+        ->and($segundo->franja->inicio_previsto->format('H:i'))->toBe('10:10')
+        ->and($segundo->aviso_calentar_en)->not->toBeNull()
+        ->and($tercero->aviso_siguientes_en)->not->toBeNull();
+
+    Notification::assertSentTo([...$segundo->local->jugadores, ...$segundo->visitante->jugadores], ACalentar::class);
+    Notification::assertSentTo([...$tercero->local->jugadores, ...$tercero->visitante->jugadores], SoisLosSiguientes::class);
+    Notification::assertNotSentTo($tercero->local->jugadores, ACalentar::class);
+
+    // Cuando acaba el segundo (tarde, a las 11:15), al tercero le toca calentar; no se le repite «sois los siguientes».
+    $this->travelTo($this->dia->setTime(11, 15));
+    terminarPartido($segundo, $this->propietario);
+
+    expect($tercero->refresh()->franja->inicio->format('H:i'))->toBe('11:15');
+    Notification::assertSentTo($tercero->local->jugadores->first(), ACalentar::class);
+    Notification::assertSentToTimes($tercero->local->jugadores->first(), SoisLosSiguientes::class, 1);
+});
+
+test('de una fase oculta no se avisa a nadie, aunque las horas se recalculen', function () {
+    $this->fase->update(['visible_en_web' => false]);
+    $pista = $this->pistas[0];
+    $primero = partidoEn($this->fase, $pista, $this->dia->setTime(9, 0));
+    $segundo = partidoEn($this->fase, $pista, $this->dia->setTime(10, 10));
+
+    Notification::fake();
+    $this->travelTo($this->dia->setTime(9, 50));
+    terminarPartido($primero, $this->propietario);
+
+    expect($segundo->refresh()->franja->inicio->format('H:i'))->toBe('09:50');
+    Notification::assertNotSentTo($segundo->local->jugadores, ACalentar::class);
+});
+
+test('si una pista va 20 minutos tarde, la página de horarios lo propone y al aplicarlo se avisa a la pareja', function () {
+    [$uno, $dos] = [$this->pistas[0], $this->pistas[1]];
+    $a = partidoEn($this->fase, $uno, $this->dia->setTime(9, 0));
+    partidoEn($this->fase, $uno, $this->dia->setTime(10, 10));
+    partidoEn($this->fase, $uno, $this->dia->setTime(11, 20));
+    $d = partidoEn($this->fase, $dos, $this->dia->setTime(9, 0));
+    partidoEn($this->fase, $dos, $this->dia->setTime(10, 10));
+    partidoEn($this->fase, $dos, $this->dia->setTime(11, 20));
+    partidoEn($this->fase, $dos, $this->dia->setTime(12, 30));
+    partidoEn($this->fase, $dos, $this->dia->setTime(13, 40));
+
+    Notification::fake();
+    $this->travelTo($this->dia->setTime(9, 50));
+    terminarPartido($a, $this->propietario);
+    $this->travelTo($this->dia->setTime(10, 40));
+    terminarPartido($d, $this->propietario);
+
+    $sugerencia = app(HorasEnDirecto::class)->sugerencia($this->torneo->refresh());
+    expect($sugerencia)->not->toBeNull()
+        ->and($sugerencia->desdePista)->toBe($dos->id)
+        ->and($sugerencia->haciaPista)->toBe($uno->id);
+
+    $this->actingAs($this->propietario);
+    Livewire::test(HorariosDelTorneo::class, ['record' => $this->torneo->getRouteKey()])
+        ->assertSee('En directo')
+        ->assertSee('min tarde')
+        ->call('aplicarSugerencia', $sugerencia->clave())
+        ->assertNotified('Partido recolocado');
+
+    $movido = Partido::query()->findOrFail($sugerencia->partido);
+    expect($movido->pista_id)->toBe($uno->id)
+        ->and($movido->franja->pista_id)->toBe($uno->id)
+        ->and($movido->franja->inicio->getTimestamp())->toBeGreaterThanOrEqual($this->dia->setTime(11, 10)->getTimestamp());
+    Notification::assertSentTo($movido->local->jugadores, CambioDePista::class);
+
+    // Lo propuesto ya no vale: no se aplica dos veces.
+    Livewire::test(HorariosDelTorneo::class, ['record' => $this->torneo->getRouteKey()])
+        ->call('aplicarSugerencia', $sugerencia->clave())
+        ->assertNotified('No se ha recolocado');
+});
+
+test('un partido que se alarga empuja a los siguientes sin cambiar su propia duración, y dos resultados seguidos no chocan', function () {
+    [$uno, $dos] = [$this->pistas[0], $this->pistas[1]];
+    $largo = partidoEn($this->fase, $dos, $this->dia->setTime(9, 0));
+    $detras = partidoEn($this->fase, $dos, $this->dia->setTime(10, 10));
+    $primero = partidoEn($this->fase, $uno, $this->dia->setTime(9, 0));
+    $segundo = partidoEn($this->fase, $uno, $this->dia->setTime(10, 10));
+    $tercero = partidoEn($this->fase, $uno, $this->dia->setTime(11, 20));
+
+    Notification::fake();
+
+    // A las 11:30 el de la pista 2 sigue jugando: el de detrás espera, pero el largo no pasa a durar más.
+    $this->travelTo($this->dia->setTime(11, 30));
+    terminarPartido($primero, $this->propietario);
+
+    expect($largo->refresh()->franja->inicio->format('H:i'))->toBe('09:00')
+        ->and($largo->franja->fin->format('H:i'))->toBe('10:10')
+        ->and($detras->refresh()->franja->inicio->format('H:i'))->toBe('11:30')
+        ->and($detras->franja->fin->format('H:i'))->toBe('12:40');
+
+    // Un walkover justo después, en la misma pista y el mismo minuto: el tercero entra ya, sin chocar con el segundo.
+    terminarPartido($segundo, $this->propietario);
+
+    expect($segundo->refresh()->franja->inicio->format('H:i'))->toBe('11:30')
+        ->and($tercero->refresh()->franja->inicio->format('H:i'))->toBe('11:30')
+        ->and($tercero->franja->fin->format('H:i'))->toBe('12:40');
+});
+
+test('al acabar en directo se mide lo que duró el partido, sin calentamiento ni walkovers', function () {
+    $pista = $this->pistas[0];
+    $jugado = partidoEn($this->fase, $pista, $this->dia->setTime(9, 0));
+    $sinJugar = partidoEn($this->fase, $pista, $this->dia->setTime(10, 10));
+
+    $this->travelTo($this->dia->setTime(10, 25));
+    terminarPartido($jugado, $this->propietario);
+
+    $formato = FormatoPartido::query()->where('es_predeterminado', true)->value('id');
+    expect($jugado->refresh()->minutos_jugados)->toBe(75)
+        ->and($jugado->formato_medido_id)->toBe($formato);
+
+    app(RegistrarResultado::class)->handle($sinJugar->refresh(), new Resultado([], ResultadoEspecial::Walkover, true), $this->propietario);
+    expect($sinJugar->refresh()->minutos_jugados)->toBeNull();
+});
+
+test('el planificador usa lo que duran de verdad los partidos de su formato', function () {
+    $formato = FormatoPartido::query()->where('es_predeterminado', true)->value('id');
+    foreach (range(1, 5) as $i) {
+        Partido::factory()->jugado()->create(['fase_id' => $this->fase->id, 'minutos_jugados' => 90, 'formato_medido_id' => $formato]);
+    }
+    $pendiente = Partido::factory()->create(['fase_id' => $this->fase->id]);
+
+    $plan = app(PlanificarHorarios::class)->proponer($this->torneo->refresh());
+    $colocado = $plan->plan->colocadoDe($pendiente->id);
+
+    // 90 de juego más los 10 de calentamiento.
+    expect($colocado)->not->toBeNull()
+        ->and(intdiv($colocado->fin->getTimestamp() - $colocado->inicio->getTimestamp(), 60))->toBe(100);
+});

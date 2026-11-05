@@ -2,7 +2,6 @@
 
 use App\Actions\Competicion\CambiarEstadoDelTorneo;
 use App\Actions\Competicion\CerrarFase;
-use App\Actions\Competicion\GenerarFranjas;
 use App\Actions\Competicion\GenerarPartidos;
 use App\Actions\Competicion\PlanificarHorarios;
 use App\Actions\Competicion\RegistrarResultado;
@@ -114,7 +113,6 @@ test('al publicar los horarios cada jugador recibe los suyos y los seguidores de
     $this->torneo->torneoPistas()->create(['pista_id' => Pista::factory()->create(['nombre' => 'Central'])->id, 'orden' => 1, 'disponibilidad' => [
         ['fecha' => $this->torneo->fecha_inicio->toDateString(), 'desde' => '09:00', 'hasta' => '21:00'],
     ]]);
-    app(GenerarFranjas::class)->handle($this->torneo);
     app(PlanificarHorarios::class)->handle($this->torneo, $this->propietario);
 
     $seguidor = suscripcionDe(null);
@@ -221,6 +219,23 @@ test('media hora antes de cada partido, un aviso a sus cuatro jugadores, una sol
     expect($partido->refresh()->aviso_proximo_en)->not->toBeNull();
 });
 
+test('de una fase oculta no sale el aviso de media hora antes hasta que se enseña', function () {
+    $this->torneo->update(['estado' => EstadoTorneo::EnJuego, 'horarios_publicados_en' => now()]);
+    $fase = torneoConGrupo($this->torneo, $this->categoria, $this->propietario);
+    $fase->update(['visible_en_web' => false]);
+    $pista = Pista::factory()->create();
+    $partido = $fase->partidos()->orderBy('id')->firstOrFail();
+    $franja = $this->torneo->franjas()->create(['pista_id' => $pista->id, 'inicio' => now()->addMinutes(20), 'fin' => now()->addMinutes(80)]);
+    $partido->update(['franja_id' => $franja->id, 'pista_id' => $pista->id, 'estado' => 'programado']);
+
+    Notification::fake();
+    $this->artisan('avisos:proximos-partidos')->expectsOutputToContain('Partidos avisados: 0');
+    Notification::assertNothingSent();
+
+    $fase->update(['visible_en_web' => true]);
+    $this->artisan('avisos:proximos-partidos')->expectsOutputToContain('Partidos avisados: 1');
+});
+
 test('el jugador activa el push y elige sus avisos; cualquiera sigue un torneo sin cuenta', function () {
     $ana = Jugador::factory()->create();
     $suscripcion = ['endpoint' => 'https://push.example.com/ana', 'keys' => ['p256dh' => 'clave', 'auth' => 'secreto']];
@@ -259,4 +274,28 @@ test('el jugador activa el push y elige sus avisos; cualquiera sigue un torneo s
 test('push:claves genera un par de claves VAPID', function () {
     config()->set('webpush.clave_publica', null);
     $this->artisan('push:claves')->expectsOutputToContain('WEBPUSH_VAPID_PUBLIC_KEY=')->assertSuccessful();
+});
+
+test('de una fase oculta en la web no se avisa de nada: ni resultados, ni validaciones, ni cruces', function () {
+    $this->torneo->update(['resultados_por_jugadores' => ResultadosPorJugadores::ConValidacion, 'estado' => EstadoTorneo::EnJuego]);
+    $fase = torneoConGrupo($this->torneo, $this->categoria, $this->propietario);
+    $fase->update(['visible_en_web' => false]);
+    $cuadro = Fase::query()->where('categoria_id', $this->categoria->id)->whereKeyNot($fase->id)->firstOrFail();
+    $cuadro->update(['visible_en_web' => false]);
+    $partidos = $fase->partidos()->orderBy('id')->get();
+
+    Notification::fake();
+
+    // Un jugador anota: el rival no recibe «valida el resultado»; la organización anota: nadie recibe el resultado.
+    app(RegistrarResultado::class)->handle($partidos[0], new Resultado([new Set(6, 2), new Set(6, 3)]), $partidos[0]->local->jugadores->first());
+    foreach ($partidos->slice(1) as $partido) {
+        app(RegistrarResultado::class)->handle($partido, new Resultado([new Set(6, 1), new Set(6, 1)]), $this->propietario);
+    }
+    app(ValidarResultado::class)->handle($partidos[0]->refresh(), $partidos[0]->visitante->jugadores->first());
+
+    // Con el cuadro oculto, cerrar avisando tampoco manda los cruces.
+    app(CerrarFase::class)->handle($fase, $this->propietario, avisar: true);
+
+    Notification::assertNothingSent();
+    expect($this->remitente->titulos())->toBe([]);
 });

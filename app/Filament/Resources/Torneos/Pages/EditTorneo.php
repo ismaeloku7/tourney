@@ -4,10 +4,7 @@ namespace App\Filament\Resources\Torneos\Pages;
 
 use App\Actions\Avisos\EnviarComunicacion;
 use App\Actions\Competicion\CambiarEstadoDelTorneo;
-use App\Actions\Competicion\GenerarFranjas;
-use App\Actions\Competicion\PlanificarHorarios;
 use App\Actions\Inscripciones\ImportarParejas;
-use App\Competicion\Datos\Conflicto;
 use App\Competicion\Errores\ErrorDeCompeticion;
 use App\Enums\EstadoTorneo;
 use App\Exportaciones\AccionesDeExportacion;
@@ -58,32 +55,11 @@ class EditTorneo extends EditRecord
                 ->color('gray')
                 ->url(fn (): string => PartidosDelTorneo::getUrl(['record' => $this->torneo()])),
             Action::make('planificar')
-                ->label('Planificar horarios')
+                ->label('Horarios')
                 ->icon(Heroicon::OutlinedCalendarDays)
+                ->color('gray')
                 ->visible(fn (): bool => $this->torneo()->torneoPistas()->exists())
-                ->requiresConfirmation()
-                ->modalDescription('Se crean las franjas que falten en las pistas del torneo y se pone hora y pista a los partidos pendientes de todas las categorías, respetando los ya programados, el descanso mínimo y que nadie juegue dos partidos a la vez.')
-                ->modalSubmitActionLabel('Planificar')
-                ->action(function (): void {
-                    $torneo = $this->torneo();
-                    $franjas = app(GenerarFranjas::class)->handle($torneo);
-                    $planificacion = app(PlanificarHorarios::class)->handle($torneo, $this->usuario());
-
-                    $colocados = count($planificacion->asignaciones);
-                    $conflictos = $planificacion->conflictos;
-
-                    if ($conflictos === []) {
-                        Avisos::hecho($colocados === 0 ? 'No había partidos que colocar' : "{$colocados} partidos con hora y pista", $franjas > 0 ? "Se han creado {$franjas} franjas nuevas." : null);
-
-                        return;
-                    }
-
-                    Avisos::error(count($conflictos).' partidos se quedan sin sitio', [
-                        "{$colocados} colocados.",
-                        ...array_map(fn (Conflicto $c): string => "Partido {$c->partido}: {$c->detalle}", array_slice($conflictos, 0, 5)),
-                        count($conflictos) > 5 ? 'Y '.(count($conflictos) - 5).' más.' : '',
-                    ]);
-                }),
+                ->url(fn (): string => HorariosDelTorneo::getUrl(['record' => $this->torneo()])),
             Action::make('importar')
                 ->label('Importar parejas')
                 ->icon(Heroicon::OutlinedArrowUpTray)

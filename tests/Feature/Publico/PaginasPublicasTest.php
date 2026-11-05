@@ -1,6 +1,5 @@
 <?php
 
-use App\Actions\Competicion\GenerarFranjas;
 use App\Actions\Competicion\GenerarPartidos;
 use App\Actions\Competicion\PlanificarHorarios;
 use App\Actions\Competicion\RegistrarResultado;
@@ -56,7 +55,6 @@ beforeEach(function () {
         $grupos = Fase::factory()->grupos(['tamano_de_grupo' => 4, 'semilla' => 3])->create(['categoria_id' => $categoria->id, 'nombre' => 'Fase de grupos']);
         app(SortearGrupos::class)->handle($grupos, $usuario);
         app(GenerarPartidos::class)->handle($grupos, $usuario);
-        app(GenerarFranjas::class)->handle($this->torneo);
         app(PlanificarHorarios::class)->handle($this->torneo, $usuario);
         $this->torneo->update(['horarios_publicados_en' => now()]);
 
@@ -157,6 +155,22 @@ test('lo que la organización oculta no sale en la web, ni en el tablero, ni en 
     Livewire::test(FichaDelTorneo::class, ['torneo' => $torneo->refresh()])
         ->call('ver', 'grupos')->assertSee('Grupo A')
         ->call('ver', 'horarios')->assertSee('Central');
+});
+
+test('los horarios de una fase oculta no salen hasta que se enseña la fase', function () {
+    usarOrganizador($this->organizador);
+    $torneo = Torneo::query()->where('slug', 'open-otono')->sole();
+    $fase = Fase::query()->where('nombre', 'Fase de grupos')->sole();
+    $fase->update(['visible_en_web' => false]);
+
+    // Los horarios del torneo siguen a la vista, pero de esta fase no sale ninguna hora.
+    Livewire::test(FichaDelTorneo::class, ['torneo' => $torneo])->call('ver', 'horarios')->assertDontSee('Central');
+    $this->get('http://norte.saas.test/torneos/open-otono/tablero')->assertOk()->assertDontSee('García / López');
+    $this->get("http://norte.saas.test/torneos/open-otono/pista/{$this->pista->id}")->assertOk()->assertDontSee('Mixta B');
+
+    usarOrganizador($this->organizador);
+    $fase->update(['visible_en_web' => true]);
+    Livewire::test(FichaDelTorneo::class, ['torneo' => $torneo->refresh()])->call('ver', 'horarios')->assertSee('Central');
 });
 
 test('desde la ficha del torneo se marca qué se ve en la web', function () {

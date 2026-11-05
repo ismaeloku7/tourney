@@ -3,7 +3,6 @@
 namespace Database\Seeders\Organizador;
 
 use App\Actions\Competicion\CerrarFase;
-use App\Actions\Competicion\GenerarFranjas;
 use App\Actions\Competicion\GenerarPartidos;
 use App\Actions\Competicion\PlanificarHorarios;
 use App\Actions\Competicion\RegistrarResultado;
@@ -69,7 +68,6 @@ class TorneosSeeder extends Seeder
             app(GenerarPartidos::class)->handle($fase, $this->propietario);
         }
 
-        app(GenerarFranjas::class)->handle($torneo);
         app(PlanificarHorarios::class)->handle($torneo, $this->propietario);
     }
 
@@ -86,7 +84,6 @@ class TorneosSeeder extends Seeder
 
         app(SortearGrupos::class)->handle($fase, $this->propietario);
         app(GenerarPartidos::class)->handle($fase, $this->propietario);
-        app(GenerarFranjas::class)->handle($torneo);
         app(PlanificarHorarios::class)->handle($torneo, $this->propietario);
 
         // El grupo A entero, con ganadores alternos; del resto, la mitad.
@@ -114,7 +111,6 @@ class TorneosSeeder extends Seeder
 
         app(SortearGrupos::class)->handle($grupos, $this->propietario);
         app(GenerarPartidos::class)->handle($grupos, $this->propietario);
-        app(GenerarFranjas::class)->handle($torneo);
         app(PlanificarHorarios::class)->handle($torneo, $this->propietario);
 
         $this->jugarTodo($grupos);

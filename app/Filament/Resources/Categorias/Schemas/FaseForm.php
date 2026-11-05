@@ -73,7 +73,7 @@ class FaseForm
                         ->options([ModoDeSorteo::Aleatorio->value => ModoDeSorteo::Aleatorio->etiqueta(), ModoDeSorteo::CabezasDeSerie->value => ModoDeSorteo::CabezasDeSerie->etiqueta()])
                         ->default(ModoDeSorteo::Aleatorio->value)->required()
                         ->visible(fn (Get $get): bool => self::tipo($get('tipo')) === TipoDeFase::Grupos)
-                        ->helperText('Con cabezas de serie, cada una encabeza un grupo. Al sortear se pueden fijar parejas a mano en cada grupo (en modo manual, todas); el resto se sortea.'),
+                        ->helperText('Con cabezas de serie, cada una encabeza un grupo. Al sortear se puede cambiar, ordenar las cabezas de serie, fijar parejas en cada grupo o hacerlo todo a mano.'),
                     Toggle::make('configuracion.ida_y_vuelta')->label('Ida y vuelta')->default(false)->inline(false),
                     TextInput::make('configuracion.partidos_por_participante')->label('Partidos por pareja')->integer()->minValue(1)
                         ->helperText('En blanco, todas contra todas. Si se limita, cada pareja juega solo esos partidos.'),

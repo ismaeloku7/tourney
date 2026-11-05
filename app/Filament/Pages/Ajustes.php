@@ -191,10 +191,17 @@ class Ajustes extends Page
                             ->placeholder(fn (): string => MarcaDelOrganizador::nombre())
                             ->visible(fn (Get $get): bool => (bool) $get(Ajuste::CorreoPropio->value)),
                         Actions::make([
-                            Action::make('probarCorreo')->label('Guardar y enviarme un correo de prueba')->icon(Heroicon::OutlinedPaperAirplane)->color('gray')
-                                ->action(fn () => $this->probarCorreo()),
-                        ])->columnSpanFull()
-                            ->visible(fn (Get $get): bool => (bool) $get(Ajuste::CorreoPropio->value)),
+                            Action::make('probarCorreo')->label('Guardar y enviar un correo de prueba')->icon(Heroicon::OutlinedPaperAirplane)->color('gray')
+                                ->modalHeading('Enviar un correo de prueba')
+                                ->modalDescription('Se guardan los ajustes y se manda un correo de prueba por el servidor configurado (el suyo o, si no tiene, el de la plataforma).')
+                                ->modalSubmitActionLabel('Enviar')
+                                ->schema([
+                                    TextInput::make('destino')->label('Enviar a')->email()->required()->maxLength(190)
+                                        ->default(fn (): ?string => ($usuario = Filament::auth()->user()) instanceof User ? $usuario->email : null)
+                                        ->helperText('Por ejemplo, una cuenta de Gmail y otra de Hotmail. Para ver la nota de entrega (SPF, DKIM, DMARC), use la dirección que da mail-tester.com.'),
+                                ])
+                                ->action(fn (array $data) => $this->probarCorreo((string) $data['destino'])),
+                        ])->columnSpanFull(),
                     ]),
                 Section::make('Privacidad')
                     ->components([
@@ -278,35 +285,55 @@ class Ajustes extends Page
         Avisos::hecho('Ajustes guardados');
     }
 
-    /** Guarda y manda un correo al propietario por el servidor que ha puesto. */
-    public function probarCorreo(): void
+    /**
+     * Guarda y manda un correo de prueba a $destino (o al usuario) por el
+     * servidor que hay: el del organizador si lo tiene encendido, o el de
+     * la plataforma.
+     */
+    public function probarCorreo(?string $destino = null): void
     {
+        $usuario = Filament::auth()->user();
+        $destino = trim((string) ($destino ?? ($usuario instanceof User ? $usuario->email : '')));
+
+        if (filter_var($destino, FILTER_VALIDATE_EMAIL) === false) {
+            Avisos::error('Esa dirección no es válida', ['Escriba un correo electrónico completo, como nombre@gmail.com.']);
+
+            return;
+        }
+
         $this->guardar();
 
+        $propio = (bool) ValorDeAjuste::obtener(Ajuste::CorreoPropio);
         $servidor = CorreoDelOrganizador::servidor();
-        $usuario = Filament::auth()->user();
 
-        if ($servidor === null || ! $usuario instanceof User) {
+        if ($propio && $servidor === null) {
             Avisos::error('Falta el servidor o el remitente', ['Rellene al menos el servidor SMTP y el correo del remitente.']);
 
             return;
         }
 
-        // Lo recién guardado: el organizador se preparó al empezar la petición, con lo de antes.
-        config(['mail.mailers.'.CorreoDelOrganizador::MAILER => $servidor['mailer']]);
-        Mail::forgetMailers();
+        if ($servidor !== null) {
+            // Lo recién guardado: el organizador se preparó al empezar la petición, con lo de antes.
+            config(['mail.mailers.'.CorreoDelOrganizador::MAILER => $servidor['mailer']]);
+            Mail::forgetMailers();
+            $mailer = CorreoDelOrganizador::MAILER;
+            $correo = new CorreoDePrueba((string) $servidor['mailer']['host'], $servidor['from']['address'], $servidor['from']['name']);
+        } else {
+            // Al empezar la petición se cargó el servidor del club (si lo tenía encendido): se suelta para usar el de la plataforma.
+            app(CorreoDelOrganizador::class)->revert();
+            $mailer = (string) config('mail.default');
+            $correo = new CorreoDePrueba('el de la plataforma', (string) config('mail.from.address'), (string) (config('mail.from.name') ?: MarcaDelOrganizador::nombre()));
+        }
 
         try {
-            Mail::mailer(CorreoDelOrganizador::MAILER)
-                ->to($usuario->email)
-                ->send(new CorreoDePrueba((string) $servidor['mailer']['host'], $servidor['from']['address'], $servidor['from']['name']));
+            Mail::mailer($mailer)->to($destino)->send($correo);
         } catch (Throwable $e) {
             Avisos::error('No se ha podido enviar', ['El servidor ha respondido: '.Str::limit($e->getMessage(), 300)]);
 
             return;
         }
 
-        Avisos::hecho('Correo de prueba enviado', "Mire la bandeja de {$usuario->email}.");
+        Avisos::hecho('Correo de prueba enviado', "Mire la bandeja de entrada (y la de correo no deseado) de {$destino}.");
     }
 
     private static function limites(Organizador $organizador): string

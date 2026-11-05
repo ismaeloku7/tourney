@@ -59,7 +59,8 @@ class RecuperarAcceso extends Command
 
             $this->line("Cambiando la contraseña de {$email}...");
             $clave = is_string($elegida) ? $elegida : Str::password(16, symbols: false);
-            $usuario->forceFill(['password' => $clave, 'activo' => true])->save();
+            // Con la contraseña nueva, fuera las sesiones recordadas en otros dispositivos.
+            $usuario->forceFill(['password' => $clave, 'activo' => true, 'remember_token' => Str::random(60)])->save();
             $this->line('Contraseña guardada y cuenta activa.');
 
             if ($this->option('sin-correo-propio') && ValorDeAjuste::obtener(Ajuste::CorreoPropio) === true) {

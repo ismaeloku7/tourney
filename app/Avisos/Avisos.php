@@ -26,6 +26,7 @@ use Illuminate\Support\Facades\Notification;
  * Quién recibe cada aviso del briefing. Las acciones lo llaman cuando pasa
  * algo; aquí se decide a qué jugadores (y seguidores del torneo) va. Los
  * envíos salen por la cola: un aviso por jugador, nunca uno por partido.
+ * De una fase oculta en la web no se avisa de nada a nadie.
  */
 class Avisos
 {
@@ -64,6 +65,10 @@ class Avisos
     /** El rival tiene que validar lo que ha anotado un jugador. */
     public function resultadoPorValidar(Partido $partido): void
     {
+        if (! $partido->fase->visible_en_web) {
+            return;
+        }
+
         $registrador = $partido->registrado_por_jugador_id;
         $rival = $partido->local !== null && $registrador !== null && in_array($registrador, $partido->local->idsDeJugadores(), true)
             ? $partido->visitante
@@ -77,6 +82,10 @@ class Avisos
     /** El resultado ya cuenta: a las dos parejas y a quien sigue el torneo. */
     public function resultadoDelPartido(Partido $partido): void
     {
+        if (! $partido->fase->visible_en_web) {
+            return;
+        }
+
         $jugadores = [];
         foreach ([$partido->local, $partido->visitante] as $participante) {
             if ($participante !== null) {
@@ -101,6 +110,11 @@ class Avisos
             ->orderBy('ronda')->orderBy('posicion')->get();
 
         foreach ($partidos as $partido) {
+            // Si el cuadro aún no se enseña, tampoco se avisa de él.
+            if (! $partido->fase->visible_en_web) {
+                continue;
+            }
+
             foreach ([$partido->local, $partido->visitante] as $participante) {
                 if ($participante === null || isset($avisados[$participante->id])) {
                     continue;

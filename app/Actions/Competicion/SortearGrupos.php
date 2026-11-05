@@ -27,8 +27,11 @@ final class SortearGrupos
 {
     public function __construct(private readonly RepartidorDeGrupos $repartidor = new RepartidorDeGrupos) {}
 
-    /** @param  list<list<int>>|null  $fijos  Ids de participante por grupo (A, B…), o null para dejar los guardados. */
-    public function handle(Fase $fase, User $usuario, bool $forzar = false, ?array $fijos = null): RepartoDeGrupos
+    /**
+     * @param  list<list<int>>|null  $fijos  Ids de participante por grupo (A, B…), o null para dejar los guardados.
+     * @param  list<int>|null  $repartidos  Ids que se reparten al azar entre los grupos, o null para dejar los guardados.
+     */
+    public function handle(Fase $fase, User $usuario, bool $forzar = false, ?array $fijos = null, ?array $repartidos = null): RepartoDeGrupos
     {
         if (! $fase->tipo->esDeGrupos()) {
             throw new OperacionNoPermitida('Solo se sortean las fases de grupos.');
@@ -51,6 +54,9 @@ final class SortearGrupos
         $configuracion = $fase->configuracionDeGrupos();
         if ($fijos !== null) {
             $configuracion = $configuracion->conGruposManuales($fijos);
+        }
+        if ($repartidos !== null) {
+            $configuracion = $configuracion->conRepartidos($repartidos);
         }
 
         return DB::transaction(function () use ($fase, $usuario, $participantes, $configuracion): RepartoDeGrupos {

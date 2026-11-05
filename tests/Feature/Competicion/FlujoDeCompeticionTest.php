@@ -3,7 +3,6 @@
 use App\Actions\Competicion\AnularResultado;
 use App\Actions\Competicion\CambiarEstadoDelTorneo;
 use App\Actions\Competicion\CerrarFase;
-use App\Actions\Competicion\GenerarFranjas;
 use App\Actions\Competicion\GenerarPartidos;
 use App\Actions\Competicion\PlanificarHorarios;
 use App\Actions\Competicion\ProyectarCruces;
@@ -111,16 +110,45 @@ test('generar partidos crea 18 pendientes y las clasificaciones a cero, y planif
         ->and(Clasificacion::query()->where('fase_id', $this->grupos->id)->count())->toBe(12)
         ->and(Clasificacion::query()->where('fase_id', $this->grupos->id)->sum('puntos'))->toBe(0);
 
-    expect(app(GenerarFranjas::class)->handle($this->torneo))->toBe(4 * 2 * 12);
-
     $planificacion = app(PlanificarHorarios::class)->handle($this->torneo, $this->propietario);
 
     expect($planificacion->conflictos)->toBe([])
-        ->and($planificacion->asignaciones)->toHaveCount(18)
-        ->and($this->grupos->partidos()->where('estado', EstadoPartido::Programado->value)->whereNotNull('franja_id')->count())->toBe(18);
+        ->and($planificacion->colocados)->toHaveCount(18)
+        ->and($this->grupos->partidos()->where('estado', EstadoPartido::Programado->value)->whereNotNull('franja_id')->count())->toBe(18)
+        // Una franja por partido, a su medida: calentamiento más duración.
+        ->and($this->torneo->franjas()->count())->toBe(18);
 
-    // Repetir no cambia nada: ya están todos fijados.
-    expect(app(PlanificarHorarios::class)->handle($this->torneo, $this->propietario)->asignaciones)->toBe([]);
+    $franjas = $this->torneo->franjas()->get();
+    $minutos = $this->torneo->margen_entre_partidos_minutos + 60;
+    expect($franjas->every(fn ($f): bool => (int) $f->inicio->diffInMinutes($f->fin) === $minutos))->toBeTrue();
+
+    // Nadie juega dos a la vez ni sin su descanso, y ninguna pista tiene dos partidos a la vez.
+    $porJugador = [];
+    foreach ($this->grupos->partidos()->with(['franja', 'local.jugadores', 'visitante.jugadores'])->get() as $partido) {
+        foreach ([...$partido->local->jugadores, ...$partido->visitante->jugadores] as $jugador) {
+            $porJugador[$jugador->id][] = [$partido->franja->inicio, $partido->franja->fin];
+        }
+    }
+    foreach ($porJugador as $tramos) {
+        usort($tramos, fn ($a, $b): int => $a[0] <=> $b[0]);
+        for ($i = 1; $i < count($tramos); $i++) {
+            expect($tramos[$i - 1][1]->diffInMinutes($tramos[$i][0], false))->toBeGreaterThanOrEqual($this->torneo->descanso_minimo_minutos);
+        }
+    }
+    foreach ($franjas->groupBy('pista_id') as $dePista) {
+        $ordenadas = $dePista->sortBy('inicio')->values();
+        for ($i = 1; $i < $ordenadas->count(); $i++) {
+            expect($ordenadas[$i]->inicio->gte($ordenadas[$i - 1]->fin))->toBeTrue();
+        }
+    }
+
+    // Repetir no cambia nada: ya están todos colocados.
+    expect(app(PlanificarHorarios::class)->handle($this->torneo, $this->propietario)->colocados)->toBe([])
+        ->and($this->torneo->franjas()->count())->toBe(18);
+
+    // Rehacerlos los vuelve a colocar a todos, sin dejar franjas sueltas.
+    expect(app(PlanificarHorarios::class)->handle($this->torneo, $this->propietario, rehacer: true)->colocados)->toHaveCount(18)
+        ->and($this->torneo->franjas()->count())->toBe(18);
 });
 
 test('registrar un resultado recalcula la tabla del grupo y pone la fase en juego', function () {
@@ -274,7 +302,6 @@ test('el torneo cambia de estado de uno en uno y con sus comprobaciones', functi
 test('el torneo de pruebas pasa a en juego cuando tiene horarios', function () {
     app(SortearGrupos::class)->handle($this->grupos, $this->propietario);
     app(GenerarPartidos::class)->handle($this->grupos, $this->propietario);
-    app(GenerarFranjas::class)->handle($this->torneo);
     app(PlanificarHorarios::class)->handle($this->torneo, $this->propietario);
 
     app(CambiarEstadoDelTorneo::class)->handle($this->torneo, EstadoTorneo::EnJuego, $this->propietario);
