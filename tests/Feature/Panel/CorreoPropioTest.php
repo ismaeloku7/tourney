@@ -141,3 +141,33 @@ test('«Guardar y enviarme un correo de prueba» lo manda al propietario desde e
         && $correo->hasFrom('torneos@padelnorte.es', 'Torneos Pádel Norte')
         && $correo->servidor === 'smtp.padelnorte.es');
 });
+
+test('el correo de prueba se manda a la dirección que se elija', function () {
+    Mail::fake();
+
+    Livewire::test(Ajustes::class)
+        ->fillForm(servidorDelClub())
+        ->call('probarCorreo', 'socio@gmail.com')
+        ->assertNotified('Correo de prueba enviado');
+
+    Mail::assertSent(CorreoDePrueba::class, fn (CorreoDePrueba $correo): bool => $correo->hasTo('socio@gmail.com')
+        && ! $correo->hasTo('duena@padelnorte.es')
+        && $correo->hasFrom('torneos@padelnorte.es', 'Torneos Pádel Norte'));
+
+    // Una dirección mal escrita no manda nada.
+    Livewire::test(Ajustes::class)->call('probarCorreo', 'socio@')->assertNotified('Esa dirección no es válida');
+    Mail::assertSentCount(1);
+});
+
+test('sin servidor propio, el correo de prueba sale por el de la plataforma', function () {
+    Mail::fake();
+
+    Livewire::test(Ajustes::class)
+        ->fillForm([Ajuste::NombrePublico->value => 'Pádel Norte', Ajuste::CorreoPropio->value => false])
+        ->call('probarCorreo', 'socio@hotmail.com')
+        ->assertNotified('Correo de prueba enviado');
+
+    Mail::assertSent(CorreoDePrueba::class, fn (CorreoDePrueba $correo): bool => $correo->hasTo('socio@hotmail.com')
+        && $correo->servidor === 'el de la plataforma'
+        && $correo->hasFrom((string) config('mail.from.address')));
+});
