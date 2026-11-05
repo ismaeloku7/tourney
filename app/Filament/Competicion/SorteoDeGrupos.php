@@ -29,6 +29,7 @@ use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Radio;
 use Filament\Forms\Components\Select;
+use Filament\Forms\Components\TextInput;
 use Filament\Schemas\Components\Actions;
 use Filament\Schemas\Components\Component;
 use Filament\Schemas\Components\Utilities\Get;
@@ -127,6 +128,7 @@ final class SorteoDeGrupos
     {
         $configuracion = $fase->configuracionDeGrupos();
         $datos = [
+            'numero' => self::numeroActual($fase),
             'modo' => $configuracion->modoDeSorteo->value,
             'cabezas' => $fase->categoria->participantes()->whereNotNull('cabeza_de_serie')->orderBy('cabeza_de_serie')->get()
                 ->map(fn (Participante $p): string => (string) $p->id)->all(),
@@ -154,13 +156,15 @@ final class SorteoDeGrupos
     private static function formulario(Fase $fase): array
     {
         $opciones = self::parejas($fase)->mapWithKeys(fn (Participante $p): array => [$p->id => self::etiqueta($p)])->all();
-        $total = self::cuantosSelectores($fase, count($opciones));
-        [$alSorteo] = self::grupos($fase->configuracionDeGrupos(), count($opciones));
-        $alSorteo = max($alSorteo, $fase->grupos()->count());
-        $esManual = fn (Get $get): bool => $get('modo') === ModoDeSorteo::Manual->value;
+        $total = self::maximoDeGrupos($fase);
+        $parejas = self::confirmadas($fase);
+        $visibles = fn (Get $get): int => self::numero($fase, $get('numero'));
 
         $campos = [];
         if ($fase->tipo === TipoDeFase::Grupos) {
+            $campos[] = TextInput::make('numero')->label('Número de grupos')
+                ->integer()->minValue(1)->maxValue($total)->required()->live(debounce: 500)
+                ->helperText(fn (Get $get): string => self::comoQuedan($parejas, $visibles($get)).' Más grupos, más pequeños. Un grupo nuevo sale vacío: pásale parejas, o «Vaciar los grupos» y «Sortear los huecos» para repartir de nuevo. Al quitar grupos, sus parejas quedan sin colocar y van al sorteo.');
             $campos[] = Radio::make('modo')->label('Cómo se hace')->inline()->live()->required()
                 ->options([
                     ModoDeSorteo::Aleatorio->value => 'Al azar',
@@ -177,11 +181,9 @@ final class SorteoDeGrupos
                 ->helperText('La primera que elijas es la 1, la segunda la 2… Cada una encabeza un grupo y se reparten en serpiente; también cuentan para el cuadro.');
         }
 
-        $visibles = fn (Get $get): int => $esManual($get) ? $total : $alSorteo;
-
         $campos[] = Select::make('tanda')->label('Tanda')
             ->multiple()->searchable()->optionsLimit(1000)
-            ->options(fn (Get $get): array => array_diff_key($opciones, array_flip(self::enOtrosGrupos($get, -1, $total))))
+            ->options(fn (Get $get): array => array_diff_key($opciones, array_flip(self::enOtrosGrupos($get, -1, $visibles($get)))))
             ->placeholder('Elige las parejas de esta tanda')
             ->helperText('Por bombos: pon aquí unas cuantas parejas y pulsa «Repartir la tanda»; caen en grupos al azar, una por grupo. Luego la siguiente tanda, y así hasta colocarlas todas.');
 
@@ -189,7 +191,7 @@ final class SorteoDeGrupos
             Action::make('repartirTanda')->label('Repartir la tanda')->icon(Heroicon::OutlinedArrowsPointingOut)
                 ->action(fn (Get $get, Set $set) => self::repartirTanda($fase, $get, $set, $total, $visibles($get))),
             Action::make('huecos')->label('Sortear los huecos')->icon(Heroicon::OutlinedSparkles)
-                ->action(fn (Get $get, Set $set) => self::sortearHuecos($fase, $get, $set, $total)),
+                ->action(fn (Get $get, Set $set) => self::sortearHuecos($fase, $get, $set, $visibles($get))),
             Action::make('vaciar')->label('Vaciar los grupos')->icon(Heroicon::OutlinedTrash)->color('gray')
                 ->action(function (Set $set) use ($total): void {
                     for ($i = 0; $i < $total; $i++) {
@@ -201,9 +203,9 @@ final class SorteoDeGrupos
         for ($i = 0; $i < $total; $i++) {
             $campos[] = Select::make("grupo_{$i}")->label('Grupo '.Grupo::nombrePorOrden($i + 1))
                 ->multiple()->searchable()->optionsLimit(1000)->live()
-                ->options(fn (Get $get): array => array_diff_key($opciones, array_flip(self::enOtrosGrupos($get, $i, $total))))
-                ->visible(fn (Get $get): bool => $i < ($esManual($get) ? $total : $alSorteo))
-                ->placeholder(fn (Get $get): string => $esManual($get) ? 'Elige sus parejas' : 'Al sorteo')
+                ->options(fn (Get $get): array => array_diff_key($opciones, array_flip(self::enOtrosGrupos($get, $i, $visibles($get)))))
+                ->visible(fn (Get $get): bool => $i < $visibles($get))
+                ->placeholder(fn (Get $get): string => $get('modo') === ModoDeSorteo::Manual->value ? 'Elige sus parejas' : 'Al sorteo')
                 ->helperText($i === 0 ? 'Busca por pareja, jugador o nivel. Una pareja colocada ya no sale en los demás grupos.' : null);
         }
 
@@ -211,26 +213,62 @@ final class SorteoDeGrupos
     }
 
     /**
-     * Cuántos grupos salen sorteando y cuántos haciéndolo a mano.
-     *
-     * @return array{0: int, 1: int}
+     * Cuántos grupos tiene la fase: los ya hechos o, sin sortear, los que
+     * saldrían con su configuración (por tamaño, si no cuadra, algún grupo
+     * con una pareja más).
      */
-    private static function grupos(ConfiguracionDeGrupos $configuracion, int $parejas): array
+    private static function numeroActual(Fase $fase): int
     {
-        $n = max(1, $parejas);
-        $tamano = $configuracion->tamanoDeGrupo ?? 4;
+        $hechos = $fase->grupos()->count();
+        if ($hechos > 0) {
+            return $hechos;
+        }
 
-        return [
-            $configuracion->numeroDeGrupos !== null ? min($configuracion->numeroDeGrupos, $n) : max(1, intdiv($n, $tamano)),
-            $configuracion->numeroDeGrupos ?? max(1, (int) ceil($n / $tamano)),
-        ];
+        $configuracion = $fase->configuracionDeGrupos();
+        $aMano = count($configuracion->gruposManuales ?? []);
+        if ($configuracion->numeroDeGrupos !== null) {
+            return max(1, $configuracion->numeroDeGrupos, $aMano);
+        }
+
+        return max(1, $aMano, intdiv(max(1, self::confirmadas($fase)), $configuracion->tamanoDeGrupo ?? 4));
     }
 
-    private static function cuantosSelectores(Fase $fase, int $parejas): int
+    /** Hasta cuántos grupos se pueden poner: de dos parejas como poco. */
+    private static function maximoDeGrupos(Fase $fase): int
     {
-        [$alSorteo, $aMano] = self::grupos($fase->configuracionDeGrupos(), $parejas);
+        if ($fase->tipo !== TipoDeFase::Grupos) {
+            return self::numeroActual($fase);
+        }
 
-        return max($alSorteo, $aMano, $fase->grupos()->count());
+        return min(64, max(self::numeroActual($fase), intdiv(self::parejas($fase)->count(), 2), 1));
+    }
+
+    /** El número de grupos elegido en el diálogo, dentro de lo posible. */
+    private static function numero(Fase $fase, mixed $valor): int
+    {
+        if ($fase->tipo !== TipoDeFase::Grupos || ! is_numeric($valor)) {
+            return self::numeroActual($fase);
+        }
+
+        return max(1, min((int) $valor, self::maximoDeGrupos($fase)));
+    }
+
+    private static function confirmadas(Fase $fase): int
+    {
+        return self::parejas($fase)->filter(fn (Participante $p): bool => $p->inscripcion?->estado === EstadoInscripcion::Confirmada)->count();
+    }
+
+    /** «Con 24 parejas: 6 grupos de 4.» o «…: 5 grupos de 4 o 5.» */
+    private static function comoQuedan(int $parejas, int $grupos): string
+    {
+        if ($parejas === 0) {
+            return "{$grupos} grupos.";
+        }
+
+        $menor = intdiv($parejas, $grupos);
+        $tamano = $parejas % $grupos === 0 ? (string) $menor : "{$menor} o ".($menor + 1);
+
+        return "Con {$parejas} parejas confirmadas: {$grupos} ".($grupos === 1 ? 'grupo' : 'grupos')." de {$tamano}.";
     }
 
     /** @return list<string> */
@@ -263,7 +301,7 @@ final class SorteoDeGrupos
         $modo = ModoDeSorteo::tryFrom((string) $get('modo')) ?? $fase->configuracionDeGrupos()->modoDeSorteo;
 
         try {
-            $reparto = self::repartir($fase, $fijos, $modo, $modo === ModoDeSorteo::CabezasDeSerie ? self::ids($get('cabezas')) : [], self::ids($get('tanda')));
+            $reparto = self::repartir($fase, $fijos, $modo, $modo === ModoDeSorteo::CabezasDeSerie ? self::ids($get('cabezas')) : [], self::ids($get('tanda')), $total);
         } catch (ErrorDeCompeticion $e) {
             Avisos::error('No se han podido sortear los huecos', [$e->getMessage()]);
 
@@ -293,7 +331,7 @@ final class SorteoDeGrupos
         }
 
         $fijos = [];
-        for ($i = 0; $i < $total; $i++) {
+        for ($i = 0; $i < $visibles; $i++) {
             $fijos[] = self::ids($get("grupo_{$i}"));
         }
         while ($fijos !== [] && end($fijos) === []) {
@@ -348,7 +386,7 @@ final class SorteoDeGrupos
      * @param  list<int>  $cabezas
      * @param  list<int>  $repartidos
      */
-    private static function repartir(Fase $fase, array $fijos, ModoDeSorteo $modo, array $cabezas, array $repartidos = []): RepartoDeGrupos
+    private static function repartir(Fase $fase, array $fijos, ModoDeSorteo $modo, array $cabezas, array $repartidos = [], ?int $grupos = null): RepartoDeGrupos
     {
         $elegidas = [...array_merge(...$fijos), ...$cabezas, ...$repartidos];
 
@@ -365,6 +403,7 @@ final class SorteoDeGrupos
         return (new RepartidorDeGrupos)->repartir($participantes, ConfiguracionDeGrupos::desdeArray([
             ...$fase->configuracion,
             'modo_de_sorteo' => ($modo === ModoDeSorteo::Manual ? ModoDeSorteo::Aleatorio : $modo)->value,
+            ...($grupos !== null ? ['numero_de_grupos' => $grupos, 'tamano_de_grupo' => null] : []),
             'semilla' => null,
             'grupos_manuales' => $fijos,
             'repartidos' => $repartidos,
@@ -387,8 +426,9 @@ final class SorteoDeGrupos
         $modo = $fase->tipo === TipoDeFase::Grupos ? (ModoDeSorteo::tryFrom((string) ($data['modo'] ?? '')) ?? $configuracion->modoDeSorteo) : $configuracion->modoDeSorteo;
         $nombres = self::parejas($fase)->pluck('nombre', 'id');
 
+        $numero = self::numero($fase, $data['numero'] ?? null);
         $fijos = [];
-        for ($i = 0; array_key_exists("grupo_{$i}", $data); $i++) {
+        for ($i = 0; $i < $numero && array_key_exists("grupo_{$i}", $data); $i++) {
             $fijos[] = self::ids($data["grupo_{$i}"]);
         }
         while ($fijos !== [] && end($fijos) === []) {
@@ -423,11 +463,25 @@ final class SorteoDeGrupos
             $fase->update(['configuracion' => [...$fase->configuracion, 'modo_de_sorteo' => $modo->value, 'grupos_manuales' => $fijos]]);
         }
 
+        // El número de grupos elegido manda desde ahora (también para la clasificación y el cuadro).
+        if ($fase->tipo === TipoDeFase::Grupos && ($configuracion->numeroDeGrupos !== $numero || $configuracion->tamanoDeGrupo !== null)) {
+            $fase->update(['configuracion' => [...$fase->configuracion, 'numero_de_grupos' => $numero, 'tamano_de_grupo' => null]]);
+        }
+
         $entran = $fase->categoria->participantes()
             ->where('estado', EstadoParticipante::Activo->value)
             ->whereHas('inscripcion', fn (Builder $q) => $q->where('estado', EstadoInscripcion::Confirmada->value))
             ->pluck('id')->map(fn (mixed $id): int => (int) $id)->all();
         $faltan = array_diff($entran, array_keys($vistos));
+
+        // Con todo colocado no hay sorteo que lo llene: un grupo vacío es un descuido.
+        if ($faltan === [] || $modo === ModoDeSorteo::Manual) {
+            for ($i = 0; $i < $numero; $i++) {
+                if (($fijos[$i] ?? []) === []) {
+                    throw new OperacionNoPermitida('El grupo '.Grupo::nombrePorOrden($i + 1).' está vacío: pásale parejas de otros grupos, o pulsa «Vaciar los grupos» y «Sortear los huecos» para repartirlas de nuevo, o quita el grupo.');
+                }
+            }
+        }
 
         // Sin grupos todavía y con huecos: el sorteo de siempre (con su semilla).
         if ($faltan !== [] && $modo !== ModoDeSorteo::Manual && $fase->grupos()->doesntExist()) {
@@ -439,7 +493,7 @@ final class SorteoDeGrupos
 
         // Con grupos ya hechos, los huecos se sortean y solo se rehacen los grupos que cambian.
         if ($faltan !== [] && $modo !== ModoDeSorteo::Manual) {
-            $fijos = array_map(fn (Grupo $g): array => $g->participantes, self::repartir($fase->refresh(), $fijos, $modo, $cabezas ?? [], $repartidos)->grupos);
+            $fijos = array_map(fn (Grupo $g): array => $g->participantes, self::repartir($fase->refresh(), $fijos, $modo, $cabezas ?? [], $repartidos, $numero)->grupos);
         }
 
         $resultado = app(EditarGrupos::class)->handle($fase->refresh(), $fijos, $usuario);
