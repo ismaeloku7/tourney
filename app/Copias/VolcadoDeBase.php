@@ -47,10 +47,14 @@ final class VolcadoDeBase
     private function tablas(Connection $db): array
     {
         if ($db->getDriverName() === 'sqlite') {
-            return array_map(
-                fn (object $fila): array => [(string) $fila->name, (string) $fila->sql],
+            return array_values(array_map(
+                function (object $fila): array {
+                    $datos = (array) $fila;
+
+                    return [(string) ($datos['name'] ?? ''), (string) ($datos['sql'] ?? '')];
+                },
                 $db->select("SELECT name, sql FROM sqlite_master WHERE type = 'table' AND name NOT LIKE 'sqlite_%' ORDER BY name"),
-            );
+            ));
         }
 
         $tablas = [];

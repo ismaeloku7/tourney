@@ -27,7 +27,7 @@ final class CopiaDeSeguridad
     {
         return app(OrganizadorActual::class)->ejecutarComo($organizador, function (Organizador $organizador): string {
             $carpeta = self::carpeta($organizador);
-            $zip = $this->abrir($carpeta, $nombre);
+            [$zip, $nombre] = $this->abrir($carpeta);
             $temporal = $this->base($zip, 'tenant');
 
             $disco = Storage::disk('local');
@@ -47,7 +47,7 @@ final class CopiaDeSeguridad
     public function deLaCentral(): string
     {
         $carpeta = self::carpeta(null);
-        $zip = $this->abrir($carpeta, $nombre);
+        [$zip, $nombre] = $this->abrir($carpeta);
         $temporal = $this->base($zip, (string) config('tenancy.database.central_connection'));
         $zip->close();
         @unlink($temporal);
@@ -80,10 +80,11 @@ final class CopiaDeSeguridad
 
     public static function carpeta(?Organizador $organizador): string
     {
-        return 'copias/'.($organizador?->id ?? 'central');
+        return 'copias/'.($organizador === null ? 'central' : $organizador->id);
     }
 
-    private function abrir(string $carpeta, ?string &$nombre): ZipArchive
+    /** @return array{0: ZipArchive, 1: string} El zip abierto y su nombre de archivo. */
+    private function abrir(string $carpeta): array
     {
         $disco = Storage::disk('local');
         $disco->makeDirectory($carpeta);
@@ -94,7 +95,7 @@ final class CopiaDeSeguridad
             throw new RuntimeException('No se ha podido crear el archivo de la copia.');
         }
 
-        return $zip;
+        return [$zip, $nombre];
     }
 
     /**

@@ -154,7 +154,7 @@ class MesaDeArbitro extends Component
 
         $enlaces = [];
         foreach ([$partido->local, $partido->visitante] as $participante) {
-            foreach ($participante?->jugadores ?? [] as $jugador) {
+            foreach ($participante === null ? [] : $participante->jugadores as $jugador) {
                 $texto = "Hola {$jugador->nombre}, {$torneo->nombre}: sois los siguientes en ".($partido->pista->nombre ?? 'pista').". {$situacion}{$hora} Id calentando.";
                 $url = EnlaceDeWhatsApp::para($jugador, $texto);
                 if ($url !== null) {

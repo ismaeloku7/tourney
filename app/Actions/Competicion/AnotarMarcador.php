@@ -27,9 +27,9 @@ final class AnotarMarcador
 
         EmpezarPartido::comprobarQuien($partido, $quien);
 
-        $limpios = ['sets' => [], 'juegos' => [max(0, (int) ($juegos[0] ?? 0)), max(0, (int) ($juegos[1] ?? 0))]];
+        $limpios = ['sets' => [], 'juegos' => [max(0, $juegos[0]), max(0, $juegos[1])]];
         foreach ($sets as $set) {
-            $limpios['sets'][] = [max(0, (int) ($set[0] ?? 0)), max(0, (int) ($set[1] ?? 0))];
+            $limpios['sets'][] = [max(0, $set[0]), max(0, $set[1])];
         }
 
         $partido->forceFill(['marcador_en_vivo' => $limpios])->saveQuietly();
@@ -45,8 +45,8 @@ final class AnotarMarcador
             return '';
         }
 
-        $partes = array_map(fn (array $set): string => "{$set[0]}-{$set[1]}", $marcador['sets'] ?? []);
-        $juegos = $marcador['juegos'] ?? [0, 0];
+        $partes = array_map(fn (array $set): string => "{$set[0]}-{$set[1]}", $marcador['sets']);
+        $juegos = $marcador['juegos'];
         if ($partes === [] || $juegos[0] > 0 || $juegos[1] > 0) {
             $partes[] = "{$juegos[0]}-{$juegos[1]}";
         }

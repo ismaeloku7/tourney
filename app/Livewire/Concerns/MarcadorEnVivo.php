@@ -83,8 +83,7 @@ trait MarcadorEnVivo
         }
 
         foreach (array_slice($sets, 0, 3) as $i => $set) {
-            $this->sets[$i]['juegos_local'] = $set[0];
-            $this->sets[$i]['juegos_visitante'] = $set[1];
+            $this->sets[$i] = ['juegos_local' => $set[0], 'juegos_visitante' => $set[1], 'tie_break_local' => null, 'tie_break_visitante' => null];
         }
     }
 

@@ -6,6 +6,8 @@ use App\Copias\CopiaDeSeguridad;
 use App\Enums\EstadoOrganizador;
 use App\Models\Organizador;
 use Illuminate\Console\Command;
+use Illuminate\Database\Eloquent\Builder;
+use Illuminate\Database\Eloquent\Collection;
 use Throwable;
 
 /**
@@ -27,8 +29,9 @@ class HacerCopias extends Command
             $fallos += $this->intentar('Base central', fn (): string => $copias->deLaCentral());
         }
 
+        /** @var Collection<int, Organizador> $organizadores */
         $organizadores = Organizador::query()
-            ->when($this->option('organizador') !== null, fn ($q) => $q->whereKey((string) $this->option('organizador')))
+            ->when($this->option('organizador') !== null, fn (Builder $q): Builder => $q->whereKey((string) $this->option('organizador')))
             ->where('estado', '!=', EstadoOrganizador::Baja->value)
             ->orderBy('id')->get();
 
