@@ -288,9 +288,10 @@ final class HorasEnDirecto
         return $cambios;
     }
 
+    /** A los cuatro jugadores; de una fase oculta en la web, a nadie. */
     private function avisar(Partido $partido, AvisoAlJugador $aviso): void
     {
-        if ($partido->local === null || $partido->visitante === null) {
+        if ($partido->local === null || $partido->visitante === null || ! $partido->fase->visible_en_web) {
             return;
         }
 
