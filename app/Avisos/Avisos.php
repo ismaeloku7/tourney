@@ -87,6 +87,11 @@ class Avisos
         $aviso = new ResultadoDelPartido($partido);
         Notification::send($jugadores, $aviso);
 
+        // A quien sigue el torneo, solo lo de las fases que se enseñan.
+        if (! $partido->fase->visible_en_web) {
+            return;
+        }
+
         $this->push->aSeguidores($partido->fase->categoria->torneo, $aviso->titulo(), $aviso->texto(), $aviso->url(), $aviso->etiqueta());
     }
 
