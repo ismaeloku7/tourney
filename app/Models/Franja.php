@@ -19,9 +19,10 @@ use Illuminate\Support\Carbon;
  * @property int $pista_id
  * @property Carbon $inicio
  * @property Carbon $fin
+ * @property Carbon|null $inicio_previsto
  * @property bool $bloqueada
  */
-#[Fillable(['torneo_id', 'pista_id', 'inicio', 'fin', 'bloqueada'])]
+#[Fillable(['torneo_id', 'pista_id', 'inicio', 'fin', 'inicio_previsto', 'bloqueada'])]
 class Franja extends Model
 {
     /** @use HasFactory<FranjaFactory> */
@@ -32,6 +33,7 @@ class Franja extends Model
         return [
             'inicio' => 'datetime',
             'fin' => 'datetime',
+            'inicio_previsto' => 'datetime',
             'bloqueada' => 'boolean',
         ];
     }

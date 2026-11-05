@@ -68,6 +68,9 @@
                         <span class="text-lg font-light text-tema-azul">{{ $p['hora'] ?? 'Sin hora' }}</span>
                     </div>
                     <div class="mt-1 text-sm font-semibold">{{ $p['texto'] }}</div>
+                    @if ($p['anterior'] !== null)
+                        <div class="mt-0.5 text-xs text-tema-suave">{{ $p['anterior'] }}{{ str_starts_with($p['anterior'], 'Después') ? ' · estad pendientes de que acabe' : '' }}</div>
+                    @endif
                     <div class="mt-1 text-sm">
                         @if ($p['resultado'] !== '') <span class="tabular-nums">{{ $p['resultado'] }}</span> · @endif
                         <span class="text-tema-suave">{{ $p['estado']->etiqueta() }}</span>

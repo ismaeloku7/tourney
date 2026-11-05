@@ -108,6 +108,9 @@ final class RegistrarResultado
             app(Avisos::class)->resultadoDelPartido($guardado);
         }
 
+        // La pista queda libre: se recalculan las horas y se avisa a quien le toca.
+        app(HorasEnDirecto::class)->trasResultado($guardado);
+
         return $guardado;
     }
 
