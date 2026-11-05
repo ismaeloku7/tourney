@@ -5,6 +5,7 @@ namespace App\Filament\Pages\Auth;
 use App\Actions\Equipo\IniciarSesion;
 use Filament\Auth\Http\Responses\Contracts\LoginResponse;
 use Filament\Auth\Pages\Login as LoginDeFilament;
+use Filament\Forms\Components\Checkbox;
 use Filament\Schemas\Schema;
 use Illuminate\Validation\ValidationException;
 
@@ -33,7 +34,7 @@ class Login extends LoginDeFilament
         return $schema->components([
             $this->getEmailFormComponent(),
             $this->getPasswordFormComponent(),
-            $this->getRememberFormComponent()->label('Mantener la sesión iniciada (30 días)')->default(true),
+            Checkbox::make('remember')->label('Mantener la sesión iniciada (30 días)')->default(true),
         ]);
     }
 }
