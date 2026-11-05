@@ -39,6 +39,9 @@
                     <div class="mt-1 flex gap-4">
                         <a href="{{ $proximo['parejas'] }}" class="esc-enlace">Ver parejas</a>
                         <a href="{{ $proximo['ficha'] }}" class="esc-enlace">Ficha del torneo</a>
+                        @if ($proximo['competicion'])
+                            <a href="{{ $proximo['competicion'] }}" class="esc-enlace">Competición</a>
+                        @endif
                     </div>
                 @else
                     <span class="esc-etiqueta">Próximo torneo</span>

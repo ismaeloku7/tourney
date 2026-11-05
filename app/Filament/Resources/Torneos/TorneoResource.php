@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Torneos;
 
 use App\Enums\Rol;
+use App\Filament\Resources\Torneos\Pages\CompeticionDelTorneo;
 use App\Filament\Resources\Torneos\Pages\CreateTorneo;
 use App\Filament\Resources\Torneos\Pages\EditTorneo;
 use App\Filament\Resources\Torneos\Pages\HorariosDelTorneo;
@@ -85,6 +86,7 @@ class TorneoResource extends Resource
             'create' => CreateTorneo::route('/nuevo'),
             'edit' => EditTorneo::route('/{record}/editar'),
             'partidos' => PartidosDelTorneo::route('/{record}/partidos'),
+            'competicion' => CompeticionDelTorneo::route('/{record}/competicion'),
             'horarios' => HorariosDelTorneo::route('/{record}/horarios'),
         ];
     }

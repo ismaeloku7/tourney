@@ -17,8 +17,8 @@ use App\Enums\OrigenInscripcion;
 use App\Enums\ResultadosPorJugadores;
 use App\Enums\Rol;
 use App\Filament\Resources\Torneos\Pages\EditTorneo;
+use App\Livewire\Jugador\Avisos;
 use App\Livewire\Publico\FichaDelTorneo;
-use App\Livewire\Publico\PortalDelJugador;
 use App\Models\Categoria;
 use App\Models\Comunicacion;
 use App\Models\Fase;
@@ -241,7 +241,7 @@ test('el jugador activa el push y elige sus avisos; cualquiera sigue un torneo s
     $suscripcion = ['endpoint' => 'https://push.example.com/ana', 'keys' => ['p256dh' => 'clave', 'auth' => 'secreto']];
 
     $this->actingAs($ana, 'jugador');
-    Livewire::test(PortalDelJugador::class)
+    Livewire::test(Avisos::class)
         ->call('guardarPush', $suscripcion, 'Android')
         ->set('avisosCorreo', false)
         ->call('guardarAvisos')
@@ -250,7 +250,7 @@ test('el jugador activa el push y elige sus avisos; cualquiera sigue un torneo s
     expect(SuscripcionPush::query()->sole()->jugador_id)->toBe($ana->id)
         ->and($ana->refresh()->avisos)->toBe(['correo' => false, 'push' => true]);
 
-    Livewire::test(PortalDelJugador::class)->call('guardarPush', ['endpoint' => 'http://inseguro'], null)->assertHasErrors('portal');
+    Livewire::test(Avisos::class)->call('guardarPush', ['endpoint' => 'http://inseguro'], null)->assertHasErrors('portal');
 
     // Un visitante sin cuenta sigue el torneo desde la ficha.
     auth('jugador')->logout();
@@ -267,7 +267,7 @@ test('el jugador activa el push y elige sus avisos; cualquiera sigue un torneo s
 
     // Y el portal le quita su dispositivo.
     $this->actingAs($ana, 'jugador');
-    Livewire::test(PortalDelJugador::class)->call('quitarPush', 'https://push.example.com/ana');
+    Livewire::test(Avisos::class)->call('quitarPush', 'https://push.example.com/ana');
     expect(SuscripcionPush::query()->where('jugador_id', $ana->id)->count())->toBe(0);
 });
 

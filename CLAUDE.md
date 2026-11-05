@@ -7,7 +7,9 @@ Instrucciones para trabajar en este repositorio. La fuente es
 - Lee `.ai/guidelines/tourney.md` y `.ai/skills/tourney/SKILL.md` antes de
   tocar nada.
 - El plan vigente está en `docs/propuesta-fase-1.md`; el producto, en
-  `docs/briefing.md`.
+  `docs/briefing.md`. Lo siguiente (portal del jugador, panel cruzado y
+  día de juego encadenado) está en
+  `docs/propuesta-portal-panel-y-dia-de-juego.md`.
 - Español en dominio, textos, comentarios y commits.
 - Cada commit pasa `vendor/bin/pint`, `vendor/bin/phpstan` y
   `php artisan test` antes del push (`composer ci:check`).

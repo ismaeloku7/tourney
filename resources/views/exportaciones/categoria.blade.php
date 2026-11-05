@@ -21,7 +21,7 @@
                     <h3>Grupo {{ $grupo->nombre }}</h3>
                     @if ($grupo->clasificaciones->isNotEmpty())
                         <table>
-                            <thead><tr><th class="n">#</th><th>Pareja</th><th class="n">Pts</th><th class="n">PJ</th><th class="n">PG</th><th class="n">PP</th><th class="n">Sets</th><th class="n">Juegos</th><th></th></tr></thead>
+                            <thead><tr><th class="n">#</th><th>Pareja</th><th class="n">Pts</th><th class="n">PJ</th><th class="n">PG</th><th class="n">PP</th><th class="n">Sets</th><th class="n">Juegos</th>@if ($bloque['cruces'] !== [])<th>Cruce previsto</th>@endif<th></th></tr></thead>
                             <tbody>
                                 @foreach ($grupo->clasificaciones as $linea)
                                     <tr>
@@ -33,6 +33,9 @@
                                         <td class="n">{{ $linea->pp }}</td>
                                         <td class="n">{{ $linea->sets_favor }}-{{ $linea->sets_contra }}</td>
                                         <td class="n">{{ $linea->juegos_favor }}-{{ $linea->juegos_contra }}</td>
+                                        @if ($bloque['cruces'] !== [])
+                                            <td class="suave">@isset ($bloque['cruces'][$linea->participante_id]) vs {{ $bloque['cruces'][$linea->participante_id]->etiqueta() }} @endisset</td>
+                                        @endif
                                         <td class="suave">{{ $linea->clasificado_como }}</td>
                                     </tr>
                                 @endforeach

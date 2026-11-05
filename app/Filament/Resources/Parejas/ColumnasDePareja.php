@@ -8,6 +8,7 @@ use App\Models\Jugador;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\IconColumn;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\ViewColumn;
 
 /**
  * Las columnas de una pareja (una inscripción con su participante y sus
@@ -21,11 +22,10 @@ final class ColumnasDePareja
         return TextColumn::make('participante.nombre')->label('Pareja')->searchable()->weight('bold');
     }
 
-    public static function jugadores(): TextColumn
+    /** Cada jugador enlaza a su ficha. */
+    public static function jugadores(): ViewColumn
     {
-        return TextColumn::make('jugadores')->label('Jugadores')
-            ->state(fn (Inscripcion $record): array => $record->participante->jugadores->map(fn (Jugador $j): string => $j->nombre_completo)->all())
-            ->listWithLineBreaks();
+        return ViewColumn::make('jugadores')->label('Jugadores')->view('filament.tablas.jugadores');
     }
 
     public static function niveles(): TextColumn

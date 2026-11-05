@@ -2,13 +2,16 @@
 
 namespace App\Livewire\Mesa;
 
+use App\Actions\Competicion\AnotarMarcador;
 use App\Actions\Competicion\RegistrarResultado;
 use App\Actions\Competicion\ValidarResultado;
+use App\Avisos\EnlaceDeWhatsApp;
 use App\Competicion\Errores\ErrorDeCompeticion;
 use App\Competicion\Errores\ResultadoInvalido;
 use App\Enums\EstadoPartido;
 use App\Filament\Competicion\Marcador;
-use App\Livewire\Concerns\FormularioDeResultado;
+use App\Livewire\Concerns\MarcadorEnVivo;
+use App\Models\Jugador;
 use App\Models\Partido;
 use App\Models\Pista;
 use App\Models\Torneo;
@@ -25,12 +28,14 @@ use Livewire\Component;
 /**
  * La mesa en el móvil: elige torneo, día y pista, y ve los partidos en
  * orden con un botón para anotar el resultado (también walkover, retirada
- * o no presentado) o validar el que dejó un jugador.
+ * o no presentado) o validar el que dejó un jugador. Además empieza cada
+ * partido, lleva el marcador en vivo, lo termina con los sets ya puestos
+ * y avisa por WhatsApp a la pareja que espera.
  */
 #[Layout('components.layouts.publico')]
 class MesaDeArbitro extends Component
 {
-    use FormularioDeResultado;
+    use MarcadorEnVivo;
 
     #[Url]
     public ?int $torneo = null;
@@ -115,6 +120,11 @@ class MesaDeArbitro extends Component
                     'resultado' => $p->cerrado() || $p->estado === EstadoPartido::PendienteValidacion ? Marcador::resultado($p) : '',
                     'estado' => $p->estado,
                     'abierto' => in_array($p->estado, [EstadoPartido::Pendiente, EstadoPartido::Programado, EstadoPartido::EnJuego], true),
+                    'porEmpezar' => in_array($p->estado, [EstadoPartido::Pendiente, EstadoPartido::Programado], true) && $p->local_id !== null && $p->visitante_id !== null,
+                    'enJuego' => $p->estado === EstadoPartido::EnJuego,
+                    'marcador' => $p->marcador_en_vivo ?? ['sets' => [], 'juegos' => [0, 0]],
+                    'marcadorTexto' => AnotarMarcador::texto($p),
+                    'whatsapp' => in_array($p->estado, [EstadoPartido::Pendiente, EstadoPartido::Programado], true) ? $this->enlacesDeWhatsApp($p, $torneo) : [],
                 ])->all();
         }
 
@@ -126,6 +136,44 @@ class MesaDeArbitro extends Component
             'pistas' => $pistas,
             'partidos' => $partidos,
         ]);
+    }
+
+    /**
+     * Un enlace de WhatsApp por jugador de la pareja, con el mensaje de
+     * «sois los siguientes» y cómo va el partido que ocupa su pista.
+     *
+     * @return list<array{nombre: string, url: string}>
+     */
+    private function enlacesDeWhatsApp(Partido $partido, Torneo $torneo): array
+    {
+        $enPista = Partido::query()->where('pista_id', $partido->pista_id)->where('estado', EstadoPartido::EnJuego->value)->with(['local', 'visitante'])->first();
+        $situacion = $enPista === null
+            ? 'La pista está libre: podéis entrar.'
+            : 'Ahora juegan '.Marcador::lado($enPista, true).' – '.Marcador::lado($enPista, false).(AnotarMarcador::texto($enPista) !== '' ? ' (va '.AnotarMarcador::texto($enPista).')' : '').'.';
+        $hora = $partido->franja !== null ? ' Hora prevista: '.$partido->franja->inicio->format('H:i').'.' : '';
+
+        $enlaces = [];
+        foreach ([$partido->local, $partido->visitante] as $participante) {
+            foreach ($participante === null ? [] : $participante->jugadores as $jugador) {
+                $texto = "Hola {$jugador->nombre}, {$torneo->nombre}: sois los siguientes en ".($partido->pista->nombre ?? 'pista').". {$situacion}{$hora} Id calentando.";
+                $url = EnlaceDeWhatsApp::para($jugador, $texto);
+                if ($url !== null) {
+                    $enlaces[] = ['nombre' => $jugador->nombre_completo, 'url' => $url];
+                }
+            }
+        }
+
+        return $enlaces;
+    }
+
+    protected function partidoEnVivo(int $id): Partido
+    {
+        return $this->partidoPermitido($id);
+    }
+
+    protected function quienMarca(): User|Jugador
+    {
+        return $this->usuario();
     }
 
     private function partidoPermitido(int $id): Partido

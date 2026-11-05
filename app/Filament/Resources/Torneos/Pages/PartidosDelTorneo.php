@@ -18,6 +18,7 @@ use Filament\Schemas\Components\EmbeddedTable;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
+use Filament\Tables\Columns\ViewColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
 use Filament\Tables\Contracts\HasTable;
 use Filament\Tables\Filters\SelectFilter;
@@ -63,6 +64,11 @@ class PartidosDelTorneo extends Page implements HasTable
     protected function getHeaderActions(): array
     {
         return [
+            Action::make('competicion')
+                ->label('Competición')
+                ->icon(Heroicon::OutlinedTrophy)
+                ->color('gray')
+                ->url(fn (): string => CompeticionDelTorneo::getUrl(['record' => $this->torneo()])),
             Action::make('horarios')
                 ->label('Horarios')
                 ->icon(Heroicon::OutlinedCalendarDays)
@@ -81,7 +87,7 @@ class PartidosDelTorneo extends Page implements HasTable
         return $table
             ->query(fn (): Builder => Partido::query()
                 ->whereHas('fase.categoria', fn (Builder $q) => $q->where('torneo_id', $this->torneo()->id))
-                ->with(['fase.categoria', 'grupo', 'local', 'visitante', 'ganador', 'pista', 'franja', 'sets'])
+                ->with(['fase.categoria', 'grupo', 'local.inscripcion', 'visitante.inscripcion', 'ganador', 'pista', 'franja', 'sets'])
                 ->orderBy(Franja::query()->select('inicio')->whereColumn('franjas.id', 'partidos.franja_id'))
                 ->orderBy('fase_id')->orderBy('ronda')->orderBy('jornada')->orderBy('posicion')->orderBy('id'))
             ->emptyStateHeading('Sin partidos')
@@ -91,9 +97,7 @@ class PartidosDelTorneo extends Page implements HasTable
                 TextColumn::make('pista.nombre')->label('Pista')->placeholder('—'),
                 TextColumn::make('fase.categoria.nombre')->label('Categoría'),
                 TextColumn::make('fase.nombre')->label('Fase')->description(fn (Partido $record): string => self::donde($record)),
-                TextColumn::make('local')->label('Partido')
-                    ->state(fn (Partido $record): string => Marcador::lado($record, true).' – '.Marcador::lado($record, false))
-                    ->weight('bold')
+                ViewColumn::make('local')->label('Partido')->view('filament.tablas.lados-del-partido')
                     ->searchable(query: fn (Builder $query, string $search): Builder => $query->where(fn (Builder $q) => $q
                         ->whereHas('local', fn (Builder $l) => $l->where('nombre', 'like', "%{$search}%"))
                         ->orWhereHas('visitante', fn (Builder $v) => $v->where('nombre', 'like', "%{$search}%")))),

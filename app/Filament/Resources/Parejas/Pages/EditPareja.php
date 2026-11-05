@@ -10,14 +10,17 @@ use App\Competicion\Errores\ErrorDeCompeticion;
 use App\Enums\EstadoInscripcion;
 use App\Filament\Avisos;
 use App\Filament\Resources\Categorias\CategoriaResource;
+use App\Filament\Resources\Jugadores\JugadorResource;
 use App\Filament\Resources\Parejas\CompaneroDePareja;
 use App\Filament\Resources\Parejas\MoverParejas;
 use App\Filament\Resources\Parejas\ParejaResource;
+use App\Filament\Resources\Torneos\TorneoResource;
 use App\Models\Inscripcion;
 use App\Models\Jugador;
 use App\Models\RegistroDeCambio;
 use App\Models\User;
 use Filament\Actions\Action;
+use Filament\Actions\ActionGroup;
 use Filament\Facades\Filament;
 use Filament\Forms\Components\Select;
 use Filament\Forms\Components\Textarea;
@@ -63,6 +66,13 @@ class EditPareja extends EditRecord
             MoverParejas::accion()->after(fn () => $this->refrescar()),
             Action::make('categoria')->label('Ver su categoría')->icon(Heroicon::OutlinedRectangleStack)->color('gray')
                 ->url(fn (): string => CategoriaResource::getUrl('edit', ['record' => $this->inscripcion()->categoria_id])),
+            Action::make('torneo')->label('Ver el torneo')->icon(Heroicon::OutlinedTrophy)->color('gray')
+                ->url(fn (): string => TorneoResource::getUrl('edit', ['record' => $this->inscripcion()->categoria->torneo_id])),
+            ActionGroup::make($this->inscripcion()->participante->jugadores->map(fn (Jugador $jugador): Action => Action::make("jugador_{$jugador->id}")
+                ->label($jugador->nombre_completo)->icon(Heroicon::OutlinedUser)
+                ->url(JugadorResource::getUrl('edit', ['record' => $jugador])))->all())
+                ->label('Fichas de los jugadores')->icon(Heroicon::OutlinedUserGroup)->color('gray')->button()
+                ->visible(fn (): bool => $this->inscripcion()->participante->jugadores->isNotEmpty()),
         ];
     }
 
