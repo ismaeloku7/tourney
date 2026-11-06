@@ -9,6 +9,7 @@ use App\Filament\Avisos;
 use App\Filament\Competicion\AccionesDePartido;
 use App\Filament\Competicion\VistaDeCompeticion;
 use App\Filament\Resources\Categorias\CategoriaResource;
+use App\Filament\Resources\Torneos\Pages\Concerns\BarraDelTorneo;
 use App\Filament\Resources\Torneos\TorneoResource;
 use App\Models\Categoria;
 use App\Models\Fase;
@@ -35,6 +36,7 @@ use Livewire\Attributes\Url;
  */
 class CompeticionDelTorneo extends Page
 {
+    use BarraDelTorneo;
     use InteractsWithRecord;
 
     protected static string $resource = TorneoResource::class;
@@ -69,18 +71,7 @@ class CompeticionDelTorneo extends Page
 
     protected function getHeaderActions(): array
     {
-        return [
-            Action::make('partidos')
-                ->label('Mesa de partidos')
-                ->icon(Heroicon::OutlinedTableCells)
-                ->color('gray')
-                ->url(fn (): string => PartidosDelTorneo::getUrl(['record' => $this->torneo()])),
-            Action::make('torneo')
-                ->label('Volver al torneo')
-                ->icon(Heroicon::OutlinedArrowUturnLeft)
-                ->color('gray')
-                ->url(fn (): string => TorneoResource::getUrl('edit', ['record' => $this->torneo()])),
-        ];
+        return $this->barraDelTorneo('competicion');
     }
 
     public function resultadoAction(): Action

@@ -5,18 +5,17 @@ namespace App\Filament\Resources\Torneos\Pages;
 use App\Enums\EstadoPartido;
 use App\Filament\Competicion\AccionesDePartido;
 use App\Filament\Competicion\Marcador;
+use App\Filament\Resources\Torneos\Pages\Concerns\BarraDelTorneo;
 use App\Filament\Resources\Torneos\TorneoResource;
 use App\Models\Franja;
 use App\Models\Partido;
 use App\Models\Pista;
 use App\Models\Torneo;
-use Filament\Actions\Action;
 use Filament\Actions\ActionGroup;
 use Filament\Resources\Pages\Concerns\InteractsWithRecord;
 use Filament\Resources\Pages\Page;
 use Filament\Schemas\Components\EmbeddedTable;
 use Filament\Schemas\Schema;
-use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Columns\ViewColumn;
 use Filament\Tables\Concerns\InteractsWithTable;
@@ -36,6 +35,7 @@ use Illuminate\Support\Facades\Gate;
  */
 class PartidosDelTorneo extends Page implements HasTable
 {
+    use BarraDelTorneo;
     use InteractsWithRecord;
     use InteractsWithTable;
 
@@ -63,23 +63,7 @@ class PartidosDelTorneo extends Page implements HasTable
 
     protected function getHeaderActions(): array
     {
-        return [
-            Action::make('competicion')
-                ->label('Competición')
-                ->icon(Heroicon::OutlinedTrophy)
-                ->color('gray')
-                ->url(fn (): string => CompeticionDelTorneo::getUrl(['record' => $this->torneo()])),
-            Action::make('horarios')
-                ->label('Horarios')
-                ->icon(Heroicon::OutlinedCalendarDays)
-                ->color('gray')
-                ->url(fn (): string => HorariosDelTorneo::getUrl(['record' => $this->torneo()])),
-            Action::make('torneo')
-                ->label('Volver al torneo')
-                ->icon(Heroicon::OutlinedArrowUturnLeft)
-                ->color('gray')
-                ->url(fn (): string => TorneoResource::getUrl('edit', ['record' => $this->torneo()])),
-        ];
+        return $this->barraDelTorneo('partidos');
     }
 
     public function table(Table $table): Table
