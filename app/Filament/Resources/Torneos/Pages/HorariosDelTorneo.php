@@ -50,6 +50,11 @@ class HorariosDelTorneo extends Page
 
     protected static string $resource = TorneoResource::class;
 
+    /** La parrilla empieza antes de que abran las pistas y acaba después, para poder colocar a mano lo que no cabe. */
+    public const MARGEN_ANTES_MINUTOS = 60;
+
+    public const MARGEN_DESPUES_MINUTOS = 180;
+
     protected static ?string $breadcrumb = 'Horarios';
 
     protected string $view = 'filament.panel.torneos.horarios';
@@ -241,7 +246,7 @@ class HorariosDelTorneo extends Page
      * Cada día con sus pistas y lo que ocupa cada una: lo guardado y, si
      * hay una propuesta, lo propuesto en lugar de lo que se recoloca.
      *
-     * @return list<array{titulo: string, desde: int, minutos: int, base: int, horas: list<array{etiqueta: string, izquierda: float}>, pistas: list<array{id: int, nombre: string, bloques: list<array{partido: int|null, movible: bool, tercero: bool, izquierda: float, ancho: float, calentamiento: float, hora: string, texto: string, detalle: string, color: string, nuevo: bool}>}>}>
+     * @return list<array{titulo: string, desde: int, minutos: int, base: int, horas: list<array{etiqueta: string, izquierda: float}>, pistas: list<array{id: int, nombre: string, abre: list<array{izquierda: float, ancho: float}>, bloques: list<array{partido: int|null, movible: bool, tercero: bool, izquierda: float, ancho: float, calentamiento: float, hora: string, texto: string, detalle: string, color: string, nuevo: bool}>}>}>
      */
     private function dias(?PropuestaDeHorarios $propuesta): array
     {
@@ -282,9 +287,13 @@ class HorariosDelTorneo extends Page
 
         $pistas = $torneo->torneoPistas()->with('pista')->orderBy('orden')->get();
 
-        // Los límites de cada día: lo que abren las pistas, ampliado si algo se sale.
+        // Los límites de cada día: lo que abren las pistas, ampliado si algo se
+        // sale, y con margen por delante y por detrás para poder colocar a mano
+        // lo que no cabe en el horario de las pistas.
         /** @var array<string, array{0: CarbonImmutable, 1: CarbonImmutable}> $limites */
         $limites = [];
+        /** @var array<string, array<int, list<array{0: CarbonImmutable, 1: CarbonImmutable}>>> $disponibles Día → pista → tramos en que abre. */
+        $disponibles = [];
         foreach ($pistas as $torneoPista) {
             /** @var TorneoPista $torneoPista */
             try {
@@ -296,11 +305,18 @@ class HorariosDelTorneo extends Page
                 $desde = CarbonImmutable::parse($tramo->fecha.' '.$tramo->desde);
                 $hasta = CarbonImmutable::parse($tramo->fecha.' '.$tramo->hasta);
                 $limites[$tramo->fecha] = isset($limites[$tramo->fecha]) ? [$limites[$tramo->fecha][0]->min($desde), $limites[$tramo->fecha][1]->max($hasta)] : [$desde, $hasta];
+                $disponibles[$tramo->fecha][$torneoPista->pista_id][] = [$desde, $hasta];
             }
         }
         foreach ($ocupaciones as $o) {
             $fecha = $o['inicio']->toDateString();
             $limites[$fecha] = isset($limites[$fecha]) ? [$limites[$fecha][0]->min($o['inicio']), $limites[$fecha][1]->max($o['fin'])] : [$o['inicio'], $o['fin']];
+        }
+        foreach ($limites as $fecha => [$desde, $hasta]) {
+            $limites[$fecha] = [
+                $desde->subMinutes(self::MARGEN_ANTES_MINUTOS)->max($desde->startOfDay()),
+                $hasta->addMinutes(self::MARGEN_DESPUES_MINUTOS)->min($desde->endOfDay()->subMinutes(4)),
+            ];
         }
         ksort($limites);
 
@@ -343,7 +359,12 @@ class HorariosDelTorneo extends Page
                     ];
                 }
 
-                $filas[] = ['id' => $torneoPista->pista_id, 'nombre' => $torneoPista->pista->nombre.($torneoPista->pista->exterior ? ' · exterior' : ''), 'bloques' => $bloques];
+                $abre = [];
+                foreach ($disponibles[$fecha][$torneoPista->pista_id] ?? [] as [$abreDesde, $abreHasta]) {
+                    $abre[] = ['izquierda' => $posicion($abreDesde->max($desde)), 'ancho' => round(100 * max(0, $abreDesde->max($desde)->diffInMinutes($abreHasta->min($hasta), false)) / $total, 3)];
+                }
+
+                $filas[] = ['id' => $torneoPista->pista_id, 'nombre' => $torneoPista->pista->nombre.($torneoPista->pista->exterior ? ' · exterior' : ''), 'abre' => $abre, 'bloques' => $bloques];
             }
 
             $dias[] = ['titulo' => ucfirst($desde->translatedFormat('l j \d\e F')), 'desde' => $desde->getTimestamp(), 'minutos' => (int) $total, 'base' => $desde->hour * 60 + $desde->minute, 'horas' => $horas, 'pistas' => $filas];

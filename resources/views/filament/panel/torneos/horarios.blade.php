@@ -19,10 +19,11 @@
         .hor-fila { display: grid; grid-template-columns: 7rem 1fr; align-items: center; gap: .5rem; }
         .hor-fila + .hor-fila { margin-top: .375rem; }
         .hor-pista { font-size: .8125rem; font-weight: 600; color: #3b4147; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .hor-linea { position: relative; height: 2.75rem; background: repeating-linear-gradient(90deg, #f3f4f6 0 1px, transparent 1px 100%); border-radius: .375rem; background-color: #f8f9fa; }
+        .hor-linea { position: relative; height: 2.75rem; background: repeating-linear-gradient(135deg, #f3f4f6 0 6px, #e9ebee 6px 12px); border-radius: .375rem; }
         .hor-horas { position: relative; height: 1.25rem; }
         .hor-hora { position: absolute; transform: translateX(-50%); font-size: .6875rem; color: #8a939b; }
         .hor-marca { position: absolute; top: 0; bottom: 0; width: 1px; background: #e6e8eb; }
+        .hor-abre { position: absolute; top: 0; bottom: 0; background: #fff; pointer-events: none; }
         .hor-bloque { position: absolute; top: .25rem; bottom: .25rem; border-radius: .375rem; color: #fff; font-size: .6875rem; line-height: 1.15; padding: .2rem .35rem; overflow: hidden; white-space: nowrap; text-overflow: ellipsis; box-sizing: border-box; }
         .hor-bloque .hor-cal { position: absolute; left: 0; top: 0; bottom: 0; background: repeating-linear-gradient(135deg, rgb(255 255 255 / .45) 0 4px, transparent 4px 8px); }
         .hor-bloque span { position: relative; }
@@ -144,7 +145,7 @@
         @endif
 
         @if ($dias !== [])
-            <p class="hor-ayuda">Arrastra un partido a otra pista u hora: la línea marca dónde empezará (se pega al anterior si queda a menos de 15 minutos y empuja a los de detrás). Suéltalo sobre otro partido para intercambiarlos. {{ $esPropuesta ? 'En la propuesta se mueve lo propuesto; se guarda al aplicarla.' : 'Lo jugado o en juego no se mueve.' }}</p>
+            <p class="hor-ayuda">La parrilla va más allá del horario de las pistas (la parte rayada): ahí se puede dejar a mano lo que no cabe, para buscarle hueco después. Arrastra un partido a otra pista u hora: la línea marca dónde empezará (se pega al anterior si queda a menos de 15 minutos y empuja a los de detrás). Suéltalo sobre otro partido para intercambiarlos. {{ $esPropuesta ? 'En la propuesta se mueve lo propuesto; se guarda al aplicarla.' : 'Lo jugado o en juego no se mueve.' }}</p>
         @endif
 
         <div class="hor-leyenda">
@@ -154,6 +155,7 @@
                 <span><i style="background: #6d7a84; opacity: .45"></i>Ya programado (no se toca)</span>
             @endif
             <span><i style="background: #c4c9ce"></i>Pista bloqueada</span>
+            <span><i style="background: repeating-linear-gradient(135deg, #f3f4f6 0 3px, #d9dde2 3px 6px)"></i>Fuera del horario de la pista (se puede colocar a mano)</span>
             <span><i style="background: #6d7a84; position: relative"><b style="position: absolute; top: -.2rem; right: -.35rem; width: .75rem; height: .75rem; border-radius: 999px; background: #fff; color: #d9480f; font-size: .55rem; line-height: .75rem; text-align: center; box-shadow: 0 0 0 1px #e6e8eb">!</b></i>Tercer partido seguido de alguien</span>
             @foreach ($categorias as $categoria)
                 <span><i style="background: {{ $categoria['color'] }}"></i>{{ $categoria['nombre'] }}</span>
@@ -202,6 +204,9 @@
                                     cogido = null;
                                 "
                             >
+                                @foreach ($pista['abre'] as $tramo)
+                                    <span class="hor-abre" style="left: {{ $tramo['izquierda'] }}%; width: {{ $tramo['ancho'] }}%"></span>
+                                @endforeach
                                 <div class="hor-guia" x-show="encima && cogido !== null" x-cloak x-bind:style="'left: ' + (minutos / total * 100) + '%'"><span x-text="hora()"></span></div>
                                 @foreach ($dia['horas'] as $hora)
                                     <span class="hor-marca" style="left: {{ $hora['izquierda'] }}%"></span>
