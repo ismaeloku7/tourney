@@ -33,7 +33,8 @@ class AccesoDeMesa extends Component
         $this->validate(['email' => ['required', 'email'], 'clave' => ['required', 'string']], [], ['email' => 'correo electrónico', 'clave' => 'contraseña']);
 
         try {
-            $iniciar->handle($this->email, $this->clave);
+            // La mesa se queda dentro 30 días: en un torneo nadie quiere volver a entrar a mitad de mañana.
+            $iniciar->handle($this->email, $this->clave, recordar: true);
         } catch (ValidationException $e) {
             $this->addError('email', (string) ($e->errors()['email'][0] ?? 'No se ha podido entrar.'));
 

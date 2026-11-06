@@ -42,7 +42,7 @@ return [
     'guards' => [
         // El equipo de un organizador, en su base (panel /panel).
         'web' => [
-            'driver' => 'session',
+            'driver' => 'sesion',
             'provider' => 'users',
             // «Mantener la sesión iniciada»: minutos que dura (30 días).
             'remember' => (int) env('AUTH_RECORDAR_MINUTOS', 43200),
@@ -56,7 +56,7 @@ return [
 
         // Los jugadores de un organizador, en su base (portal /jugador).
         'jugador' => [
-            'driver' => 'session',
+            'driver' => 'sesion',
             'provider' => 'jugadores',
             // El jugador sigue dentro de su portal 30 días (entra con un enlace al correo).
             'remember' => (int) env('AUTH_RECORDAR_MINUTOS', 43200),

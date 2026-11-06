@@ -86,3 +86,15 @@ test('tras cinco fallos bloquea también la clave buena', function () {
 
     expect(Auth::check())->toBeFalse();
 });
+
+test('salir en un navegador no cierra la sesión recordada en los demás', function () {
+    $ana = User::query()->where('email', 'ana@example.com')->sole();
+
+    Livewire::test(Login::class)->fillForm(['email' => 'ana@example.com', 'password' => 'clave-buena-12', 'remember' => true])->call('authenticate');
+    $token = (string) $ana->refresh()->remember_token;
+    expect($token)->not->toBe('');
+
+    auth('web')->logout();
+
+    expect($ana->refresh()->remember_token)->toBe($token)->and(auth('web')->check())->toBeFalse();
+});
