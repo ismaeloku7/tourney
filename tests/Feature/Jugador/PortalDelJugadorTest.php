@@ -81,7 +81,7 @@ test('el inicio saluda, resume y lista sus torneos con la pareja y lo pendiente'
     // Con el sorteo hecho, el próximo partido y su rival.
     sortearElTorneo($this->torneo, $this->categoria);
     $this->ana->update(['nivel_declarado' => '3']);
-    Livewire::test(Inicio::class)->assertSee('Contra ')->assertSee('Sin hora')->assertDontSee('Pon tu nivel de juego');
+    Livewire::test(Inicio::class)->assertSee('Contra ')->assertSee('Sin hora')->assertSee('Ver toda la información del torneo')->assertSeeInOrder(['Contra ', 'Contra ', 'Contra '])->assertDontSee('Pon tu nivel de juego');
 });
 
 test('el portal tiene menú propio y las rutas antiguas de la inscripción siguen funcionando', function () {
