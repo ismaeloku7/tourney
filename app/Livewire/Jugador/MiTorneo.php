@@ -3,9 +3,7 @@
 namespace App\Livewire\Jugador;
 
 use App\Actions\Jugadores\AnotarNoDisponibilidad;
-use App\Actions\Jugadores\CambiarNivel;
 use App\Actions\Jugadores\DarseDeBaja;
-use App\Competicion\Errores\ErrorDeCompeticion;
 use App\Enums\EstadoInscripcion;
 use App\Enums\EstadoTorneo;
 use App\Enums\ReglaDeCruces;
@@ -23,10 +21,10 @@ use Livewire\Attributes\Layout;
 use Livewire\Attributes\Url;
 
 /**
- * Un torneo del jugador: su pareja (con los niveles, que cualquiera de
- * los dos pone), sus partidos, su grupo y los demás grupos de su
- * categoría, el cuadro, cuándo no puede jugar y la baja mientras la
- * inscripción siga abierta.
+ * Un torneo del jugador: su próximo partido, sus partidos, su grupo y los
+ * demás grupos de su categoría (y de otras), el cuadro, cuándo no puede
+ * jugar y la baja mientras la inscripción siga abierta. Los niveles se
+ * cambian en «Mis datos».
  */
 #[Layout('components.layouts.jugador')]
 class MiTorneo extends PaginaDelJugador
@@ -39,9 +37,6 @@ class MiTorneo extends PaginaDelJugador
     #[Url(as: 'ver')]
     public ?int $verCategoria = null;
 
-    /** @var array<int, string> jugador => nivel */
-    public array $niveles = [];
-
     /** @var array{dia: string, desde: string, hasta: string}|array{} */
     public array $noDisponible = [];
 
@@ -51,36 +46,6 @@ class MiTorneo extends PaginaDelJugador
         abort_unless($inscripcion->participante->jugadores->contains(fn (Jugador $j): bool => $j->is($this->yo())), 404);
 
         $this->inscripcion = $inscripcion;
-        foreach ($inscripcion->participante->jugadores as $jugador) {
-            $this->niveles[$jugador->id] = (string) $jugador->nivel_declarado;
-        }
-    }
-
-    public function guardarNiveles(CambiarNivel $cambiar): void
-    {
-        abort_unless($this->editable(), 403);
-
-        $this->aviso = null;
-        $this->resetErrorBag();
-        $hayErrores = false;
-
-        foreach ($this->inscripcion->participante->jugadores()->get() as $jugador) {
-            $nuevo = trim($this->niveles[$jugador->id] ?? '');
-            if ($nuevo === (string) $jugador->nivel_declarado) {
-                continue;
-            }
-
-            try {
-                $cambiar->handle($this->yo(), $jugador, $nuevo);
-            } catch (ErrorDeCompeticion $e) {
-                $this->addError('niveles.'.$jugador->id, $e->getMessage());
-                $hayErrores = true;
-            }
-        }
-
-        if (! $hayErrores) {
-            $this->aviso = 'Niveles guardados.';
-        }
     }
 
     public function darmeDeBaja(DarseDeBaja $baja): void
@@ -103,12 +68,6 @@ class MiTorneo extends PaginaDelJugador
             AnotarNoDisponibilidad::comprobar($this->yo(), $disponibilidad->torneo);
             $disponibilidad->delete();
         }, 'Quitado.');
-    }
-
-    public function editable(): bool
-    {
-        return $this->inscripcion->estado !== EstadoInscripcion::Baja
-            && ! in_array($this->torneo()->estado, [EstadoTorneo::Finalizado, EstadoTorneo::Archivado], true);
     }
 
     public function render(PartidosDelJugador $partidos): View
@@ -159,11 +118,10 @@ class MiTorneo extends PaginaDelJugador
         return view('livewire.jugador.mi-torneo', [
             'yo' => $yo,
             'torneo' => $torneo,
-            'jugadores' => $participante->jugadores,
-            'media' => $participante->nivelMedioTexto(),
-            'editable' => $this->editable(),
+            'equipo' => $participante->nombre,
             'puedeDarseDeBaja' => $torneo->estado === EstadoTorneo::InscripcionAbierta && $this->inscripcion->estado !== EstadoInscripcion::Baja,
-            'porJugar' => $filas->filter(fn (array $p): bool => $p['porJugar'])->values()->all(),
+            'porJugar' => $porJugar = $filas->filter(fn (array $p): bool => $p['porJugar'])->values()->all(),
+            'proximo' => $porJugar[0] ?? null,
             'jugados' => $filas->reject(fn (array $p): bool => $p['porJugar'])->values()->all(),
             'miGrupo' => $miGrupo,
             'otrosGrupos' => $otrosGrupos,
