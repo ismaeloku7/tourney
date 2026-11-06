@@ -20,6 +20,7 @@ use App\Models\Torneo;
 use App\Publico\DatosDelTorneo;
 use Illuminate\Contracts\View\View;
 use Livewire\Attributes\Layout;
+use Livewire\Attributes\Url;
 
 /**
  * Un torneo del jugador: su pareja (con los niveles, que cualquiera de
@@ -33,6 +34,10 @@ class MiTorneo extends PaginaDelJugador
     use ConResultados;
 
     public Inscripcion $inscripcion;
+
+    /** La otra categoría del torneo que se está mirando (sus grupos y su cuadro). */
+    #[Url(as: 'ver')]
+    public ?int $verCategoria = null;
 
     /** @var array<int, string> jugador => nivel */
     public array $niveles = [];
@@ -128,6 +133,26 @@ class MiTorneo extends PaginaDelJugador
             }
         }
 
+        // Las demás categorías con algo que enseñar (grupos o cuadro), para mirarlas.
+        $grupos = $datos->grupos();
+        $todosLosCuadros = [...$datos->cuadros(), ...$datos->cuadrosPrevistos()];
+        $otrasCategorias = [];
+        foreach ([...$grupos, ...$todosLosCuadros] as $bloque) {
+            if ($bloque['categoria']->id !== $categoriaId) {
+                $otrasCategorias[$bloque['categoria']->id] = $bloque['categoria']->nombre;
+            }
+        }
+        $explorar = null;
+        if ($this->verCategoria !== null && isset($otrasCategorias[$this->verCategoria])) {
+            $deEsa = fn (array $bloque): bool => $bloque['categoria']->id === $this->verCategoria;
+            $explorar = ['grupos' => [], 'cuadros' => array_values(array_filter($todosLosCuadros, $deEsa))];
+            foreach (array_filter($grupos, $deEsa) as $bloque) {
+                foreach ($bloque['grupos'] as $grupo) {
+                    $explorar['grupos'][] = ['fase' => $bloque['fase'], 'cruces' => $bloque['cruces']] + $grupo;
+                }
+            }
+        }
+
         $filas = $partidos->todos($yo)->filter(fn (Partido $p): bool => $p->local_id === $participante->id || $p->visitante_id === $participante->id)->map(fn (Partido $p): array => $partidos->fila($p, $yo))->values();
         $deMiCategoria = fn (array $bloque): bool => $bloque['categoria']->id === $categoriaId;
 
@@ -145,6 +170,10 @@ class MiTorneo extends PaginaDelJugador
             // Los cuadros ya hechos y, mientras se juegan los grupos, cómo quedaría el que va detrás.
             'cuadros' => $cuadros = [...array_values(array_filter($datos->cuadros(), $deMiCategoria)), ...array_values(array_filter($datos->cuadrosPrevistos(), $deMiCategoria))],
             'cuadrosQueFaltan' => $this->cuadrosQueFaltan($categoriaId, array_map(fn (array $bloque): int => $bloque['fase']->id, $cuadros)),
+            'otrasCategorias' => $otrasCategorias,
+            'explorar' => $explorar,
+            // Su categoría tiene fases, pero ninguna se enseña todavía.
+            'faseOculta' => $this->inscripcion->categoria->fases()->exists() && $this->inscripcion->categoria->fases()->where('visible_en_web', true)->doesntExist(),
             'admiteDisponibilidad' => $torneo->horarios_publicados_en === null && ! in_array($torneo->estado, [EstadoTorneo::Finalizado, EstadoTorneo::Archivado], true) && $this->inscripcion->estado !== EstadoInscripcion::Baja,
             'noDisponibilidades' => Disponibilidad::query()->where('jugador_id', $yo->id)->where('torneo_id', $torneo->id)->orderBy('desde')->get(),
         ])->title($torneo->nombre);
