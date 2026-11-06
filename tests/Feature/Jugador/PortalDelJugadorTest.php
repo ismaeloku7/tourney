@@ -309,7 +309,10 @@ test('su torneo enseña el cuadro entero previsto mientras se juegan los grupos,
 
     // Con dos grupos de 2: semifinales y una final con «Ganador S1».
     $fase->update(['configuracion' => [...$fase->configuracion, 'tamano_de_grupo' => 2]]);
-    app(SortearGrupos::class)->handle($fase->refresh(), User::factory()->rol(Rol::Propietario)->create(), forzar: true);
+    $organizacion = User::factory()->rol(Rol::Propietario)->create();
+    app(SortearGrupos::class)->handle($fase->refresh(), $organizacion, forzar: true);
+    // Al generar los partidos de los grupos nuevos sale su clasificación (a cero), y con ella el cuadro previsto.
+    app(GenerarPartidos::class)->handle($fase->refresh(), $organizacion);
     miTorneo($this->inscripcion)->assertSee('Semifinales')->assertSee('Ganador S1')->assertSee('(1º B)');
 
     // Si el cuadro no se enseña en la web, tampoco el previsto.
