@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Torneos\Pages;
 use App\Actions\Competicion\DuracionesAprendidas;
 use App\Actions\Competicion\HorasEnDirecto;
 use App\Actions\Competicion\PlanificarHorarios;
+use App\Actions\Competicion\SoltarPartidosDePista;
 use App\Competicion\Datos\DisponibilidadDePista;
 use App\Competicion\Datos\PropuestaDeHorarios;
 use App\Competicion\Datos\SugerenciaDeRecolocacion;
@@ -33,6 +34,7 @@ use Filament\Resources\Pages\Concerns\InteractsWithRecord;
 use Filament\Resources\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Contracts\Support\Htmlable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 
@@ -126,6 +128,28 @@ class HorariosDelTorneo extends Page
             });
     }
 
+    public function soltarHuerfanosAction(): Action
+    {
+        return Action::make('soltarHuerfanos')
+            ->label(fn (): string => 'Soltar '.($this->huerfanos() === 1 ? '1 partido' : $this->huerfanos().' partidos').' de pistas quitadas')
+            ->icon(Heroicon::OutlinedExclamationTriangle)
+            ->color('warning')
+            ->visible(fn (): bool => $this->propuesta === null && $this->huerfanos() > 0 && Gate::allows('update', $this->torneo()))
+            ->requiresConfirmation()
+            ->modalHeading('Partidos en pistas que ya no son del torneo')
+            ->modalDescription('Se quedan sin hora ni pista. Después, «Calcular» los coloca en las pistas que quedan.')
+            ->modalSubmitActionLabel('Soltar')
+            ->action(function (): void {
+                $soltados = app(SoltarPartidosDePista::class)->huerfanos($this->torneo(), $this->usuario());
+                Avisos::hecho($soltados === 1 ? 'Un partido sin hora' : "{$soltados} partidos sin hora", 'Pulsa «Calcular» para colocarlos.');
+            });
+    }
+
+    private function huerfanos(): int
+    {
+        return SoltarPartidosDePista::enPistasQuitadas($this->torneo())->count();
+    }
+
     public function recalcularAction(): Action
     {
         return Action::make('recalcular')
@@ -203,6 +227,8 @@ class HorariosDelTorneo extends Page
             'sugerencia' => $sugerencia !== null && ! in_array($sugerencia->clave(), $this->ignoradas, true) ? $this->describir($sugerencia) : null,
             'retrasoMinimo' => HorasEnDirecto::RETRASO_MINUTOS,
             'esPropuesta' => $propuesta !== null,
+            'huerfanos' => $this->huerfanos(),
+            'sinHora' => $propuesta === null ? Partido::query()->whereHas('fase.categoria', fn (Builder $q) => $q->where('torneo_id', $this->torneo()->id))->whereNotNull('local_id')->whereNotNull('visitante_id')->whereNull('franja_id')->whereIn('estado', [EstadoPartido::Pendiente->value, EstadoPartido::Programado->value])->count() : 0,
             'resumen' => $propuesta !== null ? self::resumen($propuesta) : null,
             'dias' => $this->dias($propuesta),
             'conflictos' => $propuesta !== null ? $this->conflictos($propuesta) : [],

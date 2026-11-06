@@ -53,6 +53,7 @@
     <div class="hor" x-data="{ cogido: null, agarre: 0 }">
         <div class="hor-herramientas">
             {{ $this->calcularAction }}
+            {{ $this->soltarHuerfanosAction }}
             {{ $this->recalcularAction }}
             {{ $this->aplicarAction }}
             {{ $this->descartarAction }}
@@ -101,6 +102,18 @@
                 <strong>Plan propuesto, todavía sin guardar.</strong>
                 {{ $resumen ?? 'No hay partidos que colocar.' }}
                 Si te convence, pulsa «Aplicar»; si no, cambia las pistas, el calentamiento o el descanso y vuelve a calcular.
+            </div>
+        @endif
+
+        @if ($huerfanos > 0)
+            <div class="hor-conflictos">
+                <strong>{{ $huerfanos === 1 ? '1 partido sigue colocado en una pista que ya no es del torneo' : $huerfanos.' partidos siguen colocados en pistas que ya no son del torneo' }}.</strong>
+                <span class="hor-suave">No salen en la parrilla ni se recolocan solos: pulsa «Soltar … de pistas quitadas» arriba y después «Calcular».</span>
+            </div>
+        @elseif ($sinHora > 0 && ! $esPropuesta)
+            <div class="hor-aviso">
+                <strong>{{ $sinHora === 1 ? '1 partido sin hora ni pista' : $sinHora.' partidos sin hora ni pista' }}.</strong>
+                <span class="hor-suave">Pulsa «Calcular» para colocarlos en las pistas del torneo.</span>
             </div>
         @endif
 
