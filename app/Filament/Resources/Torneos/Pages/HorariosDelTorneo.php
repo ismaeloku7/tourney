@@ -315,7 +315,7 @@ class HorariosDelTorneo extends Page
         foreach ($limites as $fecha => [$desde, $hasta]) {
             $limites[$fecha] = [
                 $desde->subMinutes(self::MARGEN_ANTES_MINUTOS)->max($desde->startOfDay()),
-                $hasta->addMinutes(self::MARGEN_DESPUES_MINUTOS)->min($desde->endOfDay()->subMinutes(4)),
+                $hasta->addMinutes(self::MARGEN_DESPUES_MINUTOS)->min($desde->startOfDay()->addDay()->subMinutes(4)),
             ];
         }
         ksort($limites);
