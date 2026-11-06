@@ -96,6 +96,18 @@
             </div>
         @endif
 
+        @if ($huerfanos > 0)
+            <div class="hor-conflictos">
+                <strong>{{ $huerfanos === 1 ? '1 partido sigue colocado en una pista que ya no es del torneo' : $huerfanos.' partidos siguen colocados en pistas que ya no son del torneo' }}.</strong>
+                <span class="hor-suave">No salen en la parrilla ni se recolocan solos: pulsa «Soltar … de pistas quitadas» arriba y después «Calcular».</span>
+            </div>
+        @elseif ($sinHora > 0 && ! $esPropuesta)
+            <div class="hor-aviso">
+                <strong>{{ $sinHora === 1 ? '1 partido sin hora ni pista' : $sinHora.' partidos sin hora ni pista' }}.</strong>
+                <span class="hor-suave">Pulsa «Calcular» para colocarlos en las pistas del torneo.</span>
+            </div>
+        @endif
+
         @if ($conflictos !== [])
             <div class="hor-conflictos">
                 <strong>{{ count($conflictos) === 1 ? '1 partido no cabe' : count($conflictos).' partidos no caben' }}:</strong> <span class="hor-suave">arrástralo a una pista y una hora para colocarlo a mano.</span>

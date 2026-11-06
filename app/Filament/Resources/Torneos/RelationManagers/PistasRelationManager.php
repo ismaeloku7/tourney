@@ -2,6 +2,7 @@
 
 namespace App\Filament\Resources\Torneos\RelationManagers;
 
+use App\Actions\Competicion\SoltarPartidosDePista;
 use App\Competicion\Datos\DisponibilidadDePista;
 use App\Competicion\Datos\TramoDeDisponibilidad;
 use App\Competicion\Errores\ConfiguracionInvalida;
@@ -10,11 +11,13 @@ use App\Models\Pista;
 use App\Models\Sede;
 use App\Models\Torneo;
 use App\Models\TorneoPista;
+use App\Models\User;
 use Filament\Actions\Action;
 use Filament\Actions\BulkAction;
 use Filament\Actions\CreateAction;
 use Filament\Actions\DeleteAction;
 use Filament\Actions\EditAction;
+use Filament\Facades\Filament;
 use Filament\Forms\Components\CheckboxList;
 use Filament\Forms\Components\DatePicker;
 use Filament\Forms\Components\Repeater;
@@ -120,7 +123,14 @@ class PistasRelationManager extends RelationManager
 
                         return $record;
                     }),
-                DeleteAction::make()->label('Quitar'),
+                DeleteAction::make()->label('Quitar')
+                    ->modalDescription('La pista deja de ser del torneo. Los partidos que tuviera colocados y aún no se han jugado se quedan sin hora: vuelve a «Calcular» en Horarios para colocarlos en las pistas que quedan.')
+                    ->after(function (TorneoPista $record): void {
+                        $soltados = app(SoltarPartidosDePista::class)->handle($this->torneo(), $record->pista_id, $this->usuario());
+                        if ($soltados > 0) {
+                            Avisos::aviso($soltados === 1 ? 'Un partido se ha quedado sin hora' : "{$soltados} partidos se han quedado sin hora", ['Vuelve a «Calcular» en Horarios para colocarlos en las pistas que quedan.']);
+                        }
+                    }),
             ])
             ->toolbarActions([
                 BulkAction::make('disponibilidad')
@@ -240,6 +250,14 @@ class PistasRelationManager extends RelationManager
     private function opcionesDePistas(Collection $pistas): array
     {
         return $pistas->mapWithKeys(fn (Pista $pista): array => [$pista->id => ($pista->sede?->nombre !== null ? $pista->sede->nombre.' · ' : '').$pista->nombre])->all();
+    }
+
+    private function usuario(): User
+    {
+        $usuario = Filament::auth()->user();
+        assert($usuario instanceof User);
+
+        return $usuario;
     }
 
     private function torneo(): Torneo
