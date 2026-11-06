@@ -27,6 +27,9 @@ class TorneoForm
             ->columns(1)
             ->components([
                 Section::make('Datos')
+                    ->id('torneo-datos')
+                    ->collapsible()
+                    ->persistCollapsed()
                     ->columns(2)
                     ->schema([
                         TextInput::make('nombre')
@@ -93,6 +96,9 @@ class TorneoForm
                             ->columnSpanFull(),
                     ]),
                 Section::make('Reglas')
+                    ->id('torneo-reglas')
+                    ->collapsible()
+                    ->persistCollapsed()
                     ->columns(2)
                     ->schema([
                         Select::make('resultados_por_jugadores')
