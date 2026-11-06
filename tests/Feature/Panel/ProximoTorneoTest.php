@@ -27,6 +27,14 @@ function primeroDelMenu(): ?NavigationItem
     return $grupo === null ? null : collect($grupo->getItems())->first();
 }
 
+/** @return array<string, string|null> Las páginas del submenú, por nombre. */
+function paginasDelMenu(?NavigationItem $item): array
+{
+    return collect($item?->getChildItems() ?? [])
+        ->mapWithKeys(fn (NavigationItem $hijo): array => [(string) $hijo->getLabel() => $hijo->getUrl()])
+        ->all();
+}
+
 function torneoDePrueba(string $nombre, EstadoTorneo $estado, int $empiezaEnDias): Torneo
 {
     return Torneo::factory()->create([
@@ -46,12 +54,17 @@ test('el primero del menú es el torneo en juego o, si no hay, el siguiente que 
 
     $primero = primeroDelMenu();
     expect($primero?->getLabel())->toBe('Rally')
-        ->and($primero?->getUrl())->toBe(TorneoResource::getUrl('view', ['record' => $cercano]))
-        ->and($primero?->getBadge())->toBe('Borrador');
+        ->and($primero?->getBadge())->toBe('Borrador')
+        ->and(paginasDelMenu($primero))->toBe([
+            'Ficha' => TorneoResource::getUrl('view', ['record' => $cercano]),
+            'Competición' => TorneoResource::getUrl('competicion', ['record' => $cercano]),
+            'Partidos' => TorneoResource::getUrl('partidos', ['record' => $cercano]),
+            'Horarios' => TorneoResource::getUrl('horarios', ['record' => $cercano]),
+        ]);
 
     // Uno en juego va por delante, aunque haya empezado antes.
     $enJuego = torneoDePrueba('En marcha', EstadoTorneo::EnJuego, -3);
-    expect(primeroDelMenu()?->getUrl())->toBe(TorneoResource::getUrl('view', ['record' => $enJuego]));
+    expect(paginasDelMenu(primeroDelMenu())['Horarios'] ?? null)->toBe(TorneoResource::getUrl('horarios', ['record' => $enJuego]));
 });
 
 test('un administrador ve el próximo de los suyos y, sin torneos, no hay acceso directo', function () {
