@@ -129,3 +129,14 @@ test('al abrir un torneo se ve su ficha sin poder tocarla, con «Editar» arriba
         ->assertHasNoFormErrors()
         ->assertRedirect(ViewTorneo::getUrl(['record' => $torneo]));
 });
+
+test('en el listado, al pulsar un torneo se abre su ficha', function () {
+    $torneo = Torneo::factory()->create();
+    $this->actingAs($this->propietario);
+
+    Livewire::test(ListTorneos::class)
+        ->assertCanSeeTableRecords([$torneo])
+        ->assertSeeHtml(e(TorneoResource::getUrl('view', ['record' => $torneo])).'"')
+        ->assertTableActionHasUrl('view', TorneoResource::getUrl('view', ['record' => $torneo]), $torneo)
+        ->assertTableActionHasUrl('edit', TorneoResource::getUrl('edit', ['record' => $torneo]), $torneo);
+});
