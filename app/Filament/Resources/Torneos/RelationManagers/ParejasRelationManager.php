@@ -81,6 +81,7 @@ class ParejasRelationManager extends RelationManager implements SeCopiaParaPegar
                     ->query(fn (Builder $query, array $data): Builder => filled($data['value'] ?? null) ? $query->where('inscripciones.estado', (string) $data['value']) : $query),
             ])
             ->headerActions([
+                ParaCopiar::copiarParaWhatsApp(),
                 ParaCopiar::boton(),
                 ConfirmarCompletas::accion(fn (): Torneo => $this->torneo(), fn (): ?Categoria => null),
             ])
