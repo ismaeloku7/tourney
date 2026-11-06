@@ -7,7 +7,7 @@ use App\Push\Remitente;
 use App\Push\RemitenteWebPush;
 use App\Tenancy\OrganizadorActual;
 use Carbon\CarbonImmutable;
-use Illuminate\Contracts\Foundation\Application;
+use Illuminate\Foundation\Application;
 use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
@@ -34,6 +34,7 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         // Los guards de sesión del equipo y de los jugadores: salir en un sitio no echa de los demás.
+        // Laravel pasa la aplicación concreta, la que se lee como contenedor ($app['config']).
         Auth::extend('sesion', function (Application $app, string $nombre, array $config): GuardDeSesion {
             $guard = new GuardDeSesion(
                 $nombre,
