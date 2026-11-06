@@ -345,3 +345,27 @@ test('un cuadro visible que aún no tiene nada que enseñar dice qué falta para
     $cuadro->update(['visible_en_web' => false]);
     miTorneo($this->inscripcion)->assertDontSee('Cuadro avanzado');
 });
+
+test('desde su torneo el jugador mira los grupos de otras categorías, y si su categoría no se enseña aún lo dice', function () {
+    $fase = sortearElTorneo($this->torneo, $this->categoria);
+    $otra = Categoria::factory()->create(['torneo_id' => $this->torneo->id, 'nombre' => 'Femenino']);
+    $parejas = [];
+    foreach (range(1, 4) as $i) {
+        $parejas[] = $pareja = Participante::factory()->create(['categoria_id' => $otra->id]);
+        Inscripcion::factory()->create(['participante_id' => $pareja->id]);
+    }
+    sortearElTorneo($this->torneo, $otra);
+    $nombre = $parejas[0]->refresh()->nombre;
+
+    miTorneo($this->inscripcion)
+        ->assertSee('Otras categorías')
+        ->assertSee('Femenino')
+        ->assertDontSee($nombre)
+        ->set('verCategoria', $otra->id)
+        ->assertSee($nombre)
+        ->assertSee('Grupo A');
+
+    // Con las fases de su categoría ocultas, se le dice que aún no se han publicado.
+    $fase->update(['visible_en_web' => false]);
+    miTorneo($this->inscripcion)->assertSee('La organización todavía no ha publicado los grupos ni el cuadro de tu categoría');
+});
