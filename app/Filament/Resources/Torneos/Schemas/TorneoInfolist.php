@@ -18,6 +18,9 @@ class TorneoInfolist
             ->columns(1)
             ->components([
                 Section::make('Datos')
+                    ->id('torneo-ficha-datos')
+                    ->collapsible()
+                    ->persistCollapsed()
                     ->columns(3)
                     ->schema([
                         TextEntry::make('nombre')->label('Nombre'),
@@ -36,6 +39,9 @@ class TorneoInfolist
                         TextEntry::make('normativa')->label('Normativa')->placeholder('Sin normativa')->columnSpanFull(),
                     ]),
                 Section::make('Reglas')
+                    ->id('torneo-ficha-reglas')
+                    ->collapsible()
+                    ->persistCollapsed()
                     ->columns(3)
                     ->schema([
                         TextEntry::make('resultados_por_jugadores')->label('Resultados por jugadores')
