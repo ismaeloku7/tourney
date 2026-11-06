@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\Fase;
 use App\Models\FormatoPartido;
 use App\Models\Organizador;
 use App\Models\Pista;
@@ -96,4 +97,21 @@ test('las pistas pueden ser exteriores y el descanso de serie de 30 minutos pasa
         ->and(Pista::factory()->create(['exterior' => true])->refresh()->exterior)->toBeTrue()
         ->and($sinTocar->refresh()->descanso_minimo_minutos)->toBe(0)
         ->and($aMano->refresh()->descanso_minimo_minutos)->toBe(15);
+});
+
+test('las fases «Todo a mano» sin lista de grupos la recuperan vacía; las demás no se tocan', function () {
+    $this->seed(PlanesSeeder::class);
+    usarOrganizador(Organizador::factory()->create());
+    $aMano = Fase::factory()->grupos()->create();
+    $aMano->forceFill(['configuracion' => ['modo_de_sorteo' => 'manual', 'numero_de_grupos' => 2]])->saveQuietly();
+    $alAzar = Fase::factory()->grupos()->create();
+    $antes = $alAzar->configuracion;
+
+    $migracion = require database_path('migrations/tenant/2026_11_16_000000_grupos_a_mano_con_lista.php');
+    $migracion->up();
+    $migracion->up();
+
+    expect($aMano->refresh()->configuracion['grupos_manuales'] ?? null)->toBe([])
+        ->and($aMano->configuracionDeGrupos()->gruposManuales)->toBe([])
+        ->and($alAzar->refresh()->configuracion)->toBe($antes);
 });

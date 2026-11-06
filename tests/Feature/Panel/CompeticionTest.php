@@ -628,6 +628,24 @@ test('una fase se empieza de nuevo sin tocar las demás categorías: fuera sus g
     expect($this->grupos->grupos()->count())->toBe(3);
 });
 
+test('una fase «Todo a mano» empezada de nuevo se vuelve a abrir para colocar las parejas', function () {
+    app(SortearGrupos::class)->handle($this->grupos, $this->propietario);
+    $grupos = $this->grupos->refresh()->grupos()->with('participantes')->orderBy('orden')->get()
+        ->map(fn ($grupo): array => $grupo->participantes->pluck('id')->map(fn (mixed $id): int => (int) $id)->all())->all();
+    $this->grupos->update(['configuracion' => [...$this->grupos->configuracion, 'modo_de_sorteo' => ModoDeSorteo::Manual->value, 'grupos_manuales' => $grupos]]);
+
+    fasesDe($this->categoria)
+        ->callAction(TestAction::make('empezarDeNuevo')->table($this->grupos))
+        ->assertHasNoActionErrors();
+
+    expect($this->grupos->refresh()->configuracion['grupos_manuales'] ?? null)->toBe([])
+        ->and($this->grupos->configuracionDeGrupos()->modoDeSorteo)->toBe(ModoDeSorteo::Manual);
+
+    fasesDe($this->categoria)
+        ->mountAction(TestAction::make('sortear')->table($this->grupos))
+        ->assertActionMounted(TestAction::make('sortear')->table($this->grupos));
+});
+
 test('con resultados, empezar de nuevo pide confirmarlo', function () {
     app(SortearGrupos::class)->handle($this->grupos, $this->propietario);
     app(GenerarPartidos::class)->handle($this->grupos->refresh(), $this->propietario);
