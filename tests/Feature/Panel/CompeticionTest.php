@@ -1,11 +1,13 @@
 <?php
 
+use App\Actions\Competicion\CambiarCruces;
 use App\Actions\Competicion\GenerarPartidos;
 use App\Actions\Competicion\RegistrarResultado;
 use App\Actions\Competicion\SortearGrupos;
 use App\Competicion\Datos\Resultado;
 use App\Competicion\Datos\Set;
 use App\Competicion\Errores\ConfiguracionInvalida;
+use App\Competicion\Errores\OperacionNoPermitida;
 use App\Enums\EstadoFase;
 use App\Enums\EstadoInscripcion;
 use App\Enums\EstadoPartido;
@@ -660,4 +662,95 @@ test('con resultados, empezar de nuevo pide confirmarlo', function () {
         ->callAction(TestAction::make('empezarDeNuevo')->table($this->grupos), ['aunque' => true])
         ->assertHasNoActionErrors();
     expect($this->grupos->partidos()->count())->toBe(0);
+});
+
+/** Sortea, juega y cierra los grupos: el cuadro de cuartos queda hecho. */
+function cuadroHecho(object $prueba): Fase
+{
+    fasesDe($prueba->categoria)->callAction(TestAction::make('sortear')->table($prueba->grupos));
+    jugarTodosLosPartidosDe($prueba->grupos->refresh(), $prueba->propietario);
+    fasesDe($prueba->categoria)->callAction(TestAction::make('cerrar')->table($prueba->grupos->refresh()))->assertNotified('Fase cerrada');
+
+    return $prueba->cuadro->refresh();
+}
+
+/**
+ * @param  list<int|null>  $huecos
+ * @return array<string, string|null>
+ */
+function datosDeCruces(array $huecos): array
+{
+    $datos = [];
+    foreach ($huecos as $i => $id) {
+        $datos["hueco_{$i}"] = $id === null ? null : (string) $id;
+    }
+
+    return $datos;
+}
+
+test('los cruces del cuadro se cambian a mano y cada partido conserva su hora', function () {
+    $cuadro = cuadroHecho($this);
+    $huecos = CambiarCruces::huecos($cuadro);
+    expect($huecos)->toHaveCount(8)->not->toContain(null);
+
+    $pista = $this->torneo->torneoPistas()->firstOrFail()->pista_id;
+    $hora = now()->setTime(10, 0);
+    $franja = $this->torneo->franjas()->create(['pista_id' => $pista, 'inicio' => $hora, 'fin' => $hora->copy()->addMinutes(60), 'inicio_previsto' => $hora, 'bloqueada' => false]);
+    $cuadro->partidos()->where('ronda', 1)->where('posicion', 1)->firstOrFail()->update(['franja_id' => $franja->id, 'pista_id' => $pista, 'estado' => EstadoPartido::Programado]);
+
+    // La segunda pareja del primer cruce y la primera del segundo se intercambian.
+    $nuevos = $huecos;
+    [$nuevos[1], $nuevos[2]] = [$huecos[2], $huecos[1]];
+
+    fasesDe($this->categoria)
+        ->assertActionVisible(TestAction::make('cambiarCruces')->table($cuadro))
+        ->callAction(TestAction::make('cambiarCruces')->table($cuadro), datosDeCruces($nuevos))
+        ->assertHasNoActionErrors()
+        ->assertNotified('Cruces guardados');
+
+    $primero = $cuadro->partidos()->where('ronda', 1)->where('posicion', 1)->firstOrFail();
+    expect(CambiarCruces::huecos($cuadro->refresh()))->toBe($nuevos)
+        ->and($cuadro->partidos()->count())->toBe(7)
+        ->and([$primero->local_id, $primero->visitante_id])->toBe([$nuevos[0], $nuevos[1]])
+        ->and($primero->franja_id)->toBe($franja->id)
+        ->and($primero->estado)->toBe(EstadoPartido::Programado);
+
+    // Una pareja en dos cruces no se guarda.
+    $repetida = $nuevos;
+    $repetida[3] = $nuevos[0];
+    fasesDe($this->categoria)
+        ->callAction(TestAction::make('cambiarCruces')->table($cuadro), datosDeCruces($repetida))
+        ->assertNotified('No se han cambiado los cruces');
+    expect(CambiarCruces::huecos($cuadro->refresh()))->toBe($nuevos);
+
+    // En cuanto se juega un partido del cuadro, los cruces ya no se cambian.
+    app(RegistrarResultado::class)->handle($primero->refresh(), new Resultado([new Set(6, 1), new Set(6, 1)]), $this->propietario);
+    fasesDe($this->categoria)->assertActionHidden(TestAction::make('cambiarCruces')->table($cuadro->refresh()));
+});
+
+test('al cambiar los cruces, un hueco vacío es un bye: la otra pareja pasa sola y su hora se suelta', function () {
+    $cuadro = cuadroHecho($this);
+    $huecos = CambiarCruces::huecos($cuadro);
+
+    $pista = $this->torneo->torneoPistas()->firstOrFail()->pista_id;
+    $hora = now()->setTime(10, 0);
+    $franja = $this->torneo->franjas()->create(['pista_id' => $pista, 'inicio' => $hora, 'fin' => $hora->copy()->addMinutes(60), 'inicio_previsto' => $hora, 'bloqueada' => false]);
+    $cuadro->partidos()->where('ronda', 1)->where('posicion', 1)->firstOrFail()->update(['franja_id' => $franja->id, 'pista_id' => $pista, 'estado' => EstadoPartido::Programado]);
+
+    $nuevos = $huecos;
+    $nuevos[1] = null;
+    expect(app(CambiarCruces::class)->handle($cuadro, $nuevos, $this->propietario))->toBeTrue();
+
+    $primero = $cuadro->partidos()->where('ronda', 1)->where('posicion', 1)->firstOrFail();
+    $semifinal = $cuadro->partidos()->where('ronda', 2)->where('posicion', 1)->firstOrFail();
+    expect($primero->estado)->toBe(EstadoPartido::Walkover)
+        ->and($primero->ganador_id)->toBe($huecos[0])
+        ->and($primero->franja_id)->toBeNull()
+        ->and(Franja::query()->find($franja->id))->toBeNull()
+        ->and($semifinal->local_id)->toBe($huecos[0]);
+
+    // Un cruce sin nadie no vale.
+    $vacio = $nuevos;
+    $vacio[0] = null;
+    expect(fn () => app(CambiarCruces::class)->handle($cuadro->refresh(), $vacio, $this->propietario))->toThrow(OperacionNoPermitida::class);
 });

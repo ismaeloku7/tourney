@@ -11,6 +11,7 @@ use App\Enums\EstadoFase;
 use App\Enums\ReglaDeCruces;
 use App\Enums\TipoDeFase;
 use App\Filament\Avisos;
+use App\Filament\Competicion\CambioDeCruces;
 use App\Filament\Competicion\SorteoDeGrupos;
 use App\Filament\Resources\Categorias\Schemas\FaseForm;
 use App\Filament\Resources\Torneos\Pages\PartidosDelTorneo;
@@ -90,6 +91,7 @@ class FasesRelationManager extends RelationManager
             ])
             ->recordActions([
                 SorteoDeGrupos::accion(),
+                CambioDeCruces::accion(),
                 Action::make('quienPasa')
                     ->label('Quién pasa')
                     ->icon(Heroicon::OutlinedArrowRightCircle)
