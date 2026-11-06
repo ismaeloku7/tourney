@@ -213,7 +213,7 @@ trait BarraDelTorneo
                 ->visible(fn (): bool => $this->estadoDelPaso($paso) !== null)
                 ->requiresConfirmation()
                 ->modalHeading(fn (): string => $verbo.' «'.($this->estadoDelPaso($paso)?->etiqueta() ?? '').'»')
-                ->modalDescription(fn (): string => self::queSupone($this->estadoDelPaso($paso)))
+                ->modalDescription(fn (): string => (! $this->torneo()->estado->publicado() && ($this->estadoDelPaso($paso)?->publicado() ?? false) ? 'El torneo se publica en la web. ' : '').self::queSupone($this->estadoDelPaso($paso)))
                 ->action(function (Action $action) use ($paso): void {
                     $estado = $this->estadoDelPaso($paso);
 
@@ -243,18 +243,16 @@ trait BarraDelTorneo
 
     private function estadoDelPaso(string $paso): ?EstadoTorneo
     {
-        $actual = $this->torneo()->estado;
-
-        return $paso === 'siguiente' ? $actual->siguiente() : $actual->anterior();
+        return $paso === 'siguiente' ? $this->torneo()->estadoSiguiente() : $this->torneo()->estadoAnterior();
     }
 
     private static function queSupone(?EstadoTorneo $estado): string
     {
         return match ($estado) {
             EstadoTorneo::Borrador => 'El torneo deja de verse en público.',
-            EstadoTorneo::InscripcionAbierta => 'El torneo se publica y las parejas pueden inscribirse (la inscripción online llega en la fase 3; mientras, la organización las apunta a mano).',
+            EstadoTorneo::InscripcionAbierta => 'Las parejas pueden inscribirse desde la web.',
             EstadoTorneo::InscripcionCerrada => 'Ya no entran inscripciones nuevas. Es el momento de confirmar parejas, fijar cabezas de serie y repasar las fases.',
-            EstadoTorneo::Sorteo => 'Se sortean los grupos y se generan los partidos de cada categoría, y se planifican los horarios.',
+            EstadoTorneo::Sorteo => 'Se arman los grupos y los cuadros de cada categoría (por sorteo o a mano) y se planifican los horarios. Los jugadores ya ven el torneo en su portal.',
             EstadoTorneo::EnJuego => 'Los horarios se publican y se empiezan a registrar resultados. Hace falta haber planificado antes.',
             EstadoTorneo::Finalizado => 'El torneo termina: quedan las clasificaciones y los cuadros finales.',
             EstadoTorneo::Archivado => 'El torneo pasa al archivo.',

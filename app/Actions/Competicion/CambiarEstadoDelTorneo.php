@@ -11,9 +11,10 @@ use App\Models\Torneo;
 use App\Models\User;
 
 /**
- * Las transiciones del ciclo de vida del torneo, de una en una y con sus
- * comprobaciones: no se publica sin categorías y no se pasa a en juego
- * sin horarios.
+ * Las transiciones del ciclo de vida del torneo, de una en una por el
+ * camino de ese torneo (sin inscripción online no hay periodo de
+ * inscripción) y con sus comprobaciones: no se publica sin categorías y
+ * no se pasa a en juego sin horarios.
  */
 final class CambiarEstadoDelTorneo
 {
@@ -21,12 +22,12 @@ final class CambiarEstadoDelTorneo
     {
         $actual = $torneo->estado;
 
-        if ($estado !== $actual->siguiente() && $estado !== $actual->anterior()) {
+        if ($estado !== $torneo->estadoSiguiente() && $estado !== $torneo->estadoAnterior()) {
             throw new OperacionNoPermitida('De «'.$actual->etiqueta().'» no se pasa a «'.$estado->etiqueta().'».');
         }
 
-        if ($estado === EstadoTorneo::InscripcionAbierta && $torneo->categorias()->doesntExist()) {
-            throw new OperacionNoPermitida('No se abre la inscripción de un torneo sin categorías.');
+        if ($estado->publicado() && ! $actual->publicado() && $torneo->categorias()->doesntExist()) {
+            throw new OperacionNoPermitida('No se publica un torneo sin categorías.');
         }
 
         if ($estado === EstadoTorneo::EnJuego && ! $this->tieneHorarios($torneo)) {
