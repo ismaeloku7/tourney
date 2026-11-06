@@ -110,7 +110,7 @@ test('su torneo enseña su grupo con su pareja resaltada, los otros grupos y el 
     Fase::factory()->eliminatoria()->create(['categoria_id' => $this->categoria->id]);
 
     miTorneo($this->inscripcion)
-        ->assertSee('Mi grupo: A')
+        ->assertSee('Mi grupo · A')
         ->assertSee('tú')
         ->assertSee('García / López')
         ->assertSee('Cruce')
@@ -244,25 +244,26 @@ test('el jugador cambia su nivel desde sus datos', function () {
     expect($this->ana->refresh()->nivel_declarado)->toBe('3,5');
 });
 
-test('desde su torneo, cualquiera de la pareja pone el nivel de los dos, sea o no el capitán', function () {
+test('en sus datos, cualquiera de la pareja pone el nivel de los dos, sea o no el capitán', function () {
     $this->ana->update(['nivel_declarado' => '3']);
     $this->eva->update(['nivel_declarado' => '2']);
 
     // Eva no es la capitana (Ana es la jugadora 1).
     $this->actingAs($this->eva, 'jugador');
-    $this->get("http://norte.saas.test/jugador/torneos/{$this->inscripcion->id}")->assertOk()->assertSee('Open de Primavera')->assertSee('Mixta B');
+    $this->get("http://norte.saas.test/jugador/torneos/{$this->inscripcion->id}")->assertOk()->assertSee('Open de Primavera')->assertSee('Mixta B')->assertDontSee('Guardar niveles');
 
-    miTorneo($this->inscripcion)
-        ->assertSet('niveles', [$this->ana->id => '3', $this->eva->id => '2'])
-        ->set("niveles.{$this->ana->id}", '3,5')
-        ->set("niveles.{$this->eva->id}", '2,75')
-        ->call('guardarNiveles')
+    Livewire::test(MisDatos::class)
+        ->assertSet('nivel', '2')
+        ->assertSet('companeros', [$this->ana->id => '3'])
+        ->assertSee('El nivel de tus compañeros')
+        ->set('nivel', '2,75')
+        ->set("companeros.{$this->ana->id}", '3,5')
+        ->call('guardarDatos')
         ->assertHasNoErrors()
-        ->assertSee('Niveles guardados.')
-        ->assertSee('Media 3,13')
-        ->set("niveles.{$this->ana->id}", 'muy bueno')
-        ->call('guardarNiveles')
-        ->assertHasErrors("niveles.{$this->ana->id}");
+        ->assertSee('Datos guardados.')
+        ->set("companeros.{$this->ana->id}", 'muy bueno')
+        ->call('guardarDatos')
+        ->assertHasErrors("companeros.{$this->ana->id}");
 
     expect($this->ana->refresh()->nivel_declarado)->toBe('3,5')
         ->and($this->eva->refresh()->nivel_declarado)->toBe('2,75')
@@ -280,18 +281,14 @@ test('el torneo de otra pareja no se abre, y nadie cambia el nivel de otra parej
         ->and(CambiarNivel::puede($this->ana, $this->eva))->toBeTrue();
 });
 
-test('con el torneo terminado, los niveles ya no se cambian desde su torneo', function () {
+test('con el torneo terminado, el nivel del compañero ya no se cambia', function () {
     $this->torneo->update(['estado' => EstadoTorneo::Finalizado]);
 
     expect(CambiarNivel::companeros($this->ana))->toHaveCount(0)
         ->and(CambiarNivel::puede($this->ana, $this->eva))->toBeFalse()
         ->and(CambiarNivel::puede($this->ana, $this->ana))->toBeTrue();
 
-    miTorneo($this->inscripcion)
-        ->assertSee('ya no se cambian')
-        ->assertDontSee('Guardar niveles')
-        ->call('guardarNiveles')
-        ->assertForbidden();
+    Livewire::test(MisDatos::class)->assertSet('companeros', [])->assertDontSee('El nivel de tus compañeros');
 });
 
 test('su torneo enseña el cuadro entero previsto mientras se juegan los grupos, y sus partidos por jugar y jugados', function () {

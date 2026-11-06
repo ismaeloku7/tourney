@@ -1,6 +1,6 @@
 {{-- Un cuadro por rondas (hecho o previsto). Espera $bloque (de DatosDelTorneo::cuadros() o cuadrosPrevistos()). --}}
     <section class="tarjeta p-4" wire:key="cuadro-{{ $bloque['fase']->id }}">
-        <h2 class="text-base font-semibold">{{ $bloque['fase']->nombre }}@if ($bloque['previsto'] ?? false) <span class="text-sm font-normal text-tema-suave">· previsto</span>@endif</h2>
+        <h2 class="text-xl font-semibold">{{ $bloque['fase']->nombre }}@if ($bloque['previsto'] ?? false) <span class="text-sm font-normal text-tema-suave">· previsto</span>@endif</h2>
         @if ($bloque['previsto'] ?? false)
             <p class="mt-1 text-xs text-tema-suave">Así quedaría el cuadro si los grupos acabasen ahora. Cambia con cada resultado.</p>
         @endif
