@@ -3,8 +3,10 @@
 namespace App\Competicion;
 
 use App\Competicion\Datos\Clasificacion;
+use App\Competicion\Datos\Clasificado;
 use App\Competicion\Datos\ConfiguracionDeEliminatoria;
 use App\Competicion\Datos\CruceProyectado;
+use App\Competicion\Datos\Cuadro;
 use App\Competicion\Datos\Partido;
 use App\Competicion\Datos\Puntuacion;
 use App\Competicion\Datos\ReglaDeClasificados;
@@ -35,22 +37,13 @@ final readonly class ProyectorDeCruces
      */
     public function proyectar(array $clasificaciones, ReglaDeClasificados $regla, array $criterios, Puntuacion $puntuacion, array $partidos, array $nombresDeGrupo, ConfiguracionDeEliminatoria $cuadro): array
     {
-        if ($cuadro->reglaDeCruces === ReglaDeCruces::Sorteo || $clasificaciones === []) {
+        $previsto = $this->cuadroPrevisto($clasificaciones, $regla, $criterios, $puntuacion, $partidos, $nombresDeGrupo, $cuadro);
+        if ($previsto === null) {
             return [];
         }
+        [$construido, $clasificados] = $previsto;
 
-        try {
-            $clasificados = $this->selector->seleccionar($clasificaciones, $regla, $criterios, $puntuacion, $partidos, $nombresDeGrupo);
-            $construido = $this->constructor->construir($clasificados, $cuadro);
-        } catch (ErrorDeCompeticion) {
-            return [];
-        }
-
-        $porParticipante = [];
-        foreach ($clasificados as $clasificado) {
-            $porParticipante[$clasificado->participante] = $clasificado;
-        }
-
+        $porParticipante = $clasificados;
         $cruces = [];
 
         foreach ($construido->partidosDeRonda(1) as $partido) {
@@ -69,5 +62,37 @@ final readonly class ProyectorDeCruces
         }
 
         return $cruces;
+    }
+
+    /**
+     * El cuadro entero que saldría si la fase de grupos acabase así, con
+     * los clasificados por id de participante (para saber de dónde viene
+     * cada uno: «1º A», «mejor 3º (B)»). Null por sorteo o si no casa.
+     *
+     * @param  list<Clasificacion>  $clasificaciones
+     * @param  list<CriterioDeDesempate>  $criterios
+     * @param  list<Partido>  $partidos
+     * @param  array<int, string>  $nombresDeGrupo
+     * @return array{0: Cuadro, 1: array<int, Clasificado>}|null
+     */
+    public function cuadroPrevisto(array $clasificaciones, ReglaDeClasificados $regla, array $criterios, Puntuacion $puntuacion, array $partidos, array $nombresDeGrupo, ConfiguracionDeEliminatoria $cuadro): ?array
+    {
+        if ($cuadro->reglaDeCruces === ReglaDeCruces::Sorteo || $clasificaciones === []) {
+            return null;
+        }
+
+        try {
+            $clasificados = $this->selector->seleccionar($clasificaciones, $regla, $criterios, $puntuacion, $partidos, $nombresDeGrupo);
+            $construido = $this->constructor->construir($clasificados, $cuadro);
+        } catch (ErrorDeCompeticion) {
+            return null;
+        }
+
+        $porParticipante = [];
+        foreach ($clasificados as $clasificado) {
+            $porParticipante[$clasificado->participante] = $clasificado;
+        }
+
+        return [$construido, $porParticipante];
     }
 }

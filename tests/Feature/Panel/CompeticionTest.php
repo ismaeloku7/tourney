@@ -566,3 +566,26 @@ test('con el cuadro a mano, en cada hueco va cualquier posición y la fase de gr
     expect(fn () => FaseForm::quienPasaDesde(['1A', '1B', '1C', '2A'], ['A', 'B', 'C'], 3))->toThrow(ConfiguracionInvalida::class)
         ->and(FaseForm::quienPasaDesde(['1A', '1B', '1C', '2A', '2B', '2C', 'M1', 'M2'], ['A', 'B', 'C'], 3))->toBe(['por_grupo' => 2, 'cuantos_mejores' => 2, 'mejores_de_posicion' => 3]);
 });
+
+test('sin nada jugado, cada grupo sale con el cabeza de serie primero y luego por nivel', function () {
+    // Niveles: cada pareja, el de su orden de alta (la primera, 1; la última, 12).
+    foreach ($this->categoria->participantes()->with('jugadores')->orderBy('id')->get()->values() as $i => $pareja) {
+        foreach ($pareja->jugadores as $jugador) {
+            $jugador->update(['nivel_declarado' => (string) ($i + 1)]);
+        }
+    }
+
+    app(SortearGrupos::class)->handle($this->grupos, $this->propietario);
+    app(GenerarPartidos::class)->handle($this->grupos->refresh(), $this->propietario);
+
+    foreach ($this->grupos->refresh()->grupos()->with('clasificaciones.participante.jugadores')->get() as $grupo) {
+        $parejas = $grupo->clasificaciones->map(fn ($linea) => $linea->participante)->values();
+        $resto = $parejas->slice(1)->map(fn ($p): ?float => $p->nivelMedio())->values()->all();
+        $ordenado = $resto;
+        rsort($ordenado);
+
+        expect($parejas->first()->cabeza_de_serie)->not->toBeNull()
+            ->and($resto)->toBe($ordenado)
+            ->and($grupo->clasificaciones->pluck('sorteo_desempate')->filter()->all())->toBe([]);
+    }
+});

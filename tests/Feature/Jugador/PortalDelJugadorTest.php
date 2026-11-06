@@ -293,3 +293,29 @@ test('con el torneo terminado, los niveles ya no se cambian desde su torneo', fu
         ->call('guardarNiveles')
         ->assertForbidden();
 });
+
+test('su torneo enseña el cuadro entero previsto mientras se juegan los grupos, y sus partidos por jugar y jugados', function () {
+    $fase = sortearElTorneo($this->torneo, $this->categoria);
+    $cuadro = Fase::factory()->eliminatoria()->create(['categoria_id' => $this->categoria->id, 'nombre' => 'Cuadro final']);
+
+    // Un grupo de 4, pasan 2: la final, con quién va en cada lado.
+    miTorneo($this->inscripcion)
+        ->assertSee('Por jugar')
+        ->assertDontSee('Jugados')
+        ->assertSee('Cuadro final')
+        ->assertSee('Así quedaría el cuadro si los grupos acabasen ahora')
+        ->assertSee('(1º A)')
+        ->assertSee('(2º A)');
+
+    // Con dos grupos de 2: semifinales y una final con «Ganador S1».
+    $fase->update(['configuracion' => [...$fase->configuracion, 'tamano_de_grupo' => 2]]);
+    $organizacion = User::factory()->rol(Rol::Propietario)->create();
+    app(SortearGrupos::class)->handle($fase->refresh(), $organizacion, forzar: true);
+    // Al generar los partidos de los grupos nuevos sale su clasificación (a cero), y con ella el cuadro previsto.
+    app(GenerarPartidos::class)->handle($fase->refresh(), $organizacion);
+    miTorneo($this->inscripcion)->assertSee('Semifinales')->assertSee('Ganador S1')->assertSee('(1º B)');
+
+    // Si el cuadro no se enseña en la web, tampoco el previsto.
+    $cuadro->update(['visible_en_web' => false]);
+    miTorneo($this->inscripcion)->assertDontSee('Así quedaría el cuadro');
+});

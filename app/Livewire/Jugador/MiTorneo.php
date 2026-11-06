@@ -125,6 +125,9 @@ class MiTorneo extends PaginaDelJugador
             }
         }
 
+        $filas = $partidos->todos($yo)->filter(fn (Partido $p): bool => $p->local_id === $participante->id || $p->visitante_id === $participante->id)->map(fn (Partido $p): array => $partidos->fila($p, $yo))->values();
+        $deMiCategoria = fn (array $bloque): bool => $bloque['categoria']->id === $categoriaId;
+
         return view('livewire.jugador.mi-torneo', [
             'yo' => $yo,
             'torneo' => $torneo,
@@ -132,10 +135,12 @@ class MiTorneo extends PaginaDelJugador
             'media' => $participante->nivelMedioTexto(),
             'editable' => $this->editable(),
             'puedeDarseDeBaja' => $torneo->estado === EstadoTorneo::InscripcionAbierta && $this->inscripcion->estado !== EstadoInscripcion::Baja,
-            'partidos' => $partidos->todos($yo)->filter(fn (Partido $p): bool => $p->local_id === $participante->id || $p->visitante_id === $participante->id)->map(fn (Partido $p): array => $partidos->fila($p, $yo))->values()->all(),
+            'porJugar' => $filas->filter(fn (array $p): bool => $p['porJugar'])->values()->all(),
+            'jugados' => $filas->reject(fn (array $p): bool => $p['porJugar'])->values()->all(),
             'miGrupo' => $miGrupo,
             'otrosGrupos' => $otrosGrupos,
-            'cuadros' => array_values(array_filter($datos->cuadros(), fn (array $bloque): bool => $bloque['categoria']->id === $categoriaId)),
+            // Los cuadros ya hechos y, mientras se juegan los grupos, cómo quedaría el que va detrás.
+            'cuadros' => [...array_values(array_filter($datos->cuadros(), $deMiCategoria)), ...array_values(array_filter($datos->cuadrosPrevistos(), $deMiCategoria))],
             'admiteDisponibilidad' => $torneo->horarios_publicados_en === null && ! in_array($torneo->estado, [EstadoTorneo::Finalizado, EstadoTorneo::Archivado], true) && $this->inscripcion->estado !== EstadoInscripcion::Baja,
             'noDisponibilidades' => Disponibilidad::query()->where('jugador_id', $yo->id)->where('torneo_id', $torneo->id)->orderBy('desde')->get(),
         ])->title($torneo->nombre);

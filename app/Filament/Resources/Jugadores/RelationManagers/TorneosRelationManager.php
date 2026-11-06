@@ -71,7 +71,7 @@ class TorneosRelationManager extends RelationManager
             ->recordUrl(fn (Participante $record): ?string => $record->inscripcion === null ? null : ParejaResource::getUrl('edit', ['record' => $record->inscripcion]))
             ->recordActions([
                 Action::make('torneo')->label('Torneo')->icon(Heroicon::OutlinedTrophy)->color('gray')
-                    ->url(fn (Participante $record): string => TorneoResource::getUrl('edit', ['record' => $record->categoria->torneo_id])),
+                    ->url(fn (Participante $record): string => TorneoResource::getUrl('view', ['record' => $record->categoria->torneo_id])),
                 Action::make('categoria')->label('Categoría')->icon(Heroicon::OutlinedRectangleStack)->color('gray')
                     ->url(fn (Participante $record): string => CategoriaResource::getUrl('edit', ['record' => $record->categoria_id])),
                 Action::make('pareja')->label('Pareja')->icon(Heroicon::OutlinedUsers)->color('gray')

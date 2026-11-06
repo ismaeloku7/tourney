@@ -9,12 +9,14 @@ use App\Filament\Resources\Torneos\Pages\EditTorneo;
 use App\Filament\Resources\Torneos\Pages\HorariosDelTorneo;
 use App\Filament\Resources\Torneos\Pages\ListTorneos;
 use App\Filament\Resources\Torneos\Pages\PartidosDelTorneo;
+use App\Filament\Resources\Torneos\Pages\ViewTorneo;
 use App\Filament\Resources\Torneos\RelationManagers\AdministradoresRelationManager;
 use App\Filament\Resources\Torneos\RelationManagers\ArbitrosRelationManager;
 use App\Filament\Resources\Torneos\RelationManagers\CategoriasRelationManager;
 use App\Filament\Resources\Torneos\RelationManagers\ParejasRelationManager;
 use App\Filament\Resources\Torneos\RelationManagers\PistasRelationManager;
 use App\Filament\Resources\Torneos\Schemas\TorneoForm;
+use App\Filament\Resources\Torneos\Schemas\TorneoInfolist;
 use App\Filament\Resources\Torneos\Tables\TorneosTable;
 use App\Models\Torneo;
 use App\Models\User;
@@ -63,6 +65,11 @@ class TorneoResource extends Resource
         return TorneoForm::configure($schema);
     }
 
+    public static function infolist(Schema $schema): Schema
+    {
+        return TorneoInfolist::configure($schema);
+    }
+
     public static function table(Table $table): Table
     {
         return TorneosTable::configure($table);
@@ -84,6 +91,7 @@ class TorneoResource extends Resource
         return [
             'index' => ListTorneos::route('/'),
             'create' => CreateTorneo::route('/nuevo'),
+            'view' => ViewTorneo::route('/{record}'),
             'edit' => EditTorneo::route('/{record}/editar'),
             'partidos' => PartidosDelTorneo::route('/{record}/partidos'),
             'competicion' => CompeticionDelTorneo::route('/{record}/competicion'),

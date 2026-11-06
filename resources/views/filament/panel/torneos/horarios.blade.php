@@ -33,6 +33,7 @@
         .hor-bloque.destino { outline: 2px dashed #1f2328; outline-offset: 1px; }
         .hor-linea.destino { background-color: #eef4ff; }
         .hor-ayuda { font-size: .75rem; color: #8a939b; }
+        .hor-herramientas { display: flex; flex-wrap: wrap; gap: .5rem; }
         .hor-marca { pointer-events: none; }
         .hor-guia { position: absolute; top: -.25rem; bottom: -.25rem; width: 2px; background: #1f2328; pointer-events: none; z-index: 3; }
         .hor-guia span { position: absolute; top: -1.15rem; left: 50%; transform: translateX(-50%); background: #1f2328; color: #fff; font-size: .6875rem; font-weight: 700; border-radius: .25rem; padding: 0 .3rem; white-space: nowrap; }
@@ -50,6 +51,14 @@
     </style>
 
     <div class="hor" x-data="{ cogido: null, agarre: 0 }">
+        <div class="hor-herramientas">
+            {{ $this->calcularAction }}
+            {{ $this->soltarHuerfanosAction }}
+            {{ $this->recalcularAction }}
+            {{ $this->aplicarAction }}
+            {{ $this->descartarAction }}
+        </div>
+
         @if ($directo !== null)
             <div class="hor-dia">
                 <h3>En directo</h3>
