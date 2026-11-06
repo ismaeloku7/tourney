@@ -14,8 +14,8 @@ use App\Models\Partido;
  * Materializa la clasificación de un grupo en `clasificaciones`,
  * conservando los sorteos de desempate ya hechos para que no cambien
  * entre recálculos. Mientras no se ha jugado nada en el grupo, el orden es
- * el de partida: el cabeza de serie primero y luego por nivel medio, de
- * más a menos (sin sorteos de desempate).
+ * por nivel medio de la pareja, de más a menos (sin sorteos de desempate);
+ * el cabeza de serie no cuenta.
  */
 final class RecalcularClasificacion
 {
@@ -60,8 +60,8 @@ final class RecalcularClasificacion
     }
 
     /**
-     * Sin nada jugado: el cabeza de serie (el de número más bajo) primero,
-     * luego de más a menos nivel medio, los que no tienen nivel al final.
+     * Sin nada jugado: de más a menos nivel medio de la pareja; las que no
+     * tienen nivel, al final; a igual nivel, por nombre.
      */
     private function porSiembra(Grupo $grupo, ClasificacionDto $clasificacion): ClasificacionDto
     {
@@ -70,7 +70,7 @@ final class RecalcularClasificacion
             $pareja = $parejas->get($linea->participante);
             $nivel = $pareja?->nivelMedio();
 
-            return [$pareja->cabeza_de_serie ?? PHP_INT_MAX, $nivel === null ? 1 : 0, -($nivel ?? 0), (string) $pareja?->nombre, $linea->participante];
+            return [$nivel === null ? 1 : 0, -($nivel ?? 0), (string) $pareja?->nombre, $linea->participante];
         };
 
         $lineas = $clasificacion->lineas;
