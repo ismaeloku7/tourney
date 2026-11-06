@@ -3,6 +3,7 @@
 namespace App\Filament\Resources\Categorias\RelationManagers;
 
 use App\Actions\Competicion\CerrarFase;
+use App\Actions\Competicion\EmpezarFaseDeNuevo;
 use App\Competicion\Datos\ConfiguracionDeGrupos;
 use App\Competicion\Errores\ConfiguracionInvalida;
 use App\Competicion\Errores\ErrorDeCompeticion;
@@ -158,6 +159,31 @@ class FasesRelationManager extends RelationManager
                         Avisos::hecho('Fase cerrada', $clasificados === [] ? null : count($clasificados).' clasificados pasan a la fase siguiente.');
                     }),
                 ActionGroup::make([
+                    Action::make('empezarDeNuevo')
+                        ->label('Empezar de nuevo')
+                        ->icon(Heroicon::OutlinedArrowUturnLeft)
+                        ->color('danger')
+                        ->visible(fn (Fase $record): bool => $record->estado !== EstadoFase::Cerrada && ($record->grupos()->exists() || $record->partidos()->exists()))
+                        ->modalHeading(fn (Fase $record): string => 'Empezar de nuevo «'.$record->nombre.'»')
+                        ->modalDescription(fn (Fase $record): string => 'Se borran sus grupos y sus partidos, con las horas que tenían en el calendario, y la fase queda lista para volver a sortear.'
+                            .($record->tipo->esDeGrupos() ? ' Si detrás va un cuadro sin jugar, también se vacía.' : '')
+                            .' Las demás categorías y sus horarios no se tocan. Después: sortea de nuevo y, en Horarios, «Calcular» sin rehacer lo ya programado.')
+                        ->modalSubmitActionLabel('Empezar de nuevo')
+                        ->schema(fn (Fase $record): array => $record->tieneResultados() ? [
+                            Toggle::make('aunque')->label('Ya tiene resultados: borrarlos igualmente')->default(false)->required()->accepted(),
+                        ] : [])
+                        ->action(function (Fase $record, array $data, Action $action): void {
+                            try {
+                                $borrados = app(EmpezarFaseDeNuevo::class)->handle($record, $this->usuario(), (bool) ($data['aunque'] ?? false));
+                            } catch (ErrorDeCompeticion $e) {
+                                Avisos::error('No se ha empezado de nuevo', [$e->getMessage()]);
+                                $action->halt();
+
+                                return;
+                            }
+
+                            Avisos::hecho('Fase lista para sortear de nuevo', $borrados === 1 ? 'Se ha borrado 1 partido.' : "Se han borrado {$borrados} partidos.");
+                        }),
                     Action::make('clasificacion')
                         ->label('Clasificación')
                         ->icon(Heroicon::OutlinedListBullet)
