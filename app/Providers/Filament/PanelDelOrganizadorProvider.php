@@ -8,6 +8,7 @@ use App\Filament\MarcaDelOrganizador;
 use App\Filament\Pages\Auth\EditarPerfil;
 use App\Filament\Pages\Auth\Login;
 use App\Filament\Pages\Panel as PanelDelOrganizador;
+use App\Filament\ProximoTorneo;
 use App\Http\Middleware\ExigirOrganizador;
 use App\Http\Middleware\ResolverOrganizadorPorHost;
 use Filament\Http\Middleware\Authenticate;
@@ -59,6 +60,10 @@ class PanelDelOrganizadorProvider extends PanelProvider
                 'Competición',
                 'Instalaciones',
                 'Organización',
+            ])
+            // Lo primero del menú: el acceso directo al torneo que toca.
+            ->navigationItems([
+                ProximoTorneo::enElMenu(),
             ])
             // El acento lo elige el organizador en sus ajustes; el tema solo lee la variable.
             ->renderHook(PanelsRenderHook::HEAD_END, fn (): string => view('filament.panel.color')->render())
