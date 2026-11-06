@@ -283,6 +283,15 @@ test('el torneo cambia de estado de uno en uno y con sus comprobaciones', functi
     expect(fn () => $accion->handle($torneo, EstadoTorneo::Sorteo, $this->propietario))->toThrow(OperacionNoPermitida::class)
         ->and(fn () => $accion->handle($torneo, EstadoTorneo::InscripcionAbierta, $this->propietario))->toThrow(OperacionNoPermitida::class, 'sin categorías');
 
+    // Sin inscripción online no hay periodo de inscripción: de borrador se pasa al sorteo.
+    $directo = Torneo::factory()->soloInscribeLaOrganizacion()->create();
+    Categoria::factory()->create(['torneo_id' => $directo->id]);
+    expect($directo->estadoSiguiente())->toBe(EstadoTorneo::Sorteo)
+        ->and(fn () => $accion->handle($directo, EstadoTorneo::InscripcionAbierta, $this->propietario))->toThrow(OperacionNoPermitida::class, 'no se pasa');
+    $accion->handle($directo, EstadoTorneo::Sorteo, $this->propietario);
+    expect($directo->refresh())->estado->toBe(EstadoTorneo::Sorteo)->and($directo->publicado_en)->not->toBeNull()
+        ->and($directo->estadoAnterior())->toBe(EstadoTorneo::Borrador);
+
     Categoria::factory()->create(['torneo_id' => $torneo->id]);
     $accion->handle($torneo, EstadoTorneo::InscripcionAbierta, $this->propietario);
 
