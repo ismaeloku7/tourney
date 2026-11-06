@@ -10,12 +10,17 @@ use App\Competicion\Datos\PropuestaDeHorarios;
 use App\Competicion\Datos\SugerenciaDeRecolocacion;
 use App\Competicion\Errores\ConfiguracionInvalida;
 use App\Competicion\Errores\ErrorDeCompeticion;
+use App\Competicion\Errores\OperacionNoPermitida;
+use App\Competicion\MoverEnElHorario;
+use App\Competicion\PlanificadorContinuo;
+use App\Enums\EstadoPartido;
 use App\Filament\Avisos;
 use App\Filament\Competicion\Marcador;
 use App\Filament\Resources\Torneos\TorneoResource;
 use App\Models\Franja;
 use App\Models\Partido;
 use App\Models\Pista;
+use App\Models\RegistroDeCambio;
 use App\Models\Torneo;
 use App\Models\TorneoPista;
 use App\Models\User;
@@ -27,6 +32,7 @@ use Filament\Resources\Pages\Concerns\InteractsWithRecord;
 use Filament\Resources\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Contracts\Support\Htmlable;
+use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 
 /**
@@ -200,7 +206,7 @@ class HorariosDelTorneo extends Page
      * Cada día con sus pistas y lo que ocupa cada una: lo guardado y, si
      * hay una propuesta, lo propuesto en lugar de lo que se recoloca.
      *
-     * @return list<array{titulo: string, horas: list<array{etiqueta: string, izquierda: float}>, pistas: list<array{nombre: string, bloques: list<array{izquierda: float, ancho: float, calentamiento: float, hora: string, texto: string, detalle: string, color: string, nuevo: bool}>}>}>
+     * @return list<array{titulo: string, desde: int, minutos: int, base: int, horas: list<array{etiqueta: string, izquierda: float}>, pistas: list<array{id: int, nombre: string, bloques: list<array{partido: int|null, movible: bool, tercero: bool, izquierda: float, ancho: float, calentamiento: float, hora: string, texto: string, detalle: string, color: string, nuevo: bool}>}>}>
      */
     private function dias(?PropuestaDeHorarios $propuesta): array
     {
@@ -228,9 +234,11 @@ class HorariosDelTorneo extends Page
 
         $partidos = Partido::query()
             ->whereIn('id', array_filter(array_column($ocupaciones, 'partido')))
-            ->with(['local', 'visitante', 'fase.categoria'])
+            ->with(['local.participanteJugadores', 'visitante.participanteJugadores', 'fase.categoria'])
             ->get()
             ->keyBy('id');
+        $sePuedeMover = Gate::allows('update', $torneo);
+        $terceros = self::tercerosSeguidos($ocupaciones, $partidos->all(), $calentamiento);
 
         $colores = [];
         foreach ($torneo->categorias()->orderBy('orden')->pluck('id')->values() as $i => $categoria) {
@@ -284,24 +292,266 @@ class HorariosDelTorneo extends Page
                     $categoria = $partido?->fase->categoria;
 
                     $bloques[] = [
+                        'partido' => $partido?->id,
+                        // En una propuesta se mueve lo propuesto; en lo guardado, lo que no se ha jugado ni está en juego.
+                        'movible' => $sePuedeMover && $partido !== null && ($propuesta !== null ? $o['nuevo'] : self::movible($partido)),
                         'izquierda' => $posicion($o['inicio']),
                         'ancho' => round(100 * $minutos / $total, 3),
                         'calentamiento' => $partido !== null ? round(100 * min($calentamiento, $minutos) / $minutos, 3) : 0.0,
                         'hora' => $o['inicio']->format('H:i'),
                         'texto' => $texto,
-                        'detalle' => $o['inicio']->format('H:i').'–'.$o['fin']->format('H:i').($categoria !== null ? ' · '.$categoria->nombre : '').($partido !== null ? ' · P'.$partido->id : '').' · '.$texto,
+                        'detalle' => $o['inicio']->format('H:i').'–'.$o['fin']->format('H:i').($categoria !== null ? ' · '.$categoria->nombre : '').($partido !== null ? ' · P'.$partido->id : '').' · '.$texto
+                            .($partido !== null && isset($terceros[$partido->id]) ? ' · ¡Alguien juega su tercer partido seguido!' : ''),
                         'color' => $categoria !== null ? ($colores[$categoria->id] ?? '#6d7a84') : '#c4c9ce',
                         'nuevo' => $o['nuevo'],
+                        'tercero' => $partido !== null && isset($terceros[$partido->id]),
                     ];
                 }
 
-                $filas[] = ['nombre' => $torneoPista->pista->nombre, 'bloques' => $bloques];
+                $filas[] = ['id' => $torneoPista->pista_id, 'nombre' => $torneoPista->pista->nombre.($torneoPista->pista->exterior ? ' · exterior' : ''), 'bloques' => $bloques];
             }
 
-            $dias[] = ['titulo' => ucfirst($desde->translatedFormat('l j \d\e F')), 'horas' => $horas, 'pistas' => $filas];
+            $dias[] = ['titulo' => ucfirst($desde->translatedFormat('l j \d\e F')), 'desde' => $desde->getTimestamp(), 'minutos' => (int) $total, 'base' => $desde->hour * 60 + $desde->minute, 'horas' => $horas, 'pistas' => $filas];
         }
 
         return $dias;
+    }
+
+    /**
+     * Arrastrado a una pista y una hora: se pega al anterior si queda
+     * cerca, empuja a los de detrás y en su pista suben los que iban
+     * pegados. En una propuesta, solo cambia la propuesta.
+     */
+    public function moverPartido(int $partido, int $pista, int $inicio): void
+    {
+        $this->cambiarHorario(function (array $ocupaciones, int $calentamiento) use ($partido, $pista, $inicio): array {
+            // Uno que no cabía en la propuesta entra desde fuera del horario.
+            if (! in_array($partido, array_column($ocupaciones, 'id'), true)) {
+                $ocupaciones[] = $this->sinSitio($partido, $calentamiento);
+            }
+
+            return app(MoverEnElHorario::class)->mover($ocupaciones, $partido, $pista, CarbonImmutable::now()->setTimestamp($inicio)->roundMinutes(5)->getTimestamp(), $calentamiento);
+        });
+    }
+
+    /** Soltado sobre otro partido: se intercambian. */
+    public function intercambiarPartidos(int $partido, int $otro): void
+    {
+        $this->cambiarHorario(fn (array $ocupaciones, int $calentamiento): array => app(MoverEnElHorario::class)->intercambiar($ocupaciones, $partido, $otro, $calentamiento));
+    }
+
+    /**
+     * Un partido que se quedó sin sitio en la propuesta, listo para
+     * colocarlo a mano (fuera de toda pista hasta que se suelta).
+     *
+     * @return array{id: int, pista: int, inicio: int, fin: int, movible: bool, jugadores: list<int>}
+     *
+     * @throws OperacionNoPermitida
+     */
+    private function sinSitio(int $id, int $calentamiento): array
+    {
+        $propuesta = $this->propuesta !== null ? PropuestaDeHorarios::desdeArray($this->propuesta) : null;
+        $sinSitio = array_map(fn ($c): int => $c->partido, $propuesta->plan->conflictos ?? []);
+        $partido = in_array($id, $sinSitio, true)
+            ? Partido::query()->with(['local.participanteJugadores', 'visitante.participanteJugadores', 'fase.categoria'])->find($id)
+            : null;
+        if ($partido === null || $partido->local === null || $partido->visitante === null) {
+            throw new OperacionNoPermitida('Ese partido no está en el horario.');
+        }
+
+        return [
+            'id' => $partido->id,
+            'pista' => 0,
+            'inicio' => 0,
+            'fin' => ($calentamiento + app(DuracionesAprendidas::class)->minutosDe($partido)) * 60,
+            'movible' => true,
+            'jugadores' => array_values(array_unique([...$partido->local->idsDeJugadores(), ...$partido->visitante->idsDeJugadores()])),
+        ];
+    }
+
+    /**
+     * @param  callable(list<array{id: int, pista: int, inicio: int, fin: int, movible: bool, jugadores: list<int>}>, int): array{cambios: array<int, array{pista: int, inicio: int, fin: int}>, avisos: list<array{partido: int, tipo: string}>}  $cambio
+     */
+    private function cambiarHorario(callable $cambio): void
+    {
+        abort_unless(Gate::allows('update', $this->torneo()), 403);
+        $torneo = $this->torneo();
+        $propuesta = $this->propuesta !== null ? PropuestaDeHorarios::desdeArray($this->propuesta) : null;
+
+        try {
+            $resultado = $cambio($this->ocupaciones($propuesta), $torneo->margen_entre_partidos_minutos);
+        } catch (ErrorDeCompeticion $e) {
+            Avisos::error('No se ha movido', [$e->getMessage()]);
+
+            return;
+        }
+
+        if ($resultado['cambios'] === []) {
+            return;
+        }
+
+        if ($this->propuesta !== null) {
+            $colocados = [];
+            $estaban = [];
+            foreach ((array) ($this->propuesta['colocados'] ?? []) as $c) {
+                $c = array_values((array) $c);
+                $estaban[] = (int) $c[0];
+                $nuevo = $resultado['cambios'][(int) $c[0]] ?? null;
+                $colocados[] = $nuevo !== null ? [(int) $c[0], $nuevo['pista'], $nuevo['inicio'], $nuevo['fin']] : $c;
+            }
+            // Los que no tenían sitio y se han soltado en el horario: dejan de ser conflicto.
+            foreach ($resultado['cambios'] as $id => $nuevo) {
+                if (! in_array($id, $estaban, true)) {
+                    $colocados[] = [$id, $nuevo['pista'], $nuevo['inicio'], $nuevo['fin']];
+                    $this->propuesta['conflictos'] = array_values(array_filter((array) ($this->propuesta['conflictos'] ?? []), fn (mixed $c): bool => (int) (array_values((array) $c)[0] ?? 0) !== $id));
+                }
+            }
+            $this->propuesta['colocados'] = $colocados;
+            $this->propuesta['fin'] = max(array_map(fn (array $c): int => (int) $c[3], $colocados));
+        } else {
+            try {
+                $this->guardarCambios($resultado['cambios']);
+            } catch (ErrorDeCompeticion $e) {
+                Avisos::error('No se ha movido', [$e->getMessage()]);
+
+                return;
+            }
+        }
+
+        $avisos = [];
+        // Tres seguidos se ve en el propio partido (con «!»); aquí solo se avisa de lo que no puede ser.
+        $resultado['avisos'] = array_values(array_filter($resultado['avisos'], fn (array $a): bool => $a['tipo'] === 'a_la_vez'));
+        if ($resultado['avisos'] !== []) {
+            $nombres = Partido::query()->with(['local', 'visitante'])->whereIn('id', array_column($resultado['avisos'], 'partido'))->get()->keyBy('id');
+            foreach ($resultado['avisos'] as $aviso) {
+                $partido = $nombres->get($aviso['partido']);
+                $quien = $partido !== null ? Marcador::lado($partido, true).' – '.Marcador::lado($partido, false) : 'P'.$aviso['partido'];
+                $avisos[] = $quien.': alguien juega a la vez en otra pista.';
+            }
+        }
+
+        $movidos = count($resultado['cambios']);
+        if ($avisos !== []) {
+            Avisos::aviso('Movido, pero revísalo', $avisos);
+        } else {
+            Avisos::hecho($movidos === 1 ? 'Partido movido' : "Movido: cambian {$movidos} partidos", $this->propuesta !== null ? 'En la propuesta: se guarda al aplicarla.' : null);
+        }
+    }
+
+    /**
+     * Lo que ocupa las pistas, para moverlo. Con una propuesta, solo se
+     * mueve lo propuesto; lo guardado no se toca.
+     *
+     * @return list<array{id: int, pista: int, inicio: int, fin: int, movible: bool, jugadores: list<int>}>
+     */
+    private function ocupaciones(?PropuestaDeHorarios $propuesta): array
+    {
+        $torneo = $this->torneo();
+        $seRecolocan = $propuesta->partidos ?? [];
+        $jugadoresDe = fn (?Partido $p): array => $p === null ? [] : array_values(array_unique([...($p->local?->idsDeJugadores() ?? []), ...($p->visitante?->idsDeJugadores() ?? [])]));
+
+        $ocupaciones = [];
+        $franjas = Franja::query()->where('torneo_id', $torneo->id)
+            ->with(['partido.local.participanteJugadores', 'partido.visitante.participanteJugadores', 'partido.local.jugadores', 'partido.visitante.jugadores'])
+            ->get();
+        foreach ($franjas as $franja) {
+            $partido = $franja->partido;
+            if (($partido === null && ! $franja->bloqueada) || ($partido !== null && in_array($partido->id, $seRecolocan, true))) {
+                continue;
+            }
+            $ocupaciones[] = [
+                'id' => $partido !== null ? $partido->id : -$franja->id,
+                'pista' => $franja->pista_id,
+                'inicio' => $franja->inicio->getTimestamp(),
+                'fin' => $franja->fin->getTimestamp(),
+                'movible' => $propuesta === null && $partido !== null && self::movible($partido),
+                'jugadores' => $jugadoresDe($partido),
+            ];
+        }
+
+        if ($propuesta !== null) {
+            $partidos = Partido::query()->whereIn('id', array_map(fn ($c): int => $c->partido, $propuesta->plan->colocados))
+                ->with(['local.participanteJugadores', 'visitante.participanteJugadores', 'local.jugadores', 'visitante.jugadores'])->get()->keyBy('id');
+            foreach ($propuesta->plan->colocados as $c) {
+                $ocupaciones[] = ['id' => $c->partido, 'pista' => $c->pista, 'inicio' => $c->inicio->getTimestamp(), 'fin' => $c->fin->getTimestamp(), 'movible' => true, 'jugadores' => $jugadoresDe($partidos->get($c->partido))];
+            }
+        }
+
+        return $ocupaciones;
+    }
+
+    /**
+     * Guarda las horas y pistas nuevas de lo movido.
+     *
+     * @param  array<int, array{pista: int, inicio: int, fin: int}>  $cambios
+     *
+     * @throws OperacionNoPermitida
+     */
+    private function guardarCambios(array $cambios): void
+    {
+        $torneo = $this->torneo();
+        $usuario = $this->usuario();
+
+        DB::transaction(function () use ($torneo, $usuario, $cambios): void {
+            $antes = [];
+            foreach (Partido::query()->with('franja')->whereIn('id', array_keys($cambios))->get() as $partido) {
+                $franja = $partido->franja;
+                if ($franja === null || ! self::movible($partido)) {
+                    throw new OperacionNoPermitida('El horario ha cambiado mientras tanto: recarga la página.');
+                }
+                $antes[$partido->id] = [$franja->pista_id, $franja->inicio->format('Y-m-d H:i')];
+                $nuevo = $cambios[$partido->id];
+                $inicio = CarbonImmutable::now()->setTimestamp($nuevo['inicio']);
+                $franja->update(['pista_id' => $nuevo['pista'], 'inicio' => $inicio, 'fin' => CarbonImmutable::now()->setTimestamp($nuevo['fin']), 'inicio_previsto' => $inicio]);
+                $partido->forceFill(['pista_id' => $nuevo['pista'], 'aviso_siguientes_en' => null, 'aviso_calentar_en' => null])->save();
+            }
+
+            RegistroDeCambio::anotar('mover_en_horario', $torneo, $usuario, ['partidos' => $antes], ['partidos' => array_map(fn (array $c): array => [$c['pista'], date('Y-m-d H:i', $c['inicio'])], $cambios)]);
+        });
+    }
+
+    /**
+     * Los partidos que son el tercero (o más) seguido de alguno de sus
+     * jugadores: con menos de 20 minutos sin jugar entre uno y otro.
+     *
+     * @param  list<array{partido: int|null, pista: int, inicio: CarbonImmutable, fin: CarbonImmutable, nuevo: bool}>  $ocupaciones
+     * @param  array<int, Partido>  $partidos
+     * @return array<int, true>
+     */
+    private static function tercerosSeguidos(array $ocupaciones, array $partidos, int $calentamientoMinutos): array
+    {
+        $porJugador = [];
+        foreach ($ocupaciones as $o) {
+            $partido = $o['partido'] !== null ? ($partidos[$o['partido']] ?? null) : null;
+            if ($partido === null) {
+                continue;
+            }
+            // Quien viene de jugar no calienta: cuenta el juego.
+            $juega = $o['inicio']->addMinutes($calentamientoMinutos)->min($o['fin'])->getTimestamp();
+            foreach ([...($partido->local?->idsDeJugadores() ?? []), ...($partido->visitante?->idsDeJugadores() ?? [])] as $jugador) {
+                $porJugador[$jugador][] = [$juega, $o['fin']->getTimestamp(), $partido->id];
+            }
+        }
+
+        $terceros = [];
+        foreach ($porJugador as $juegos) {
+            usort($juegos, fn (array $a, array $b): int => $a[0] <=> $b[0]);
+            $racha = 1;
+            for ($i = 1; $i < count($juegos); $i++) {
+                $racha = $juegos[$i][0] - $juegos[$i - 1][1] < PlanificadorContinuo::MINUTOS_PARA_DESCANSAR * 60 ? $racha + 1 : 1;
+                if ($racha >= 3) {
+                    $terceros[$juegos[$i][2]] = true;
+                }
+            }
+        }
+
+        return $terceros;
+    }
+
+    /** Un partido que todavía no se ha jugado ni está en juego. */
+    private static function movible(Partido $partido): bool
+    {
+        return in_array($partido->estado, [EstadoPartido::Pendiente, EstadoPartido::Programado], true);
     }
 
     public function aplicarSugerencia(string $clave): void
@@ -340,7 +590,7 @@ class HorariosDelTorneo extends Page
         ];
     }
 
-    /** @return list<string> */
+    /** @return list<array{partido: int, texto: string, movible: bool}> */
     private function conflictos(PropuestaDeHorarios $propuesta): array
     {
         $partidos = Partido::query()
@@ -352,9 +602,14 @@ class HorariosDelTorneo extends Page
         $lineas = [];
         foreach ($propuesta->plan->conflictos as $conflicto) {
             $partido = $partidos->get($conflicto->partido);
-            $lineas[] = ($partido !== null
-                ? $partido->fase->categoria->nombre.' · '.Marcador::lado($partido, true).' – '.Marcador::lado($partido, false)
-                : 'P'.$conflicto->partido).': '.$conflicto->detalle;
+            $lineas[] = [
+                'partido' => $conflicto->partido,
+                'texto' => ($partido !== null
+                    ? $partido->fase->categoria->nombre.' · '.Marcador::lado($partido, true).' – '.Marcador::lado($partido, false)
+                    : 'P'.$conflicto->partido).': '.$conflicto->detalle,
+                // Con sus dos parejas se puede soltar a mano en el horario.
+                'movible' => $partido !== null && $partido->local_id !== null && $partido->visitante_id !== null && Gate::allows('update', $this->torneo()),
+            ];
         }
 
         return $lineas;

@@ -5,6 +5,7 @@ use App\Actions\Competicion\RegistrarResultado;
 use App\Actions\Competicion\SortearGrupos;
 use App\Competicion\Datos\Resultado;
 use App\Competicion\Datos\Set;
+use App\Competicion\Errores\ConfiguracionInvalida;
 use App\Enums\EstadoFase;
 use App\Enums\EstadoInscripcion;
 use App\Enums\EstadoPartido;
@@ -445,4 +446,123 @@ test('el cuadro se puede hacer a mano por posiciones y se rellena al cerrar los 
     expect($primeraRonda)->toHaveCount(4)
         ->and([$primeraRonda[0]->local_id, $primeraRonda[1]->local_id, $primeraRonda[1]->visitante_id, $primeraRonda[2]->local_id, $primeraRonda[2]->visitante_id, $primeraRonda[3]->visitante_id])
         ->toBe([$quien('1º A'), $quien('2º B'), $quien('2º C'), $quien('1º C'), $quien('2º A'), $quien('1º B')]);
+});
+
+test('en el sorteo se elige el número de grupos: más grupos, más pequeños', function () {
+    fasesDe($this->categoria)
+        ->mountAction(TestAction::make('sortear')->table($this->grupos))
+        ->assertActionDataSet(['numero' => 3])
+        ->setActionData(['modo' => 'aleatorio', 'numero' => 4])
+        ->callMountedAction()
+        ->assertHasNoActionErrors()
+        ->assertNotified('4 grupos y 12 partidos');
+
+    $grupos = $this->grupos->refresh()->grupos()->with('participantes')->get();
+    expect($grupos->map(fn ($g): int => $g->participantes->count())->all())->toBe([3, 3, 3, 3])
+        ->and($this->grupos->configuracionDeGrupos()->numeroDeGrupos)->toBe(4)
+        ->and($this->grupos->configuracionDeGrupos()->tamanoDeGrupo)->toBeNull();
+});
+
+test('después del sorteo se añaden o se quitan grupos', function () {
+    app(SortearGrupos::class)->handle($this->grupos, $this->propietario);
+    app(GenerarPartidos::class)->handle($this->grupos, $this->propietario);
+    $antes = $this->grupos->grupos()->with('participantes')->get()->map(fn ($g): array => array_map('strval', $g->participantes->pluck('id')->all()))->all();
+
+    // Un grupo más, vacío y con todo colocado: no se guarda.
+    fasesDe($this->categoria)
+        ->callAction(TestAction::make('sortear')->table($this->grupos), ['modo' => 'aleatorio', 'numero' => 4])
+        ->assertNotified('No se ha podido sortear');
+    expect($this->grupos->grupos()->count())->toBe(3);
+
+    // Un grupo más con una pareja de cada uno: cuatro de tres.
+    fasesDe($this->categoria)
+        ->callAction(TestAction::make('sortear')->table($this->grupos), [
+            'modo' => 'aleatorio',
+            'numero' => 4,
+            'grupo_0' => array_slice($antes[0], 1),
+            'grupo_1' => array_slice($antes[1], 1),
+            'grupo_2' => array_slice($antes[2], 1),
+            'grupo_3' => [$antes[0][0], $antes[1][0], $antes[2][0]],
+        ])
+        ->assertHasNoActionErrors()
+        ->assertNotified('Grupos guardados');
+
+    $grupos = $this->grupos->refresh()->grupos()->with('participantes')->orderBy('orden')->get();
+    expect($grupos->map(fn ($g): int => $g->participantes->count())->all())->toBe([3, 3, 3, 3])
+        ->and($grupos[3]->nombre)->toBe('D')
+        ->and($this->grupos->partidos()->count())->toBe(12)
+        ->and($this->grupos->configuracionDeGrupos()->numeroDeGrupos)->toBe(4);
+
+    // Dos grupos: las parejas de los que se quitan van al sorteo.
+    fasesDe($this->categoria)
+        ->callAction(TestAction::make('sortear')->table($this->grupos), ['modo' => 'aleatorio', 'numero' => 2])
+        ->assertHasNoActionErrors()
+        ->assertNotified('Grupos guardados');
+
+    $grupos = $this->grupos->refresh()->grupos()->with('participantes')->get();
+    expect($grupos->map(fn ($g): int => $g->participantes->count())->all())->toBe([6, 6])
+        ->and($this->grupos->partidos()->count())->toBe(30);
+});
+
+test('al configurar el cuadro se ve su esquema: rondas, cruces y quién llega a cada hueco', function () {
+    $pagina = fasesDe($this->categoria);
+    $esquema = fn (array $configuracion): string => FaseForm::esquema($configuracion, $pagina->instance(), $this->cuadro)->toHtml();
+
+    // 3 grupos, pasan 2 por grupo y los 2 mejores terceros: cuartos.
+    expect($esquema(['regla_de_cruces' => 'entre_grupos']))
+        ->toContain('Cuartos')->toContain('Semifinales')->toContain('Final')
+        ->toContain('Ganador C1')->toContain('1º A')->toContain('Orientativo');
+
+    $aMano = $esquema(['regla_de_cruces' => 'a_posiciones', 'cruces_por_posicion' => [
+        ['local' => '1A', 'visitante' => 'M2'], ['local' => '2B', 'visitante' => '2C'], ['local' => '1C', 'visitante' => '2A'], ['local' => 'M1', 'visitante' => '1B'],
+    ]]);
+    expect($aMano)->toContain('Mejor 3º nº 2')->toContain('Ganador S1')->not->toContain('Orientativo')
+        ->and($esquema(['regla_de_cruces' => 'a_posiciones']))->toContain('Partir del cuadro automático')
+        ->and($esquema(['regla_de_cruces' => 'sorteo', 'tercer_y_cuarto_puesto' => true]))->toContain('Sorteo')->toContain('Tercer puesto')->toContain('Perdedor S1');
+
+    // Y el formulario de la fase se abre y se guarda con el esquema dentro.
+    $pagina->mountAction(TestAction::make('edit')->table($this->cuadro))
+        ->callMountedAction()
+        ->assertHasNoActionErrors();
+});
+
+test('en una fase de grupos ya sorteada se cambia quién pasa: por ejemplo, los dos mejores terceros', function () {
+    $this->grupos->update(['configuracion' => [...$this->grupos->configuracion, 'clasificados' => ['por_grupo' => 2]]]);
+    app(SortearGrupos::class)->handle($this->grupos, $this->propietario);
+    app(GenerarPartidos::class)->handle($this->grupos->refresh(), $this->propietario);
+
+    $pagina = fasesDe($this->categoria);
+    $automatico = fn (): string => FaseForm::esquema(['regla_de_cruces' => 'entre_grupos'], $pagina->instance(), $this->cuadro)->toHtml();
+    expect($automatico())->toContain('Bye');
+
+    $pagina->assertActionHidden(TestAction::make('edit')->table($this->grupos))
+        ->callAction(TestAction::make('quienPasa')->table($this->grupos), ['por_grupo' => 2, 'cuantos_mejores' => 2, 'mejores_de_posicion' => 3])
+        ->assertHasNoActionErrors()
+        ->assertNotified('Guardado');
+
+    $regla = $this->grupos->refresh()->configuracionDeGrupos()->clasificados;
+    expect($regla->porGrupo)->toBe(2)->and($regla->cuantosMejores)->toBe(2)->and($regla->mejoresDePosicion)->toBe(3)
+        ->and($automatico())->toContain('Mejor 3º nº 1')->not->toContain('Bye');
+});
+
+test('con el cuadro a mano, en cada hueco va cualquier posición y la fase de grupos pasa a clasificar justo a esos', function () {
+    // Solo los primeros y el mejor segundo.
+    fasesDe($this->categoria)
+        ->callAction(TestAction::make('edit')->table($this->cuadro), ['configuracion' => [
+            'regla_de_cruces' => 'a_posiciones',
+            'mejores_de' => 2,
+            'cruces_por_posicion' => [['local' => '1A', 'visitante' => 'M1'], ['local' => '1B', 'visitante' => '1C']],
+            'tercer_y_cuarto_puesto' => false,
+            'consolacion' => 'ninguna',
+        ]])
+        ->assertHasNoActionErrors()
+        ->assertNotified('Cuadro guardado');
+
+    $regla = $this->grupos->refresh()->configuracionDeGrupos()->clasificados;
+    expect($regla->porGrupo)->toBe(1)->and($regla->cuantosMejores)->toBe(1)->and($regla->mejoresDePosicion)->toBe(2)
+        ->and($this->cuadro->refresh()->configuracion['cruces_por_posicion'])->toBe([['1A', 'M1'], ['1B', '1C']]);
+
+    // Si pasa el 2º de un grupo, pasan los de todos.
+    expect(fn () => FaseForm::quienPasaDesde(['1A', '1B', '1C', '2A'], ['A', 'B', 'C'], 3))->toThrow(ConfiguracionInvalida::class)
+        ->and(FaseForm::quienPasaDesde(['1A', '1B', '1C', '2A', '2B', '2C', 'M1', 'M2'], ['A', 'B', 'C'], 3))->toBe(['por_grupo' => 2, 'cuantos_mejores' => 2, 'mejores_de_posicion' => 3]);
 });

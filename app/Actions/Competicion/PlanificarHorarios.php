@@ -105,6 +105,7 @@ final class PlanificarHorarios
                 $jugadores,
                 $duraciones->minutosDe($partido, $estimador),
                 $dependeDe,
+                $partido->fase->tipo->esDeGrupos(),
             );
         }
 
@@ -129,6 +130,7 @@ final class PlanificarHorarios
                 $noDisponibilidades,
                 $torneo->margen_entre_partidos_minutos,
                 $rehacer ? CarbonImmutable::now()->ceilMinute(5)->toDateTimeImmutable() : null,
+                array_values($torneo->torneoPistas()->whereHas('pista', fn (Builder $consulta) => $consulta->where('exterior', true))->pluck('pista_id')->map(fn (mixed $id): int => (int) $id)->all()),
             ),
             $fijos,
         );

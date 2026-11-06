@@ -65,7 +65,7 @@ final class HorasEnDirecto
 
         [$datos, $modelos] = $this->cargar($torneo);
 
-        return $this->guardar($this->motor->recalcular($datos, now()->getTimestamp(), $torneo->descanso_minimo_minutos), $modelos);
+        return $this->guardar($this->motor->recalcular($datos, now()->getTimestamp(), $torneo->descanso_minimo_minutos, $torneo->margen_entre_partidos_minutos), $modelos);
     }
 
     /** Tras un resultado: recalcula y avisa a la cola de esa pista. */
@@ -116,7 +116,7 @@ final class HorasEnDirecto
 
         [$datos] = $this->cargar($torneo);
 
-        return $this->motor->sugerencia($datos, now()->getTimestamp(), $torneo->descanso_minimo_minutos, self::RETRASO_MINUTOS, self::AVISO_MINUTOS);
+        return $this->motor->sugerencia($datos, now()->getTimestamp(), $torneo->descanso_minimo_minutos, self::RETRASO_MINUTOS, self::AVISO_MINUTOS, $torneo->margen_entre_partidos_minutos);
     }
 
     /**
@@ -128,7 +128,7 @@ final class HorasEnDirecto
     {
         [$datos, $modelos] = $this->cargar($torneo);
         $ahora = now()->getTimestamp();
-        $horas = $this->motor->recalcular($datos, $ahora, $torneo->descanso_minimo_minutos);
+        $horas = $this->motor->recalcular($datos, $ahora, $torneo->descanso_minimo_minutos, $torneo->margen_entre_partidos_minutos);
         $retrasos = $this->motor->retrasos($datos, $horas, $ahora);
         $salida = [];
 
@@ -170,11 +170,11 @@ final class HorasEnDirecto
 
         [$datos, $modelos] = $this->cargar($torneo);
         $ahora = now()->getTimestamp();
-        $antes = $this->motor->recalcular($datos, $ahora, $torneo->descanso_minimo_minutos);
+        $antes = $this->motor->recalcular($datos, $ahora, $torneo->descanso_minimo_minutos, $torneo->margen_entre_partidos_minutos);
         $movidos = array_map(fn (PartidoEnDirecto $p): PartidoEnDirecto => $p->id === $sugerencia->partido
             ? $p->con($sugerencia->haciaPista, $p->inicio, $sugerencia->orden, $ahora + self::AVISO_MINUTOS * 60)
             : $p, $datos);
-        $despues = $this->motor->recalcular($movidos, $ahora, $torneo->descanso_minimo_minutos);
+        $despues = $this->motor->recalcular($movidos, $ahora, $torneo->descanso_minimo_minutos, $torneo->margen_entre_partidos_minutos);
 
         $partido = $modelos->get($sugerencia->partido);
         $franja = $partido?->franja;

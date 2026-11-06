@@ -19,8 +19,9 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
  * @property string $nombre
  * @property int $orden
  * @property bool $activa
+ * @property bool $exterior
  */
-#[Fillable(['sede_id', 'nombre', 'orden', 'activa'])]
+#[Fillable(['sede_id', 'nombre', 'orden', 'activa', 'exterior'])]
 class Pista extends Model
 {
     /** @use HasFactory<PistaFactory> */
@@ -28,7 +29,7 @@ class Pista extends Model
 
     protected function casts(): array
     {
-        return ['activa' => 'boolean'];
+        return ['activa' => 'boolean', 'exterior' => 'boolean'];
     }
 
     /** @return BelongsTo<Sede, $this> */

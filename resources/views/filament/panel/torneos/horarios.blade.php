@@ -3,6 +3,8 @@
     un día por bloque, una fila por pista y cada partido como una barra desde
     su calentamiento (rayado) hasta su final estimado. Con una propuesta,
     lo nuevo va resaltado y arriba sale el resumen y lo que no cabe.
+    Los partidos se arrastran: a otra pista u hora (moverPartido) o sobre
+    otro partido para intercambiarlos (intercambiarPartidos).
 --}}
 <x-filament-panels::page>
     <style>
@@ -26,6 +28,16 @@
         .hor-bloque span { position: relative; }
         .hor-bloque.viejo { opacity: .45; }
         .hor-bloque.nuevo { box-shadow: 0 0 0 2px #fff, 0 0 0 3px currentColor; }
+        .hor-bloque.movible { cursor: grab; }
+        .hor-bloque.cogido { opacity: .35; }
+        .hor-bloque.destino { outline: 2px dashed #1f2328; outline-offset: 1px; }
+        .hor-linea.destino { background-color: #eef4ff; }
+        .hor-ayuda { font-size: .75rem; color: #8a939b; }
+        .hor-marca { pointer-events: none; }
+        .hor-guia { position: absolute; top: -.25rem; bottom: -.25rem; width: 2px; background: #1f2328; pointer-events: none; z-index: 3; }
+        .hor-guia span { position: absolute; top: -1.15rem; left: 50%; transform: translateX(-50%); background: #1f2328; color: #fff; font-size: .6875rem; font-weight: 700; border-radius: .25rem; padding: 0 .3rem; white-space: nowrap; }
+        .hor-suelto { cursor: grab; border-bottom: 1px dashed currentColor; }
+        .hor-alerta { position: absolute; top: .15rem; right: .15rem; width: .9rem; height: .9rem; border-radius: 999px; background: #fff; color: #d9480f; font-weight: 800; font-size: .625rem; line-height: .9rem; text-align: center; pointer-events: none; }
         .hor-leyenda { display: flex; gap: 1rem; font-size: .75rem; color: #8a939b; flex-wrap: wrap; }
         .hor-leyenda i { display: inline-block; width: 1.25rem; height: .75rem; border-radius: .2rem; vertical-align: middle; margin-right: .25rem; }
         .hor-vacio { font-size: .875rem; color: #8a939b; }
@@ -37,7 +49,7 @@
         .hor-bien { color: #2f9e44; }
     </style>
 
-    <div class="hor">
+    <div class="hor" x-data="{ cogido: null, agarre: 0 }">
         @if ($directo !== null)
             <div class="hor-dia">
                 <h3>En directo</h3>
@@ -86,16 +98,32 @@
 
         @if ($conflictos !== [])
             <div class="hor-conflictos">
-                <strong>{{ count($conflictos) }} partidos no caben:</strong>
+                <strong>{{ count($conflictos) === 1 ? '1 partido no cabe' : count($conflictos).' partidos no caben' }}:</strong> <span class="hor-suave">arrástralo a una pista y una hora para colocarlo a mano.</span>
                 <ul>
                     @foreach (array_slice($conflictos, 0, 30) as $linea)
-                        <li>{{ $linea }}</li>
+                        <li>
+                            @if ($linea['movible'])
+                                <span
+                                    class="hor-suelto"
+                                    draggable="true"
+                                    title="Arrástralo a una pista y una hora"
+                                    x-on:dragstart="cogido = {{ $linea['partido'] }}; agarre = 0; $event.dataTransfer.effectAllowed = 'move'; $event.dataTransfer.setData('text/plain', '{{ $linea['partido'] }}')"
+                                    x-on:dragend="cogido = null"
+                                >⠿ {{ $linea['texto'] }}</span>
+                            @else
+                                {{ $linea['texto'] }}
+                            @endif
+                        </li>
                     @endforeach
                     @if (count($conflictos) > 30)
                         <li>Y {{ count($conflictos) - 30 }} más.</li>
                     @endif
                 </ul>
             </div>
+        @endif
+
+        @if ($dias !== [])
+            <p class="hor-ayuda">Arrastra un partido a otra pista u hora: la línea marca dónde empezará (se pega al anterior si queda a menos de 15 minutos y empuja a los de detrás). Suéltalo sobre otro partido para intercambiarlos. {{ $esPropuesta ? 'En la propuesta se mueve lo propuesto; se guarda al aplicarla.' : 'Lo jugado o en juego no se mueve.' }}</p>
         @endif
 
         <div class="hor-leyenda">
@@ -105,6 +133,7 @@
                 <span><i style="background: #6d7a84; opacity: .45"></i>Ya programado (no se toca)</span>
             @endif
             <span><i style="background: #c4c9ce"></i>Pista bloqueada</span>
+            <span><i style="background: #6d7a84; position: relative"><b style="position: absolute; top: -.2rem; right: -.35rem; width: .75rem; height: .75rem; border-radius: 999px; background: #fff; color: #d9480f; font-size: .55rem; line-height: .75rem; text-align: center; box-shadow: 0 0 0 1px #e6e8eb">!</b></i>Tercer partido seguido de alguien</span>
             @foreach ($categorias as $categoria)
                 <span><i style="background: {{ $categoria['color'] }}"></i>{{ $categoria['nombre'] }}</span>
             @endforeach
@@ -125,18 +154,62 @@
                     @foreach ($dia['pistas'] as $pista)
                         <div class="hor-fila">
                             <span class="hor-pista" title="{{ $pista['nombre'] }}">{{ $pista['nombre'] }}</span>
-                            <div class="hor-linea">
+                            <div
+                                class="hor-linea"
+                                x-data="{
+                                    encima: false,
+                                    minutos: 0,
+                                    total: {{ $dia['minutos'] }},
+                                    // Donde quedaría el comienzo del partido: el ratón menos por dónde se cogió, de 5 en 5 minutos.
+                                    calcular(evento) {
+                                        const caja = this.$el.getBoundingClientRect();
+                                        this.minutos = Math.max(0, Math.round(((evento.clientX - this.agarre - caja.left) / caja.width) * this.total / 5) * 5);
+                                    },
+                                    hora() {
+                                        const m = {{ $dia['base'] }} + this.minutos;
+                                        return String(Math.floor(m / 60) % 24).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0');
+                                    },
+                                }"
+                                x-bind:class="{ destino: encima && cogido !== null }"
+                                x-on:dragover.prevent="encima = true; calcular($event)"
+                                x-on:dragleave="encima = false"
+                                x-on:drop.prevent="
+                                    encima = false;
+                                    if (cogido === null) return;
+                                    calcular($event);
+                                    $wire.moverPartido(cogido, {{ $pista['id'] }}, {{ $dia['desde'] }} + minutos * 60);
+                                    cogido = null;
+                                "
+                            >
+                                <div class="hor-guia" x-show="encima && cogido !== null" x-cloak x-bind:style="'left: ' + (minutos / total * 100) + '%'"><span x-text="hora()"></span></div>
                                 @foreach ($dia['horas'] as $hora)
                                     <span class="hor-marca" style="left: {{ $hora['izquierda'] }}%"></span>
                                 @endforeach
                                 @foreach ($pista['bloques'] as $bloque)
                                     <div
-                                        @class(['hor-bloque', 'nuevo' => $esPropuesta && $bloque['nuevo'], 'viejo' => $esPropuesta && ! $bloque['nuevo']])
+                                        @class(['hor-bloque', 'nuevo' => $esPropuesta && $bloque['nuevo'], 'viejo' => $esPropuesta && ! $bloque['nuevo'], 'movible' => $bloque['movible']])
                                         style="left: {{ $bloque['izquierda'] }}%; width: {{ $bloque['ancho'] }}%; background: {{ $bloque['color'] }}; color: {{ $bloque['color'] }}"
                                         title="{{ $bloque['detalle'] }}"
+                                        @if ($bloque['movible'])
+                                            draggable="true"
+                                            x-data="{ encima: false }"
+                                            x-bind:class="{ cogido: cogido === {{ $bloque['partido'] }}, destino: encima && cogido !== null && cogido !== {{ $bloque['partido'] }} }"
+                                            x-on:dragstart="cogido = {{ $bloque['partido'] }}; agarre = $event.clientX - $el.getBoundingClientRect().left; $event.dataTransfer.effectAllowed = 'move'; $event.dataTransfer.setData('text/plain', '{{ $bloque['partido'] }}')"
+                                            x-on:dragend="cogido = null"
+                                            x-on:dragover.prevent.stop="encima = true"
+                                            x-on:dragleave="encima = false"
+                                            x-on:drop.prevent.stop="
+                                                encima = false;
+                                                if (cogido !== null && cogido !== {{ $bloque['partido'] }}) $wire.intercambiarPartidos(cogido, {{ $bloque['partido'] }});
+                                                cogido = null;
+                                            "
+                                        @endif
                                     >
                                         <div class="hor-cal" style="width: {{ $bloque['calentamiento'] }}%"></div>
                                         <span style="color: #fff"><b>{{ $bloque['hora'] }}</b> {{ $bloque['texto'] }}</span>
+                                        @if ($bloque['tercero'])
+                                            <span class="hor-alerta" aria-label="Alguien juega su tercer partido seguido">!</span>
+                                        @endif
                                     </div>
                                 @endforeach
                             </div>
