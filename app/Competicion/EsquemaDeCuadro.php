@@ -139,7 +139,8 @@ final readonly class EsquemaDeCuadro
         return $codigo;
     }
 
-    private static function prefijo(int $partidos): string
+    /** La letra de los cruces de una ronda por cuántos partidos tiene: F, S, C, O, D… */
+    public static function prefijo(int $partidos): string
     {
         return match (true) {
             $partidos <= 1 => 'F',
