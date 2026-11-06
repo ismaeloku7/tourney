@@ -61,6 +61,16 @@ beforeEach(function () {
     TorneoArbitro::query()->create(['torneo_id' => $this->torneo->id, 'user_id' => $this->arbitro->id, 'pista_id' => $this->central->id]);
 });
 
+test('la mesa se queda dentro 30 días: al entrar se guarda el recuerdo de la sesión', function () {
+    Livewire::test(AccesoDeMesa::class)
+        ->set(['email' => 'arbitro@example.com', 'clave' => 'clave-de-arbitro-12'])
+        ->call('entrar')
+        ->assertHasNoErrors()
+        ->assertRedirect(route('mesa'));
+
+    expect($this->arbitro->refresh()->remember_token)->not->toBeNull();
+});
+
 test('el árbitro entra en la mesa y la mesa sin sesión lleva al acceso', function () {
     $this->get('http://norte.saas.test/mesa')->assertRedirect(route('mesa.acceso'));
 
