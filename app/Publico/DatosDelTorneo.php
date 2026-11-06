@@ -4,14 +4,19 @@ namespace App\Publico;
 
 use App\Actions\Competicion\AnotarMarcador;
 use App\Actions\Competicion\ProyectarCruces;
+use App\Competicion\Datos\Origen;
+use App\Competicion\Datos\Partido as PartidoDto;
+use App\Competicion\EsquemaDeCuadro;
 use App\Enums\EstadoInscripcion;
 use App\Enums\EstadoPartido;
+use App\Enums\TipoDeOrigen;
 use App\Filament\Competicion\Marcador;
 use App\Models\Categoria;
 use App\Models\Clasificacion;
 use App\Models\Fase;
 use App\Models\Grupo;
 use App\Models\Inscripcion;
+use App\Models\Participante;
 use App\Models\Partido;
 use App\Models\Torneo;
 use Illuminate\Database\Eloquent\Builder;
@@ -119,6 +124,80 @@ final class DatosDelTorneo
             }
 
             $salida[] = ['categoria' => $fase->categoria, 'fase' => $fase, 'rondas' => $lista];
+        }
+
+        return $salida;
+    }
+
+    /**
+     * Con la fase de grupos en juego y el cuadro que va detrás aún sin
+     * hacer (y visible), el cuadro entero tal y como saldría si los grupos
+     * acabasen ahora: cada pareja con su posición («Ana / Eva (1º A)») y en
+     * las rondas siguientes de qué cruce sale cada una («Ganador C1»). Por
+     * sorteo no hay nada que adelantar.
+     *
+     * @return list<array{categoria: Categoria, fase: Fase, previsto: true, rondas: list<array{nombre: string, partidos: list<array{partido: string, codigo: string, resultado: string, hora: string|null, enVivo: string, ganaLocal: bool|null}>}>}>
+     */
+    public function cuadrosPrevistos(): array
+    {
+        $salida = [];
+
+        foreach ($this->fases() as $fase) {
+            $cuadro = $fase->tipo->esDeGrupos() ? $fase->siguiente() : null;
+            if ($cuadro === null || ! $cuadro->visible_en_web || $cuadro->partidos()->exists()) {
+                continue;
+            }
+
+            $previsto = app(ProyectarCruces::class)->cuadro($fase);
+            if ($previsto === null) {
+                continue;
+            }
+            [$construido, $clasificados] = $previsto;
+
+            $nombres = Participante::query()->with('jugadores')->whereIn('id', array_keys($clasificados))->get()
+                ->mapWithKeys(fn (Participante $p): array => [$p->id => (string) NombrePublico::participante($p, $this->torneo)])->all();
+
+            // Cada cruce con su código: O1…, C1…, S1, S2, F.
+            $codigo = [];
+            for ($ronda = 1; $ronda <= $construido->rondas; $ronda++) {
+                $deRonda = $construido->partidosDeRonda($ronda);
+                foreach ($deRonda as $partido) {
+                    $codigo[(int) $partido->id] = EsquemaDeCuadro::prefijo(count($deRonda)).($ronda === $construido->rondas ? '' : $partido->posicion);
+                }
+            }
+
+            $hueco = function (?int $participante, ?Origen $origen) use ($nombres, $clasificados, $codigo): string {
+                if ($participante !== null) {
+                    return ($nombres[$participante] ?? '?').' ('.($clasificados[$participante]->origen ?? '?').')';
+                }
+                if ($origen !== null) {
+                    return ($origen->tipo === TipoDeOrigen::PerdedorDe ? 'Perdedor ' : 'Ganador ').($codigo[$origen->referencia] ?? '?');
+                }
+
+                return 'Bye';
+            };
+            $fila = fn (PartidoDto $p, string $codigoDelPartido): array => [
+                'partido' => $hueco($p->local, $p->local === null ? $p->origenLocal : null).' – '.$hueco($p->visitante, $p->visitante === null ? $p->origenVisitante : null),
+                'codigo' => $codigoDelPartido,
+                'resultado' => '',
+                'hora' => null,
+                'enVivo' => '',
+                'ganaLocal' => null,
+            ];
+
+            $rondas = [];
+            for ($ronda = 1; $ronda <= $construido->rondas; $ronda++) {
+                $rondas[] = [
+                    'nombre' => Marcador::ronda($ronda, $construido->rondas),
+                    'partidos' => array_map(fn (PartidoDto $p): array => $fila($p, $codigo[(int) $p->id]), $construido->partidosDeRonda($ronda)),
+                ];
+            }
+            $tercero = $construido->tercerPuesto();
+            if ($tercero !== null) {
+                $rondas[] = ['nombre' => 'Tercer puesto', 'partidos' => [$fila($tercero, '3º')]];
+            }
+
+            $salida[] = ['categoria' => $fase->categoria, 'fase' => $cuadro, 'previsto' => true, 'rondas' => $rondas];
         }
 
         return $salida;
