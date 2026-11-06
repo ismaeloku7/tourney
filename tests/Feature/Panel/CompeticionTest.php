@@ -24,10 +24,12 @@ use App\Models\Categoria;
 use App\Models\Clasificacion;
 use App\Models\Fase;
 use App\Models\FormatoPartido;
+use App\Models\Franja;
 use App\Models\Inscripcion;
 use App\Models\Jugador;
 use App\Models\Organizador;
 use App\Models\Participante;
+use App\Models\Partido;
 use App\Models\Pista;
 use App\Models\Torneo;
 use App\Models\User;
@@ -588,4 +590,56 @@ test('sin nada jugado, cada grupo sale ordenado por nivel, tenga o no cabeza de 
             ->and($grupo->clasificaciones->last()->participante->cabeza_de_serie)->not->toBeNull()
             ->and($grupo->clasificaciones->pluck('sorteo_desempate')->filter()->all())->toBe([]);
     }
+});
+
+test('una fase se empieza de nuevo sin tocar las demás categorías: fuera sus grupos, sus partidos y sus horas', function () {
+    app(SortearGrupos::class)->handle($this->grupos, $this->propietario);
+    app(GenerarPartidos::class)->handle($this->grupos->refresh(), $this->propietario);
+    $pista = $this->torneo->torneoPistas()->firstOrFail()->pista_id;
+    $hora = now()->setTime(10, 0);
+    $conHora = function ($partido) use ($pista, &$hora) {
+        $franja = $this->torneo->franjas()->create(['pista_id' => $pista, 'inicio' => $hora, 'fin' => $hora->copy()->addMinutes(70), 'inicio_previsto' => $hora, 'bloqueada' => false]);
+        $partido->update(['franja_id' => $franja->id, 'pista_id' => $pista, 'estado' => EstadoPartido::Programado]);
+        $hora = $hora->copy()->addMinutes(70);
+
+        return $franja;
+    };
+    $deEsta = $conHora($this->grupos->partidos()->firstOrFail());
+
+    // Otra categoría con un partido con hora: no se toca.
+    $otraFase = Fase::factory()->grupos()->create(['categoria_id' => Categoria::factory()->create(['torneo_id' => $this->torneo->id])->id]);
+    $otro = Partido::factory()->create(['fase_id' => $otraFase->id]);
+    $deLaOtra = $conHora($otro);
+
+    fasesDe($this->categoria)
+        ->callAction(TestAction::make('empezarDeNuevo')->table($this->grupos))
+        ->assertHasNoActionErrors()
+        ->assertNotified('Fase lista para sortear de nuevo');
+
+    expect($this->grupos->refresh()->estado)->toBe(EstadoFase::Pendiente)
+        ->and($this->grupos->grupos()->count())->toBe(0)
+        ->and($this->grupos->partidos()->count())->toBe(0)
+        ->and(Franja::query()->find($deEsta->id))->toBeNull()
+        ->and($otro->refresh()->franja_id)->toBe($deLaOtra->id)
+        ->and(Franja::query()->find($deLaOtra->id))->not->toBeNull();
+
+    // Se vuelve a sortear como si nada.
+    app(SortearGrupos::class)->handle($this->grupos->refresh(), $this->propietario);
+    expect($this->grupos->grupos()->count())->toBe(3);
+});
+
+test('con resultados, empezar de nuevo pide confirmarlo', function () {
+    app(SortearGrupos::class)->handle($this->grupos, $this->propietario);
+    app(GenerarPartidos::class)->handle($this->grupos->refresh(), $this->propietario);
+    app(RegistrarResultado::class)->handle($this->grupos->partidos()->firstOrFail(), new Resultado([new Set(6, 1), new Set(6, 1)]), $this->propietario);
+
+    fasesDe($this->categoria)
+        ->callAction(TestAction::make('empezarDeNuevo')->table($this->grupos), ['aunque' => false])
+        ->assertHasActionErrors(['aunque']);
+    expect($this->grupos->partidos()->count())->toBeGreaterThan(0);
+
+    fasesDe($this->categoria)
+        ->callAction(TestAction::make('empezarDeNuevo')->table($this->grupos), ['aunque' => true])
+        ->assertHasNoActionErrors();
+    expect($this->grupos->partidos()->count())->toBe(0);
 });

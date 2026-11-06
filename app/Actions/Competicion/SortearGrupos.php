@@ -12,6 +12,7 @@ use App\Enums\EstadoInscripcion;
 use App\Enums\EstadoParticipante;
 use App\Models\Fase;
 use App\Models\Participante;
+use App\Models\Partido;
 use App\Models\RegistroDeCambio;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -67,7 +68,7 @@ final class SortearGrupos
 
             $reparto = $this->repartidor->repartir($participantes, $configuracion);
 
-            $fase->partidos()->forceDelete();
+            Partido::borrarConSusHoras($fase->partidos());
             $fase->clasificaciones()->delete();
             $fase->grupos()->delete();
 
