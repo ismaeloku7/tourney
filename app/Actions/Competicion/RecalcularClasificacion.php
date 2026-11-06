@@ -70,7 +70,7 @@ final class RecalcularClasificacion
             $pareja = $parejas->get($linea->participante);
             $nivel = $pareja?->nivelMedio();
 
-            return [$pareja?->cabeza_de_serie ?? PHP_INT_MAX, $nivel === null ? 1 : 0, -($nivel ?? 0), (string) $pareja?->nombre, $linea->participante];
+            return [$pareja->cabeza_de_serie ?? PHP_INT_MAX, $nivel === null ? 1 : 0, -($nivel ?? 0), (string) $pareja?->nombre, $linea->participante];
         };
 
         $lineas = $clasificacion->lineas;
@@ -78,7 +78,7 @@ final class RecalcularClasificacion
 
         return new ClasificacionDto(
             $clasificacion->grupo,
-            array_values(array_map(fn (LineaDeClasificacion $l, int $i): LineaDeClasificacion => $l->con(posicion: $i + 1, criterioAplicado: null, sorteo: null), $lineas, array_keys($lineas))),
+            array_map(fn (LineaDeClasificacion $l, int $i): LineaDeClasificacion => $l->con(posicion: $i + 1, criterioAplicado: null, sorteo: null), $lineas, array_keys($lineas)),
             $clasificacion->completa,
         );
     }
