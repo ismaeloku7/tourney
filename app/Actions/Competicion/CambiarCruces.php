@@ -88,7 +88,6 @@ final class CambiarCruces
         if (count($huecos) !== count($antes)) {
             throw new OperacionNoPermitida('Faltan huecos del cuadro: vuelve a abrir el diálogo.');
         }
-        $huecos = array_values($huecos);
         if ($huecos === $antes) {
             return false;
         }
