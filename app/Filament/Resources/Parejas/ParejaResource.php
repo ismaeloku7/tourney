@@ -99,6 +99,7 @@ class ParejaResource extends Resource
                 SelectFilter::make('estado')->label('Estado')->options(EstadoInscripcion::opciones()),
             ])
             ->headerActions([
+                ParaCopiar::copiarParaWhatsApp(),
                 ParaCopiar::boton(),
             ])
             ->recordUrl(fn (Inscripcion $record, mixed $livewire): ?string => ParaCopiar::enlace($livewire, self::getUrl('edit', ['record' => $record])))

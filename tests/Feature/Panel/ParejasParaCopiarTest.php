@@ -3,7 +3,9 @@
 use App\Enums\Rol;
 use App\Filament\Resources\Jugadores\JugadorResource;
 use App\Filament\Resources\Parejas\Pages\ListParejas;
+use App\Filament\Resources\Parejas\ParaCopiar;
 use App\Filament\Resources\Parejas\ParejaResource;
+use App\Filament\Resources\Parejas\TextoParaWhatsApp;
 use App\Filament\Resources\Torneos\Pages\EditTorneo;
 use App\Filament\Resources\Torneos\RelationManagers\ParejasRelationManager;
 use App\Models\Categoria;
@@ -76,4 +78,27 @@ test('la pestaña Parejas del torneo también tiene la vista para copiar', funct
         ->instance()->getTable()->getColumns();
 
     expect(array_filter($columnas, fn (Column $c): bool => ! $c->isToggleable()))->toBe([]);
+});
+
+test('«Copiar para WhatsApp» da el texto limpio de lo que sale en la tabla', function () {
+    $this->inscripcion->load('categoria.torneo', 'participante.jugadores');
+    $pareja = $this->inscripcion->participante;
+    $jugadores = $pareja->jugadores->map(fn (Jugador $j): string => $j->nombre_completo)->join(' y ');
+    $categoria = $this->inscripcion->categoria;
+
+    $componente = Livewire::test(ListParejas::class)
+        ->mountAction(TestAction::make('copiarParaWhatsApp')->table())
+        ->assertActionMounted(TestAction::make('copiarParaWhatsApp')->table());
+
+    $texto = ParaCopiar::texto($componente->instance());
+
+    expect($texto)->toStartWith("*{$this->torneo->nombre} · {$categoria->nombre}*\n1. {$pareja->nombre}: {$jugadores} · Nivel ")
+        ->and($texto)->toContain($this->inscripcion->estado->etiqueta())
+        ->and($texto)->not->toContain('Editar')
+        ->and($texto)->not->toContain('Mover');
+
+    // Solo con lo que se ve; sin categoría, sin cabecera.
+    expect(TextoParaWhatsApp::componer([$this->inscripcion], ['participante.nombre', 'jugadores']))->toBe("1. {$pareja->nombre}: {$jugadores}")
+        ->and(TextoParaWhatsApp::componer([$this->inscripcion], ['pago_marcado_en']))->toBe('1. Sin pagar')
+        ->and(TextoParaWhatsApp::componer([], ['participante.nombre']))->toBe('');
 });
