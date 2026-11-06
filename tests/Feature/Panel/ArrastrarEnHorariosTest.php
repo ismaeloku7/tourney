@@ -140,6 +140,6 @@ test('la parrilla va más allá del horario de las pistas y admite dejar ahí un
         ->and($dia['pistas'][0]['abre'][0]['izquierda'])->toBe(round(100 * 60 / (16 * 60 - 4), 3));
 
     // Un partido se deja a las 22:00, fuera del horario de la pista, y se guarda.
-    $pagina->call('moverPartido', $a->id, $this->dos->id, $this->dia->setTime(22, 0)->getTimestamp())->assertNotified('Movido: cambia 1 partido');
+    $pagina->call('moverPartido', $a->id, $this->dos->id, $this->dia->setTime(22, 0)->getTimestamp())->assertNotified('Partido movido');
     expect($a->refresh()->pista_id)->toBe($this->dos->id)->and($a->franja->inicio->format('H:i'))->toBe('22:00');
 });
