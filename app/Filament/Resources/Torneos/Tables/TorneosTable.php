@@ -3,8 +3,10 @@
 namespace App\Filament\Resources\Torneos\Tables;
 
 use App\Enums\EstadoTorneo;
+use App\Filament\Resources\Torneos\TorneoResource;
 use App\Models\Torneo;
 use Filament\Actions\EditAction;
+use Filament\Actions\ViewAction;
 use Filament\Tables\Columns\TextColumn;
 use Filament\Tables\Filters\SelectFilter;
 use Filament\Tables\Table;
@@ -44,7 +46,10 @@ class TorneosTable
                     ->label('Estado')
                     ->options(EstadoTorneo::opciones()),
             ])
+            // Al pulsar un torneo se abre su ficha; desde ella (o desde aquí) se edita.
+            ->recordUrl(fn (Torneo $record): string => TorneoResource::getUrl('view', ['record' => $record]))
             ->recordActions([
+                ViewAction::make()->label('Ficha'),
                 EditAction::make(),
             ]);
     }
