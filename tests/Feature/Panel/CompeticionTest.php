@@ -567,8 +567,8 @@ test('con el cuadro a mano, en cada hueco va cualquier posición y la fase de gr
         ->and(FaseForm::quienPasaDesde(['1A', '1B', '1C', '2A', '2B', '2C', 'M1', 'M2'], ['A', 'B', 'C'], 3))->toBe(['por_grupo' => 2, 'cuantos_mejores' => 2, 'mejores_de_posicion' => 3]);
 });
 
-test('sin nada jugado, cada grupo sale con el cabeza de serie primero y luego por nivel', function () {
-    // Niveles: cada pareja, el de su orden de alta (la primera, 1; la última, 12).
+test('sin nada jugado, cada grupo sale ordenado por nivel, tenga o no cabeza de serie', function () {
+    // Niveles: cada pareja, el de su orden de alta (la primera, 1; la última, 12). Las tres primeras son cabezas de serie.
     foreach ($this->categoria->participantes()->with('jugadores')->orderBy('id')->get()->values() as $i => $pareja) {
         foreach ($pareja->jugadores as $jugador) {
             $jugador->update(['nivel_declarado' => (string) ($i + 1)]);
@@ -579,13 +579,13 @@ test('sin nada jugado, cada grupo sale con el cabeza de serie primero y luego po
     app(GenerarPartidos::class)->handle($this->grupos->refresh(), $this->propietario);
 
     foreach ($this->grupos->refresh()->grupos()->with('clasificaciones.participante.jugadores')->get() as $grupo) {
-        $parejas = $grupo->clasificaciones->map(fn ($linea) => $linea->participante)->values();
-        $resto = $parejas->slice(1)->map(fn ($p): ?float => $p->nivelMedio())->values()->all();
-        $ordenado = $resto;
+        $niveles = $grupo->clasificaciones->map(fn ($linea): ?float => $linea->participante->nivelMedio())->values()->all();
+        $ordenado = $niveles;
         rsort($ordenado);
 
-        expect($parejas->first()->cabeza_de_serie)->not->toBeNull()
-            ->and($resto)->toBe($ordenado)
+        expect($niveles)->toBe($ordenado)
+            // El cabeza de serie (de los niveles más bajos) va al final.
+            ->and($grupo->clasificaciones->last()->participante->cabeza_de_serie)->not->toBeNull()
             ->and($grupo->clasificaciones->pluck('sorteo_desempate')->filter()->all())->toBe([]);
     }
 });
