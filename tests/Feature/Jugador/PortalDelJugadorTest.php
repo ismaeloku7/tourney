@@ -319,3 +319,29 @@ test('su torneo enseña el cuadro entero previsto mientras se juegan los grupos,
     $cuadro->update(['visible_en_web' => false]);
     miTorneo($this->inscripcion)->assertDontSee('Así quedaría el cuadro');
 });
+
+test('un cuadro visible que aún no tiene nada que enseñar dice qué falta para que se llene', function () {
+    $cuadro = Fase::factory()->eliminatoria()->create(['categoria_id' => $this->categoria->id, 'nombre' => 'Cuadro avanzado']);
+
+    // Sin grupos ni sorteo: el cuadro existe, pero no hay nada que prever.
+    miTorneo($this->inscripcion)->assertSee('Cuadro avanzado')->assertSee('Todavía no hay cuadro')->assertSee('cuando la organización haga el sorteo');
+
+    // Con fase de grupos sin sortear.
+    $grupos = Fase::factory()->grupos(['semilla' => 5])->create(['categoria_id' => $this->categoria->id]);
+    miTorneo($this->inscripcion)->assertSee('cuando se sorteen los grupos');
+
+    // Con los cruces por sorteo, aunque los grupos estén sorteados, no se adelanta nada.
+    $cuadro->update(['configuracion' => [...$cuadro->configuracion, 'regla_de_cruces' => 'sorteo']]);
+    $organizacion = User::factory()->rol(Rol::Propietario)->create();
+    app(SortearGrupos::class)->handle($grupos, $organizacion);
+    app(GenerarPartidos::class)->handle($grupos->refresh(), $organizacion);
+    miTorneo($this->inscripcion)->assertSee('Los cruces se sortean cuando acabe la fase de grupos')->assertDontSee('Así quedaría el cuadro');
+
+    // Con cruces entre grupos sí se adelanta, y la tarjeta de «falta» desaparece.
+    $cuadro->update(['configuracion' => [...$cuadro->configuracion, 'regla_de_cruces' => 'entre_grupos']]);
+    miTorneo($this->inscripcion)->assertSee('Así quedaría el cuadro')->assertDontSee('Todavía no hay cuadro');
+
+    // Oculto en la web, ni una cosa ni otra.
+    $cuadro->update(['visible_en_web' => false]);
+    miTorneo($this->inscripcion)->assertDontSee('Cuadro avanzado');
+});

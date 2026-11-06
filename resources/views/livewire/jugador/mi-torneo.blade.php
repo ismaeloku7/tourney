@@ -68,6 +68,13 @@
                 </section>
             @endif
 
+            @foreach ($cuadrosQueFaltan as $pendiente)
+                <section class="tarjeta p-4" wire:key="cuadro-pendiente-{{ $pendiente['fase']->id }}">
+                    <h2 class="text-base font-semibold">{{ $pendiente['fase']->nombre }}</h2>
+                    <p class="mt-1 text-sm text-tema-suave">Todavía no hay cuadro. {{ $pendiente['motivo'] }}</p>
+                </section>
+            @endforeach
+
             @foreach ($cuadros as $bloque)
                 <section class="tarjeta p-4" wire:key="cuadro-{{ $bloque['fase']->id }}">
                     <h2 class="text-base font-semibold">{{ $bloque['fase']->nombre }}@if ($bloque['previsto'] ?? false) <span class="text-sm font-normal text-tema-suave">· previsto</span>@endif</h2>

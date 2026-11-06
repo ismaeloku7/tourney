@@ -8,8 +8,11 @@ use App\Actions\Jugadores\DarseDeBaja;
 use App\Competicion\Errores\ErrorDeCompeticion;
 use App\Enums\EstadoInscripcion;
 use App\Enums\EstadoTorneo;
+use App\Enums\ReglaDeCruces;
+use App\Enums\TipoDeFase;
 use App\Jugadores\PartidosDelJugador;
 use App\Models\Disponibilidad;
+use App\Models\Fase;
 use App\Models\Inscripcion;
 use App\Models\Jugador;
 use App\Models\Partido;
@@ -140,10 +143,43 @@ class MiTorneo extends PaginaDelJugador
             'miGrupo' => $miGrupo,
             'otrosGrupos' => $otrosGrupos,
             // Los cuadros ya hechos y, mientras se juegan los grupos, cómo quedaría el que va detrás.
-            'cuadros' => [...array_values(array_filter($datos->cuadros(), $deMiCategoria)), ...array_values(array_filter($datos->cuadrosPrevistos(), $deMiCategoria))],
+            'cuadros' => $cuadros = [...array_values(array_filter($datos->cuadros(), $deMiCategoria)), ...array_values(array_filter($datos->cuadrosPrevistos(), $deMiCategoria))],
+            'cuadrosQueFaltan' => $this->cuadrosQueFaltan($categoriaId, array_map(fn (array $bloque): int => $bloque['fase']->id, $cuadros)),
             'admiteDisponibilidad' => $torneo->horarios_publicados_en === null && ! in_array($torneo->estado, [EstadoTorneo::Finalizado, EstadoTorneo::Archivado], true) && $this->inscripcion->estado !== EstadoInscripcion::Baja,
             'noDisponibilidades' => Disponibilidad::query()->where('jugador_id', $yo->id)->where('torneo_id', $torneo->id)->orderBy('desde')->get(),
         ])->title($torneo->nombre);
+    }
+
+    /**
+     * Los cuadros de la categoría que se enseñan en la web pero aún no
+     * tienen nada que ver, cada uno con por qué: así el jugador sabe que
+     * el cuadro existe y qué falta para que se llene.
+     *
+     * @param  list<int>  $yaEnsenados
+     * @return list<array{fase: Fase, motivo: string}>
+     */
+    private function cuadrosQueFaltan(int $categoriaId, array $yaEnsenados): array
+    {
+        $fases = Fase::query()->where('categoria_id', $categoriaId)->where('visible_en_web', true)->orderBy('orden')->get();
+        $faltan = [];
+
+        foreach ($fases as $fase) {
+            if (! $fase->tipo->esDeCuadro() || in_array($fase->id, $yaEnsenados, true) || $fase->partidos()->exists()) {
+                continue;
+            }
+
+            $anterior = $fases->last(fn (Fase $f): bool => $f->orden < $fase->orden && $f->tipo->esDeGrupos());
+            $motivo = match (true) {
+                $anterior === null => 'Se llenará cuando la organización haga el sorteo.',
+                $anterior->grupos()->doesntExist() => 'Se llenará cuando se sorteen los grupos y acabe la fase de grupos.',
+                $fase->tipo === TipoDeFase::Eliminatoria && $fase->configuracionDeEliminatoria()->reglaDeCruces === ReglaDeCruces::Sorteo => 'Los cruces se sortean cuando acabe la fase de grupos: hasta entonces no se puede adelantar.',
+                default => 'Se llenará cuando acabe la fase de grupos.',
+            };
+
+            $faltan[] = ['fase' => $fase, 'motivo' => $motivo];
+        }
+
+        return $faltan;
     }
 
     private function torneo(): Torneo
