@@ -12,6 +12,7 @@ use App\Models\Concerns\VaALaPapelera;
 use App\Tenancy\EnLaBaseDelOrganizador;
 use Database\Factories\PartidoFactory;
 use Illuminate\Database\Eloquent\Attributes\Fillable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -126,6 +127,23 @@ class Partido extends Model
     public function pista(): BelongsTo
     {
         return $this->belongsTo(Pista::class);
+    }
+
+    /**
+     * Borra del todo estos partidos y suelta las horas (franjas) que tenían
+     * reservadas, para que no se queden ocupando pista. Los bloqueos de
+     * pista no se tocan.
+     *
+     * @param  Builder<Partido>|HasMany<Partido, covariant Model>  $consulta
+     */
+    public static function borrarConSusHoras(Builder|HasMany $consulta): void
+    {
+        $franjas = (clone $consulta)->whereNotNull('franja_id')->pluck('franja_id')->all();
+        $consulta->forceDelete();
+
+        if ($franjas !== []) {
+            Franja::query()->whereIn('id', $franjas)->where('bloqueada', false)->delete();
+        }
     }
 
     /** @return BelongsTo<Franja, $this> */
