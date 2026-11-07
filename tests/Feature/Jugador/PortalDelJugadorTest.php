@@ -396,3 +396,11 @@ test('en su torneo los equipos salen por su nombre y la pista, una vez y a la vi
     expect(substr_count($html, 'Pista Central'))->toBe(2)
         ->and($html)->toContain($inicio->translatedFormat('D j/n H:i'));
 });
+
+test('con sesión de jugador, la portada y el logotipo llevan a su portal', function () {
+    $this->get('http://norte.saas.test/')->assertRedirect(route('jugador.portal'));
+    $this->get('http://norte.saas.test/jugador/partidos')->assertOk()->assertSee('href="'.route('jugador.portal').'"', false);
+
+    auth('jugador')->logout();
+    $this->get('http://norte.saas.test/')->assertOk();
+});

@@ -35,7 +35,7 @@
     <body class="flex min-h-screen flex-col bg-tema-fondo text-tema-texto antialiased" style="--acento: {{ $color }}">
         <header class="border-b border-tema-borde bg-white">
             <div class="mx-auto flex max-w-5xl items-center justify-between gap-3 px-4 py-3">
-                <a href="{{ url('/') }}" class="flex min-w-0 items-center gap-3">
+                <a href="{{ $organizador && \Illuminate\Support\Facades\Auth::guard('jugador')->check() ? route('jugador.portal') : url('/') }}" class="flex min-w-0 items-center gap-3">
                     @if ($logo)
                         <img src="{{ $logo }}" alt="" class="h-10 w-auto max-w-40 object-contain">
                     @else
