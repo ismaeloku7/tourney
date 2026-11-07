@@ -108,7 +108,10 @@ test('un administrador del torneo también puede duplicar', function () {
 });
 
 test('al pulsar una categoría del torneo se abre su configuración', function () {
-    $tabla = Livewire::test(CategoriasRelationManager::class, ['ownerRecord' => $this->torneo, 'pageClass' => EditTorneo::class])->instance()->getTable();
+    // La pestaña se carga en diferido: con una primera comprobación ya está montada.
+    $tabla = Livewire::test(CategoriasRelationManager::class, ['ownerRecord' => $this->torneo, 'pageClass' => EditTorneo::class])
+        ->assertActionVisible(TestAction::make('configurar')->table($this->origen))
+        ->instance()->getTable();
 
     expect($tabla->getRecordUrl($this->origen))->toBe(CategoriaResource::getUrl('edit', ['record' => $this->origen]));
 });
