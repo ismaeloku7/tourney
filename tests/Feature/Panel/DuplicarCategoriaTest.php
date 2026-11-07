@@ -5,6 +5,7 @@ use App\Enums\EstadoFase;
 use App\Enums\Genero;
 use App\Enums\Rol;
 use App\Enums\TipoDeFase;
+use App\Filament\Resources\Categorias\CategoriaResource;
 use App\Filament\Resources\Torneos\Pages\EditTorneo;
 use App\Filament\Resources\Torneos\RelationManagers\CategoriasRelationManager;
 use App\Models\Categoria;
@@ -104,4 +105,10 @@ test('un administrador del torneo también puede duplicar', function () {
 
     Livewire::test(CategoriasRelationManager::class, ['ownerRecord' => $this->torneo, 'pageClass' => EditTorneo::class])
         ->assertActionVisible(TestAction::make('duplicar')->table($this->origen));
+});
+
+test('al pulsar una categoría del torneo se abre su configuración', function () {
+    $tabla = Livewire::test(CategoriasRelationManager::class, ['ownerRecord' => $this->torneo, 'pageClass' => EditTorneo::class])->instance()->getTable();
+
+    expect($tabla->getRecordUrl($this->origen))->toBe(CategoriaResource::getUrl('edit', ['record' => $this->origen]));
 });

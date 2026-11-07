@@ -80,6 +80,8 @@ class CategoriasRelationManager extends RelationManager
             ->headerActions([
                 CreateAction::make(),
             ])
+            // Al pulsar una categoría se abre su configuración (fases, inscripciones…), no el diálogo de editar.
+            ->recordUrl(fn (Categoria $record): string => CategoriaResource::getUrl('edit', ['record' => $record]))
             ->recordActions([
                 Action::make('configurar')
                     ->label('Configurar')
