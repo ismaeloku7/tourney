@@ -3,6 +3,7 @@
 use App\Enums\EstadoPartido;
 use App\Enums\EstadoTorneo;
 use App\Enums\Rol;
+use App\Filament\Resources\Jugadores\Pages\EditJugador;
 use App\Filament\Resources\Jugadores\Pages\ListJugadores;
 use App\Filament\Resources\Parejas\Pages\EditPareja;
 use App\Filament\Resources\Parejas\Pages\ListParejas;
@@ -138,6 +139,8 @@ test('ve las parejas y los jugadores de sus torneos con el enlace de cada pareja
         ->assertCanSeeTableRecords([$this->ana])
         ->assertCanNotSeeTableRecords([$this->deFuera])
         ->assertActionHidden(TestAction::make('edit')->table($this->ana));
+    // A los de sus torneos los ve, pero no los edita.
+    Livewire::test(EditJugador::class, ['record' => $this->ana->getRouteKey()])->assertForbidden();
 });
 
 test('el enlace de cada pareja lleva su QR para escanearlo', function () {
