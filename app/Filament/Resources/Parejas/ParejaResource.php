@@ -7,6 +7,7 @@ use App\Enums\Rol;
 use App\Filament\Resources\Categorias\CategoriaResource;
 use App\Filament\Resources\Parejas\Pages\EditPareja;
 use App\Filament\Resources\Parejas\Pages\ListParejas;
+use App\Filament\Resources\Torneos\TorneoResource;
 use App\Models\Categoria;
 use App\Models\Inscripcion;
 use App\Models\User;
@@ -61,6 +62,10 @@ class ParejaResource extends Resource
         if ($usuario instanceof User && $usuario->rol === Rol::Administrador) {
             $consulta->whereHas('categoria.torneo.administradores', fn (Builder $q) => $q->whereKey($usuario->id));
         }
+        // Un árbitro, las de los torneos que arbitra.
+        if ($usuario instanceof User && $usuario->esArbitro()) {
+            $consulta->whereHas('categoria', fn (Builder $q) => $q->whereIn('torneo_id', $usuario->idsDeTorneosQueArbitra()));
+        }
 
         return $consulta;
     }
@@ -101,20 +106,22 @@ class ParejaResource extends Resource
             ->headerActions([
                 ParaCopiar::copiarParaWhatsApp(),
                 ParaCopiar::boton(),
-                AccesoDePareja::crearTodos(),
-                AccesoDePareja::borrarTodos(),
+                AccesoDePareja::crearTodos()->authorize(fn (): bool => ! TorneoResource::esArbitro()),
+                AccesoDePareja::borrarTodos()->authorize(fn (): bool => ! TorneoResource::esArbitro()),
             ])
-            ->recordUrl(fn (Inscripcion $record, mixed $livewire): ?string => ParaCopiar::enlace($livewire, self::getUrl('edit', ['record' => $record])))
+            // Un árbitro ve las parejas y sus enlaces; no las cambia.
+            ->recordUrl(fn (Inscripcion $record, mixed $livewire): ?string => TorneoResource::esArbitro() ? null : ParaCopiar::enlace($livewire, self::getUrl('edit', ['record' => $record])))
             ->recordActions(ParaCopiar::ocultando([
                 AccesoDePareja::crear(),
                 AccesoDePareja::ver(),
-                CompaneroDePareja::accion(),
-                MoverParejas::accion(),
+                CompaneroDePareja::accion()->authorize(fn (): bool => ! TorneoResource::esArbitro()),
+                MoverParejas::accion()->authorize(fn (): bool => ! TorneoResource::esArbitro()),
                 Action::make('editar')->label('Editar')->icon(Heroicon::OutlinedPencilSquare)
+                    ->authorize(fn (): bool => ! TorneoResource::esArbitro())
                     ->url(fn (Inscripcion $record): string => self::getUrl('edit', ['record' => $record])),
             ]))
             ->toolbarActions(ParaCopiar::ocultando([
-                MoverParejas::enBloque(),
+                MoverParejas::enBloque()->authorize(fn (): bool => ! TorneoResource::esArbitro()),
             ]));
     }
 

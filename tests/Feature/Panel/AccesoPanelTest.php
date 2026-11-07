@@ -30,14 +30,14 @@ test('el panel de un host desconocido y el del dominio del SaaS responden 404', 
     $this->get('http://saas.test/panel/login')->assertNotFound();
 });
 
-test('el propietario y un administrador entran; un árbitro, no', function () {
+test('el propietario, un administrador y un árbitro entran', function () {
     $propietario = comoOrganizador($this->organizador, fn () => User::factory()->rol(Rol::Propietario)->create());
     $administrador = comoOrganizador($this->organizador, fn () => User::factory()->rol(Rol::Administrador)->create());
     $arbitro = comoOrganizador($this->organizador, fn () => User::factory()->rol(Rol::Arbitro)->create());
 
     $this->actingAs($propietario)->get('http://padel-norte.test/panel')->assertOk()->assertSee('Panel');
     $this->actingAs($administrador)->get('http://padel-norte.test/panel')->assertOk();
-    $this->actingAs($arbitro)->get('http://padel-norte.test/panel')->assertForbidden();
+    $this->actingAs($arbitro)->get('http://padel-norte.test/panel')->assertOk();
 });
 
 test('un usuario desactivado con la sesión abierta pierde el acceso', function () {

@@ -58,7 +58,8 @@ trait BarraDelTorneo
             ->url(fn (): string => TorneoResource::getUrl($pagina, ['record' => $this->torneo()]));
 
         return [
-            $ir('ficha', 'Ficha', Heroicon::OutlinedDocumentText, 'view'),
+            // Un árbitro solo lleva los partidos: sin ficha, sin «Más» y sin cambiar el estado.
+            $ir('ficha', 'Ficha', Heroicon::OutlinedDocumentText, 'view')->hidden(fn (): bool => TorneoResource::esArbitro()),
             $ir('editar', 'Editar', Heroicon::OutlinedPencilSquare, 'edit')->visible(fn (): bool => Gate::allows('update', $this->torneo())),
             $ir('competicion', 'Competición', Heroicon::OutlinedTrophy, 'competicion'),
             $ir('partidos', 'Partidos', Heroicon::OutlinedTableCells, 'partidos'),
@@ -187,12 +188,14 @@ trait BarraDelTorneo
                 ->label('Más')
                 ->icon(Heroicon::OutlinedEllipsisHorizontal)
                 ->color('gray')
-                ->button(),
+                ->button()
+                ->visible(fn (): bool => Gate::allows('update', $this->torneo())),
             ActionGroup::make($this->accionesDeEstado())
                 ->label(fn (): string => 'Estado: '.$this->torneo()->estado->etiqueta())
                 ->icon(Heroicon::OutlinedFlag)
                 ->color(fn (): string => $this->torneo()->estado->color())
-                ->button(),
+                ->button()
+                ->visible(fn (): bool => Gate::allows('update', $this->torneo())),
         ];
     }
 

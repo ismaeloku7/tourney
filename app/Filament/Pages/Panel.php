@@ -221,6 +221,7 @@ class Panel extends Dashboard
         $torneos = $this->torneos()->pluck('id')->all();
 
         $inscripciones = Inscripcion::query()
+            ->when($this->usuario()->esArbitro(), fn (Builder $q) => $q->whereRaw('1 = 0'))
             ->where('estado', EstadoInscripcion::Pendiente->value)
             ->whereHas('categoria', fn (Builder $q) => $q->whereIn('torneo_id', $torneos))
             ->whereHas('participante', fn (Builder $q) => $q->has('participanteJugadores', '>=', 2))
@@ -265,6 +266,11 @@ class Panel extends Dashboard
     /** @return list<array{texto: string, cuando: string}> */
     private function actividad(): array
     {
+        // La actividad de toda la organización no es para el árbitro.
+        if ($this->usuario()->esArbitro()) {
+            return [];
+        }
+
         return array_values(RegistroDeCambio::query()
             ->with(['usuario', 'jugador'])
             ->latest('id')
@@ -385,6 +391,9 @@ class Panel extends Dashboard
 
     private function cambiarInscripcion(int $id, EstadoInscripcion $estado, string $hecho): void
     {
+        // Las inscripciones las lleva la organización; el árbitro, solo los partidos.
+        abort_if($this->usuario()->esArbitro(), 403);
+
         $torneos = $this->torneos()->pluck('id')->all();
         $inscripcion = Inscripcion::query()->whereHas('categoria', fn (Builder $q) => $q->whereIn('torneo_id', $torneos))->find($id);
         abort_if($inscripcion === null, 404);

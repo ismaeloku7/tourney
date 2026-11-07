@@ -47,9 +47,10 @@ class TorneosTable
                     ->options(EstadoTorneo::opciones()),
             ])
             // Al pulsar un torneo se abre su ficha; desde ella (o desde aquí) se edita.
-            ->recordUrl(fn (Torneo $record): string => TorneoResource::getUrl('view', ['record' => $record]))
+            // Un árbitro va a sus partidos: la ficha no es para él.
+            ->recordUrl(fn (Torneo $record): string => TorneoResource::getUrl(TorneoResource::esArbitro() ? 'partidos' : 'view', ['record' => $record]))
             ->recordActions([
-                ViewAction::make()->label('Ficha'),
+                ViewAction::make()->label('Ficha')->hidden(fn (): bool => TorneoResource::esArbitro()),
                 EditAction::make(),
             ]);
     }

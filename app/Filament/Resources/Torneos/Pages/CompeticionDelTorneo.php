@@ -102,7 +102,8 @@ class CompeticionDelTorneo extends Page
             ->color('success')
             ->record(fn (array $arguments): ?Fase => $this->fase($arguments))
             ->hidden(fn (array $arguments): bool => $this->fase($arguments) === null)
-            ->visible(fn (Fase $record): bool => in_array($record->estado, [EstadoFase::Preparada, EstadoFase::EnJuego], true))
+            // Cerrar una fase (y armar el cuadro) es de la organización, no del árbitro.
+            ->visible(fn (Fase $record): bool => in_array($record->estado, [EstadoFase::Preparada, EstadoFase::EnJuego], true) && Gate::allows('update', $this->torneo()))
             ->disabled(fn (Fase $record): bool => ! self::cerrable($record))
             ->tooltip(fn (Fase $record): ?string => self::cerrable($record) ? null : 'Hace falta que todos los partidos tengan resultado.')
             ->requiresConfirmation()
@@ -138,7 +139,8 @@ class CompeticionDelTorneo extends Page
             'categorias' => $this->categorias(),
             'categoria' => $categoria,
             'fases' => $categoria === null ? [] : app(VistaDeCompeticion::class)->deCategoria($categoria),
-            'configurar' => $categoria === null ? null : CategoriaResource::getUrl('edit', ['record' => $categoria]),
+            // Configurar la categoría es de la organización: el árbitro no tiene ese enlace.
+            'configurar' => $categoria === null || TorneoResource::esArbitro() ? null : CategoriaResource::getUrl('edit', ['record' => $categoria]),
         ];
     }
 
