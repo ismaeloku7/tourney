@@ -142,7 +142,7 @@ final class HorasEnDirecto
         }
 
         // A los de detrás cuya hora cambia, también (los dos primeros ya saben que les toca).
-        $this->avisarCambiosDeHora($torneo, $cola->take(2)->pluck('id')->map(fn (mixed $id): int => (int) $id)->all());
+        $this->avisarCambiosDeHora($torneo, array_values($cola->take(2)->pluck('id')->map(fn (mixed $id): int => (int) $id)->all()));
     }
 
     /**
@@ -355,7 +355,7 @@ final class HorasEnDirecto
             $datos[] = new PartidoEnDirecto(
                 $partido->id,
                 $franja->pista_id,
-                $empezado && $partido->empezado_en !== null ? $partido->empezado_en->getTimestamp() : $franja->inicio->getTimestamp(),
+                $empezado ? $partido->empezado_en->getTimestamp() : $franja->inicio->getTimestamp(),
                 $empezado ? max(1, $minutos - $torneo->margen_entre_partidos_minutos) : $minutos,
                 array_values(array_unique([...($partido->local?->idsDeJugadores() ?? []), ...($partido->visitante?->idsDeJugadores() ?? [])])),
                 $dependeDe,

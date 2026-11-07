@@ -367,7 +367,7 @@ class HorariosDelTorneo extends Page
                         && in_array($partido->estado, [EstadoPartido::Pendiente, EstadoPartido::Programado], true)
                         && $o['inicio']->lte($ahora->subMinutes(HorasEnDirecto::TOLERANCIA_MINUTOS));
                     $cuando = $real
-                        ? ($enJuego ? 'Se está jugando desde las '.$o['inicio']->format('H:i') : 'Se jugó de '.$o['inicio']->format('H:i').' a '.$o['fin']->format('H:i').(($partido?->cerrado() ?? true) ? '' : ' (falta el resultado)'))
+                        ? ($enJuego ? 'Se está jugando desde las '.$o['inicio']->format('H:i') : 'Se jugó de '.$o['inicio']->format('H:i').' a '.$o['fin']->format('H:i').($partido->cerrado() ? '' : ' (falta el resultado)'))
                         : $o['inicio']->format('H:i').'–'.$o['fin']->format('H:i').($tarde ? ' · ¡Debía haber empezado!' : '');
 
                     $bloques[] = [
