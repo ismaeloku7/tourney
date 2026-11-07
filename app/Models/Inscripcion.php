@@ -11,6 +11,7 @@ use Illuminate\Database\Eloquent\Attributes\Fillable;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Support\Carbon;
 
 /**
@@ -63,6 +64,16 @@ class Inscripcion extends Model
     public function participante(): BelongsTo
     {
         return $this->belongsTo(Participante::class);
+    }
+
+    /**
+     * El enlace de acceso directo de la pareja, si se ha creado.
+     *
+     * @return HasOne<AccesoDirecto, $this>
+     */
+    public function accesoDirecto(): HasOne
+    {
+        return $this->hasOne(AccesoDirecto::class);
     }
 
     /** @return BelongsTo<User, $this> */

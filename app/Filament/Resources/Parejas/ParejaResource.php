@@ -55,7 +55,7 @@ class ParejaResource extends Resource
 
     public static function getEloquentQuery(): Builder
     {
-        $consulta = parent::getEloquentQuery()->with(['categoria.torneo', 'participante.jugadores']);
+        $consulta = parent::getEloquentQuery()->with(['categoria.torneo', 'participante.jugadores', 'accesoDirecto']);
         $usuario = Filament::auth()->user();
 
         if ($usuario instanceof User && $usuario->rol === Rol::Administrador) {
@@ -101,11 +101,14 @@ class ParejaResource extends Resource
             ->headerActions([
                 ParaCopiar::copiarParaWhatsApp(),
                 ParaCopiar::boton(),
+                AccesoDePareja::crearTodos(),
+                AccesoDePareja::borrarTodos(),
             ])
             ->recordUrl(fn (Inscripcion $record, mixed $livewire): ?string => ParaCopiar::enlace($livewire, self::getUrl('edit', ['record' => $record])))
             ->recordActions(ParaCopiar::ocultando([
+                AccesoDePareja::crear(),
+                AccesoDePareja::ver(),
                 CompaneroDePareja::accion(),
-                NivelesDePareja::accion(),
                 MoverParejas::accion(),
                 Action::make('editar')->label('Editar')->icon(Heroicon::OutlinedPencilSquare)
                     ->url(fn (Inscripcion $record): string => self::getUrl('edit', ['record' => $record])),

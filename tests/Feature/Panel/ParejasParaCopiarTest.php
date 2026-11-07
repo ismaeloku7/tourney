@@ -55,7 +55,7 @@ test('la vista para copiar quita las acciones, las casillas y los enlaces, y se 
         ->callAction(TestAction::make('paraCopiar')->table())
         ->assertActionHidden(TestAction::make('editar')->table($this->inscripcion))
         ->assertActionHidden(TestAction::make('mover')->table($this->inscripcion))
-        ->assertActionHidden(TestAction::make('niveles')->table($this->inscripcion))
+        ->assertActionHidden(TestAction::make('crearAcceso')->table($this->inscripcion))
         ->assertActionHidden(TestAction::make('moverMarcadas')->table()->bulk())
         ->assertDontSeeHtml($ficha)
         ->assertDontSeeHtml($jugador)

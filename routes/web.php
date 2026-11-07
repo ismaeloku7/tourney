@@ -53,6 +53,8 @@ Route::middleware(ExigirOrganizador::class)->group(function (): void {
     // El jugador: acceso por enlace, invitación de pareja y su portal.
     Route::get('/jugador/acceso', AccesoJugador::class)->name('jugador.acceso');
     Route::get('/jugador/entrar/{token}', [AccesoDelJugador::class, 'entrar'])->middleware('throttle:20,1')->name('jugador.entrar');
+    // El enlace de acceso directo de una pareja (lo crea la organización y no caduca).
+    Route::get('/acceso/{token}', [AccesoDelJugador::class, 'directo'])->middleware('throttle:20,1')->name('jugador.directo');
     Route::post('/jugador/salir', [AccesoDelJugador::class, 'salir'])->name('jugador.salir');
     Route::get('/invitacion/{token}', InvitacionDePareja::class)->middleware('throttle:20,1')->name('invitacion');
     Route::middleware(ExigirJugador::class)->prefix('jugador')->name('jugador.')->group(function (): void {
