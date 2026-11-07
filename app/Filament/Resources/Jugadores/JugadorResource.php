@@ -9,12 +9,15 @@ use App\Filament\Resources\Jugadores\RelationManagers\TorneosRelationManager;
 use App\Filament\Resources\Jugadores\Schemas\JugadorForm;
 use App\Filament\Resources\Jugadores\Tables\JugadoresTable;
 use App\Models\Jugador;
+use App\Models\User;
 use BackedEnum;
+use Filament\Facades\Filament;
 use Filament\Resources\Resource;
 use Filament\Schemas\Schema;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Table;
 use Illuminate\Contracts\Support\Htmlable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Model;
 use UnitEnum;
 
@@ -44,6 +47,19 @@ class JugadorResource extends Resource
     public static function table(Table $table): Table
     {
         return JugadoresTable::configure($table);
+    }
+
+    /** Un árbitro ve solo los jugadores de los torneos que arbitra (y no los cambia). */
+    public static function getEloquentQuery(): Builder
+    {
+        $consulta = parent::getEloquentQuery();
+        $usuario = Filament::auth()->user();
+
+        if ($usuario instanceof User && $usuario->esArbitro()) {
+            $consulta->whereHas('participantes.categoria', fn (Builder $q) => $q->whereIn('torneo_id', $usuario->idsDeTorneosQueArbitra()));
+        }
+
+        return $consulta;
     }
 
     public static function getRelations(): array

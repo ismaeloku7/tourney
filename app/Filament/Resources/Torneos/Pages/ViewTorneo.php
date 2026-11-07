@@ -17,6 +17,16 @@ class ViewTorneo extends ViewRecord
 
     protected static string $resource = TorneoResource::class;
 
+    /** Un árbitro no ve la ficha: va a los partidos del torneo. */
+    public function mount(int|string $record): void
+    {
+        parent::mount($record);
+
+        if (TorneoResource::esArbitro()) {
+            $this->redirect(TorneoResource::getUrl('partidos', ['record' => $this->torneo()]));
+        }
+    }
+
     protected function getHeaderActions(): array
     {
         return $this->barraDelTorneo('ficha');

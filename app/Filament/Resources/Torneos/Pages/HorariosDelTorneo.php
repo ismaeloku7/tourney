@@ -280,7 +280,7 @@ class HorariosDelTorneo extends Page
             ->with(['local.participanteJugadores', 'visitante.participanteJugadores', 'fase.categoria'])
             ->get()
             ->keyBy('id');
-        $sePuedeMover = Gate::allows('update', $torneo);
+        $sePuedeMover = Gate::allows('gestionarPartidos', $torneo);
 
         // Lo que ya ha empezado se ve donde de verdad se juega (o se jugó), de 5 en 5 minutos;
         // lo que nadie ha empezado sigue en su hora prevista, aunque se solape.
@@ -490,7 +490,8 @@ class HorariosDelTorneo extends Page
      */
     private function cambiarHorario(callable $cambio): void
     {
-        abort_unless(Gate::allows('update', $this->torneo()), 403);
+        // Mover partidos lo hace también el árbitro; recalcular y aplicar propuestas, solo la organización.
+        abort_unless(Gate::allows('gestionarPartidos', $this->torneo()), 403);
         $torneo = $this->torneo();
         $propuesta = $this->propuesta !== null ? PropuestaDeHorarios::desdeArray($this->propuesta) : null;
 
@@ -724,7 +725,7 @@ class HorariosDelTorneo extends Page
                     ? $partido->fase->categoria->nombre.' · '.Marcador::lado($partido, true).' – '.Marcador::lado($partido, false)
                     : 'P'.$conflicto->partido).': '.$conflicto->detalle,
                 // Con sus dos parejas se puede soltar a mano en el horario.
-                'movible' => $partido !== null && $partido->local_id !== null && $partido->visitante_id !== null && Gate::allows('update', $this->torneo()),
+                'movible' => $partido !== null && $partido->local_id !== null && $partido->visitante_id !== null && Gate::allows('gestionarPartidos', $this->torneo()),
             ];
         }
 

@@ -64,7 +64,8 @@ final class ProximoTorneo
             ->isActiveWhen(fn (): bool => false)
             ->visible(fn (): bool => self::torneo() !== null)
             ->childItems([
-                self::pagina('Ficha', Heroicon::OutlinedDocumentText, 'view', ['view', 'edit']),
+                // Un árbitro no tiene ficha: solo competición, partidos y horarios.
+                self::pagina('Ficha', Heroicon::OutlinedDocumentText, 'view', ['view', 'edit'])->hidden(fn (): bool => TorneoResource::esArbitro()),
                 self::pagina('Competición', Heroicon::OutlinedTrophy, 'competicion'),
                 self::pagina('Partidos', Heroicon::OutlinedTableCells, 'partidos'),
                 self::pagina('Horarios', Heroicon::OutlinedCalendarDays, 'horarios'),

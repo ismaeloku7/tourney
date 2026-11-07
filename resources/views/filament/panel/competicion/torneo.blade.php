@@ -43,7 +43,7 @@
                 </div>
 
                 @if ($fase->tipo->esDeGrupos() && $bloque['grupos'] === [])
-                    <p class="text-sm text-gray-500 dark:text-gray-400">Sin sortear. <a href="{{ $configurar }}" class="text-primary-600 hover:underline dark:text-primary-400">Sortear los grupos desde la categoría</a>.</p>
+                    <p class="text-sm text-gray-500 dark:text-gray-400">Sin sortear.@if ($configurar) <a href="{{ $configurar }}" class="text-primary-600 hover:underline dark:text-primary-400">Sortear los grupos desde la categoría</a>.@endif</p>
                 @endif
 
                 @if ($bloque['grupos'] !== [])

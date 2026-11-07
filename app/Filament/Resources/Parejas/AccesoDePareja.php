@@ -6,11 +6,13 @@ use App\Actions\Jugadores\AccesosDirectos;
 use App\Filament\Avisos;
 use App\Models\Inscripcion;
 use App\Models\User;
+use chillerlan\QRCode\QRCode;
 use Filament\Actions\Action;
 use Filament\Facades\Filament;
 use Filament\Support\Icons\Heroicon;
 use Filament\Tables\Contracts\HasTable;
 use Illuminate\Database\Eloquent\Builder;
+use Throwable;
 
 /**
  * Los botones de los enlaces de acceso directo en los listados de
@@ -47,13 +49,16 @@ final class AccesoDePareja
             ->color('primary')
             ->visible(fn (Inscripcion $record): bool => $record->accesoDirecto !== null)
             ->modalHeading(fn (Inscripcion $record): string => 'Enlace de acceso · '.$record->participante->nombre)
-            ->modalDescription('Quien lo abra entra en el portal de la pareja sin correo ni contraseña, y no caduca: mándalo solo a la pareja. Para que deje de valer, «Borrar todos los enlaces».')
+            ->modalDescription('Quien lo abra (o escanee el QR) entra en el portal de la pareja sin correo ni contraseña, y no caduca: dáselo solo a la pareja. Para que deje de valer, «Borrar todos los enlaces».')
             ->modalContent(function (Inscripcion $record) {
                 $acceso = $record->accesoDirecto;
                 assert($acceso !== null);
 
+                $url = AccesosDirectos::url($acceso);
+
                 return view('filament.tablas.enlace-de-acceso', [
-                    'url' => AccesosDirectos::url($acceso),
+                    'url' => $url,
+                    'qr' => self::qr($url),
                     'jugador' => $acceso->jugador()->first()?->nombre_completo,
                     'ultimoUso' => $acceso->ultimo_uso_en?->translatedFormat('j \d\e F, H:i'),
                 ]);
@@ -103,6 +108,18 @@ final class AccesoDePareja
         $consulta = $livewire->getFilteredTableQuery() ?? Inscripcion::query()->whereRaw('1 = 0');
 
         return $consulta;
+    }
+
+    /** El QR del enlace, como imagen SVG en data URI; nulo si no se puede. */
+    private static function qr(string $url): ?string
+    {
+        try {
+            $qr = (new QRCode)->render($url);
+
+            return is_string($qr) ? $qr : null;
+        } catch (Throwable) {
+            return null;
+        }
     }
 
     private static function usuario(): ?User

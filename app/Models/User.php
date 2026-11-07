@@ -90,7 +90,8 @@ class User extends Authenticatable implements FilamentUser, HasName
      */
     public function canAccessPanel(Panel $panel): bool
     {
-        return $panel->getId() === 'panel' && $this->activo && $this->rol !== Rol::Arbitro;
+        // El árbitro también entra: ve solo sus torneos (competición, partidos, horarios, parejas y jugadores).
+        return $panel->getId() === 'panel' && $this->activo;
     }
 
     public function getFilamentName(): string
@@ -106,5 +107,20 @@ class User extends Authenticatable implements FilamentUser, HasName
     public function torneosQueAdministra(): BelongsToMany
     {
         return $this->belongsToMany(Torneo::class, 'torneo_administradores')->withTimestamps();
+    }
+
+    public function esArbitro(): bool
+    {
+        return $this->rol === Rol::Arbitro;
+    }
+
+    /**
+     * Los torneos que tiene asignados como árbitro (o mesa).
+     *
+     * @return list<int>
+     */
+    public function idsDeTorneosQueArbitra(): array
+    {
+        return array_values(TorneoArbitro::query()->where('user_id', $this->id)->distinct()->pluck('torneo_id')->map(fn (mixed $id): int => (int) $id)->all());
     }
 }

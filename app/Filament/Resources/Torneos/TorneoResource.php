@@ -47,7 +47,7 @@ class TorneoResource extends Resource
 
     protected static ?string $recordTitleAttribute = 'nombre';
 
-    /** Un administrador de torneo solo ve los suyos. */
+    /** Un administrador de torneo solo ve los suyos; un árbitro, los que arbitra. */
     public static function getEloquentQuery(): Builder
     {
         $consulta = parent::getEloquentQuery();
@@ -56,8 +56,19 @@ class TorneoResource extends Resource
         if ($usuario instanceof User && $usuario->rol === Rol::Administrador) {
             $consulta->whereHas('administradores', fn (Builder $q) => $q->whereKey($usuario->id));
         }
+        if ($usuario instanceof User && $usuario->esArbitro()) {
+            $consulta->whereIn('torneos.id', $usuario->idsDeTorneosQueArbitra());
+        }
 
         return $consulta;
+    }
+
+    /** Si quien está en el panel es un árbitro (o mesa): solo lleva los partidos. */
+    public static function esArbitro(): bool
+    {
+        $usuario = Filament::auth()->user();
+
+        return $usuario instanceof User && $usuario->esArbitro();
     }
 
     public static function form(Schema $schema): Schema

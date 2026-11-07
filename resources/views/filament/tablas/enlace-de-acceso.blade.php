@@ -1,4 +1,4 @@
-{{-- El enlace de acceso directo de una pareja, con su botón de copiar. Espera $url, $jugador y $ultimoUso. --}}
+{{-- El enlace de acceso directo de una pareja, con su botón de copiar y su QR. Espera $url, $qr, $jugador y $ultimoUso. --}}
 <div
     x-data="{
         copiado: false,
@@ -29,6 +29,14 @@
         <x-filament::button icon="heroicon-o-clipboard-document" x-on:click="copiar()">Copiar enlace</x-filament::button>
         <span x-show="copiado" x-cloak class="text-sm font-medium text-success-600 dark:text-success-400">Copiado.</span>
     </div>
+
+    @if ($qr)
+        {{-- Sobre blanco siempre, para que se escanee bien también en modo oscuro. --}}
+        <div class="flex justify-center">
+            <img src="{{ $qr }}" alt="QR del enlace de acceso" width="240" height="240" class="rounded-lg bg-white p-3 shadow-sm ring-1 ring-gray-200">
+        </div>
+        <p class="text-center text-xs text-gray-500 dark:text-gray-400">Que lo escaneen con la cámara del móvil: entran directamente.</p>
+    @endif
 
     <p class="text-sm text-gray-500 dark:text-gray-400">
         @if ($jugador)
