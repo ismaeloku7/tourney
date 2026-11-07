@@ -75,7 +75,7 @@ class MiTorneo extends PaginaDelJugador
         $yo = $this->yo();
         $torneo = $this->torneo();
         $participante = $this->inscripcion->participante->load('jugadores');
-        $datos = new DatosDelTorneo($torneo->load(['categorias', 'sede']));
+        $datos = new DatosDelTorneo($torneo->load(['categorias', 'sede']), nombresDeEquipo: true);
         $categoriaId = $this->inscripcion->categoria_id;
 
         $grupos = array_values(array_filter($datos->grupos(), fn (array $bloque): bool => $bloque['categoria']->id === $categoriaId));

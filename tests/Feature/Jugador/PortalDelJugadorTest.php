@@ -22,6 +22,7 @@ use App\Models\Jugador;
 use App\Models\Organizador;
 use App\Models\Participante;
 use App\Models\Partido;
+use App\Models\Pista;
 use App\Models\RegistroDeCambio;
 use App\Models\Torneo;
 use App\Models\User;
@@ -365,4 +366,33 @@ test('desde su torneo el jugador mira los grupos de otras categorías, y si su c
     // Con las fases de su categoría ocultas, se le dice que aún no se han publicado.
     $fase->update(['visible_en_web' => false]);
     miTorneo($this->inscripcion)->assertSee('La organización todavía no ha publicado los grupos ni el cuadro de tu categoría');
+});
+
+test('en su torneo los equipos salen por su nombre y la pista, una vez y a la vista', function () {
+    // Con alias en la web pública: en el portal, igualmente los nombres de equipo.
+    $this->torneo->update(['privacidad_alias' => true, 'horarios_publicados_en' => now(), 'web_horarios' => true]);
+    $this->ana->update(['alias' => 'Anita']);
+    $this->eva->update(['alias' => 'Evi']);
+    $fase = sortearElTorneo($this->torneo, $this->categoria);
+
+    $pista = Pista::factory()->create(['nombre' => 'Pista Central']);
+    $partido = $fase->partidos()->where(fn ($q) => $q->where('local_id', $this->nuestra->id)->orWhere('visitante_id', $this->nuestra->id))->orderBy('id')->firstOrFail();
+    $inicio = $this->torneo->fecha_inicio->copy()->setTime(10, 30);
+    $franja = $this->torneo->franjas()->create(['pista_id' => $pista->id, 'inicio' => $inicio, 'fin' => $inicio->copy()->addHour(), 'inicio_previsto' => $inicio, 'bloqueada' => false]);
+    $partido->update(['franja_id' => $franja->id, 'pista_id' => $pista->id, 'estado' => EstadoPartido::Programado]);
+    $rival = Participante::query()->findOrFail($partido->local_id === $this->nuestra->id ? $partido->visitante_id : $partido->local_id);
+
+    $html = miTorneo($this->inscripcion)
+        ->assertSee('Mi grupo · A')
+        ->assertSee('García / López')
+        ->assertSee($rival->nombre)
+        ->assertDontSee('Anita / Evi')
+        // En los partidos del grupo, la hora y la pista, sin el día.
+        ->assertSee('10:30 · Pista Central')
+        ->assertDontSee($inicio->translatedFormat('D j/n H:i').' · Pista Central')
+        ->html();
+
+    // La pista no va pegada a la fecha: una vez en su tarjeta de «Por jugar» y otra en el grupo; en el próximo partido, sola y en grande.
+    expect(substr_count($html, 'Pista Central'))->toBe(2)
+        ->and($html)->toContain($inicio->translatedFormat('D j/n H:i'));
 });
