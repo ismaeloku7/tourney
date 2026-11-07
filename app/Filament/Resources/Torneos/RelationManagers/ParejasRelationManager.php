@@ -4,11 +4,11 @@ namespace App\Filament\Resources\Torneos\RelationManagers;
 
 use App\Enums\EstadoInscripcion;
 use App\Filament\ConfirmarCompletas;
+use App\Filament\Resources\Parejas\AccesoDePareja;
 use App\Filament\Resources\Parejas\ColumnasDePareja;
 use App\Filament\Resources\Parejas\CompaneroDePareja;
 use App\Filament\Resources\Parejas\ConVistaParaCopiar;
 use App\Filament\Resources\Parejas\MoverParejas;
-use App\Filament\Resources\Parejas\NivelesDePareja;
 use App\Filament\Resources\Parejas\ParaCopiar;
 use App\Filament\Resources\Parejas\ParejaResource;
 use App\Filament\Resources\Parejas\SeCopiaParaPegar;
@@ -58,7 +58,7 @@ class ParejasRelationManager extends RelationManager implements SeCopiaParaPegar
     {
         return $table
             ->modifyQueryUsing(fn (Builder $query): Builder => $query
-                ->with(['categoria', 'participante.jugadores'])
+                ->with(['categoria', 'participante.jugadores', 'accesoDirecto'])
                 ->orderBy('categorias.orden')
                 ->orderBy('inscripciones.id'))
             ->paginated([25, 50, 100, 'all'])
@@ -83,12 +83,15 @@ class ParejasRelationManager extends RelationManager implements SeCopiaParaPegar
             ->headerActions([
                 ParaCopiar::copiarParaWhatsApp(),
                 ParaCopiar::boton(),
+                AccesoDePareja::crearTodos(),
+                AccesoDePareja::borrarTodos(),
                 ConfirmarCompletas::accion(fn (): Torneo => $this->torneo(), fn (): ?Categoria => null),
             ])
             ->recordUrl(fn (Inscripcion $record, mixed $livewire): ?string => ParaCopiar::enlace($livewire, ParejaResource::getUrl('edit', ['record' => $record])))
             ->recordActions(ParaCopiar::ocultando([
+                AccesoDePareja::crear(),
+                AccesoDePareja::ver(),
                 CompaneroDePareja::accion(),
-                NivelesDePareja::accion(),
                 MoverParejas::accion(),
                 Action::make('editar')->label('Editar')->icon(Heroicon::OutlinedPencilSquare)
                     ->url(fn (Inscripcion $record): string => ParejaResource::getUrl('edit', ['record' => $record])),

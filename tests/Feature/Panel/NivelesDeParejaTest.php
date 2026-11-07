@@ -3,7 +3,6 @@
 use App\Enums\Rol;
 use App\Filament\Resources\Categorias\Pages\EditCategoria;
 use App\Filament\Resources\Categorias\RelationManagers\InscripcionesRelationManager;
-use App\Filament\Resources\Parejas\Pages\ListParejas;
 use App\Models\Categoria;
 use App\Models\Inscripcion;
 use App\Models\Jugador;
@@ -17,7 +16,12 @@ use Filament\Actions\Testing\TestAction;
 use Filament\Facades\Filament;
 use Livewire\Livewire;
 
-/** La organización pone el nivel de cada jugador de una pareja desde el panel. */
+/** La organización pone el nivel de cada jugador de una pareja desde el panel (en su categoría). */
+function inscripcionesDe(Categoria $categoria)
+{
+    return Livewire::test(InscripcionesRelationManager::class, ['ownerRecord' => $categoria, 'pageClass' => EditCategoria::class]);
+}
+
 beforeEach(function () {
     $this->seed(PlanesSeeder::class);
     usarOrganizador(Organizador::factory()->create());
@@ -33,8 +37,8 @@ beforeEach(function () {
     $this->actingAs($this->propietario);
 });
 
-test('desde Parejas se ponen los niveles de los dos jugadores', function () {
-    Livewire::test(ListParejas::class)
+test('desde las inscripciones de la categoría se ponen los niveles de los dos jugadores', function () {
+    inscripcionesDe($this->categoria)
         ->callAction(TestAction::make('niveles')->table($this->inscripcion), [
             "nivel_{$this->ana->id}" => '3,5',
             "nivel_{$this->eva->id}" => '2,5',
@@ -48,19 +52,19 @@ test('desde Parejas se ponen los niveles de los dos jugadores', function () {
 });
 
 test('lo que no es un nivel no se guarda', function () {
-    Livewire::test(ListParejas::class)
+    inscripcionesDe($this->categoria)
         ->callAction(TestAction::make('niveles')->table($this->inscripcion), ["nivel_{$this->ana->id}" => 'muy bueno', "nivel_{$this->eva->id}" => '2'])
         ->assertHasActionErrors(["nivel_{$this->ana->id}"]);
 
-    Livewire::test(ListParejas::class)
+    inscripcionesDe($this->categoria)
         ->callAction(TestAction::make('niveles')->table($this->inscripcion), ["nivel_{$this->ana->id}" => '12', "nivel_{$this->eva->id}" => '2'])
         ->assertNotified('No se han podido guardar');
 
     expect($this->ana->refresh()->nivel_declarado)->toBeNull();
 });
 
-test('también desde las inscripciones de la categoría', function () {
-    Livewire::test(InscripcionesRelationManager::class, ['ownerRecord' => $this->categoria, 'pageClass' => EditCategoria::class])
+test('un nivel en blanco se deja sin poner', function () {
+    inscripcionesDe($this->categoria)
         ->callAction(TestAction::make('niveles')->table($this->inscripcion), ["nivel_{$this->ana->id}" => '4', "nivel_{$this->eva->id}" => ''])
         ->assertHasNoActionErrors();
 
