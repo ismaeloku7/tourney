@@ -9,7 +9,7 @@ use Illuminate\Contracts\View\View;
 use Illuminate\Support\Facades\Auth;
 use Livewire\Attributes\Layout;
 
-/** Los datos del jugador (nombre, teléfono, alias, nivel) y el borrado de su cuenta. */
+/** Los datos del jugador (nombre, teléfono, alias, nivel y el de sus compañeros) y el borrado de su cuenta. */
 #[Layout('components.layouts.jugador')]
 class MisDatos extends PaginaDelJugador
 {
@@ -23,6 +23,9 @@ class MisDatos extends PaginaDelJugador
 
     public string $nivel = '';
 
+    /** @var array<int, string> compañero (jugador) => nivel, de las parejas con torneo sin terminar */
+    public array $companeros = [];
+
     public string $confirmarBorrado = '';
 
     public function mount(): void
@@ -33,6 +36,9 @@ class MisDatos extends PaginaDelJugador
         $this->telefono = (string) $yo->getAttribute('telefono');
         $this->alias = (string) $yo->alias;
         $this->nivel = (string) $yo->nivel_declarado;
+        foreach (CambiarNivel::companeros($yo) as $companero) {
+            $this->companeros[$companero->id] = (string) $companero->nivel_declarado;
+        }
     }
 
     public function guardarDatos(): void
@@ -50,6 +56,21 @@ class MisDatos extends PaginaDelJugador
                 app(CambiarNivel::class)->handle($this->yo(), $this->yo(), $this->nivel);
             } catch (ErrorDeCompeticion $e) {
                 $this->addError('nivel', $e->getMessage());
+
+                return;
+            }
+        }
+
+        // El de cada compañero, igual: solo si cambia.
+        foreach (CambiarNivel::companeros($this->yo()) as $companero) {
+            $nuevo = trim($this->companeros[$companero->id] ?? '');
+            if ($nuevo === (string) $companero->nivel_declarado) {
+                continue;
+            }
+            try {
+                app(CambiarNivel::class)->handle($this->yo(), $companero, $nuevo);
+            } catch (ErrorDeCompeticion $e) {
+                $this->addError('companeros.'.$companero->id, $e->getMessage());
 
                 return;
             }
@@ -77,6 +98,6 @@ class MisDatos extends PaginaDelJugador
 
     public function render(): View
     {
-        return view('livewire.jugador.mis-datos', ['yo' => $this->yo()])->title('Mis datos');
+        return view('livewire.jugador.mis-datos', ['yo' => $this->yo(), 'listaDeCompaneros' => CambiarNivel::companeros($this->yo())])->title('Mis datos');
     }
 }

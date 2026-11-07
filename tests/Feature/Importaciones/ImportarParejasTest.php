@@ -11,6 +11,7 @@ use App\Filament\Resources\Categorias\Pages\EditCategoria;
 use App\Filament\Resources\Categorias\RelationManagers\InscripcionesRelationManager;
 use App\Filament\Resources\Parejas\Pages\ListParejas;
 use App\Filament\Resources\Torneos\Pages\EditTorneo;
+use App\Filament\Resources\Torneos\Pages\ViewTorneo;
 use App\Filament\Resources\Torneos\RelationManagers\ParejasRelationManager;
 use App\Models\Categoria;
 use App\Models\Inscripcion;
@@ -211,7 +212,7 @@ test('desde la ficha del torneo se sube el Excel y se importa', function () {
         ])
         ->assertHasNoActionErrors()
         ->assertNotified('Importación hecha')
-        ->assertRedirect(EditTorneo::getUrl(['record' => $this->torneo, 'relation' => '1']));
+        ->assertRedirect(ViewTorneo::getUrl(['record' => $this->torneo, 'relation' => '1']));
 
     expect(Inscripcion::query()->count())->toBe(5)
         ->and(Storage::disk('local')->allFiles('importaciones'))->toBe([]);

@@ -11,6 +11,7 @@ use App\Enums\EstadoParticipante;
 use App\Enums\EstadoPartido;
 use App\Models\Fase;
 use App\Models\Grupo;
+use App\Models\Partido;
 use App\Models\RegistroDeCambio;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -95,7 +96,7 @@ final class EditarGrupos
 
                 $grupo ??= $fase->grupos()->create(['nombre' => Grupo::nombrePorOrden($orden), 'orden' => $orden]);
 
-                $grupo->partidos()->forceDelete();
+                Partido::borrarConSusHoras($grupo->partidos());
                 $grupo->clasificaciones()->delete();
                 $grupo->participantes()->sync(collect($miembros)->mapWithKeys(fn (int $id, int $k): array => [$id => ['posicion_sorteo' => $k + 1]])->all());
                 $grupo->unsetRelation('participantes');
@@ -119,7 +120,7 @@ final class EditarGrupos
             // Los grupos que sobran se quitan con sus partidos.
             foreach ($existentes as $orden => $grupo) {
                 if ($orden > count($grupos)) {
-                    $grupo->partidos()->forceDelete();
+                    Partido::borrarConSusHoras($grupo->partidos());
                     $grupo->clasificaciones()->delete();
                     $grupo->participantes()->detach();
                     $grupo->delete();

@@ -2,11 +2,15 @@
 
 namespace App\Filament\Resources\Parejas\Pages;
 
+use App\Filament\Resources\Parejas\ConVistaParaCopiar;
 use App\Filament\Resources\Parejas\ParejaResource;
+use App\Filament\Resources\Parejas\SeCopiaParaPegar;
 use Filament\Resources\Pages\ListRecords;
 
-class ListParejas extends ListRecords
+class ListParejas extends ListRecords implements SeCopiaParaPegar
 {
+    use ConVistaParaCopiar;
+
     protected static string $resource = ParejaResource::class;
 
     public function getSubheading(): string

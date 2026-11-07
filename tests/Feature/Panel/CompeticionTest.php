@@ -1,10 +1,13 @@
 <?php
 
+use App\Actions\Competicion\CambiarCruces;
 use App\Actions\Competicion\GenerarPartidos;
 use App\Actions\Competicion\RegistrarResultado;
 use App\Actions\Competicion\SortearGrupos;
 use App\Competicion\Datos\Resultado;
 use App\Competicion\Datos\Set;
+use App\Competicion\Errores\ConfiguracionInvalida;
+use App\Competicion\Errores\OperacionNoPermitida;
 use App\Enums\EstadoFase;
 use App\Enums\EstadoInscripcion;
 use App\Enums\EstadoPartido;
@@ -23,10 +26,12 @@ use App\Models\Categoria;
 use App\Models\Clasificacion;
 use App\Models\Fase;
 use App\Models\FormatoPartido;
+use App\Models\Franja;
 use App\Models\Inscripcion;
 use App\Models\Jugador;
 use App\Models\Organizador;
 use App\Models\Participante;
+use App\Models\Partido;
 use App\Models\Pista;
 use App\Models\Torneo;
 use App\Models\User;
@@ -501,4 +506,251 @@ test('después del sorteo se añaden o se quitan grupos', function () {
     $grupos = $this->grupos->refresh()->grupos()->with('participantes')->get();
     expect($grupos->map(fn ($g): int => $g->participantes->count())->all())->toBe([6, 6])
         ->and($this->grupos->partidos()->count())->toBe(30);
+});
+
+test('al configurar el cuadro se ve su esquema: rondas, cruces y quién llega a cada hueco', function () {
+    $pagina = fasesDe($this->categoria);
+    $esquema = fn (array $configuracion): string => FaseForm::esquema($configuracion, $pagina->instance(), $this->cuadro)->toHtml();
+
+    // 3 grupos, pasan 2 por grupo y los 2 mejores terceros: cuartos.
+    expect($esquema(['regla_de_cruces' => 'entre_grupos']))
+        ->toContain('Cuartos')->toContain('Semifinales')->toContain('Final')
+        ->toContain('Ganador C1')->toContain('1º A')->toContain('Orientativo');
+
+    $aMano = $esquema(['regla_de_cruces' => 'a_posiciones', 'cruces_por_posicion' => [
+        ['local' => '1A', 'visitante' => 'M2'], ['local' => '2B', 'visitante' => '2C'], ['local' => '1C', 'visitante' => '2A'], ['local' => 'M1', 'visitante' => '1B'],
+    ]]);
+    expect($aMano)->toContain('Mejor 3º nº 2')->toContain('Ganador S1')->not->toContain('Orientativo')
+        ->and($esquema(['regla_de_cruces' => 'a_posiciones']))->toContain('Partir del cuadro automático')
+        ->and($esquema(['regla_de_cruces' => 'sorteo', 'tercer_y_cuarto_puesto' => true]))->toContain('Sorteo')->toContain('Tercer puesto')->toContain('Perdedor S1');
+
+    // Y el formulario de la fase se abre y se guarda con el esquema dentro.
+    $pagina->mountAction(TestAction::make('edit')->table($this->cuadro))
+        ->callMountedAction()
+        ->assertHasNoActionErrors();
+});
+
+test('en una fase de grupos ya sorteada se cambia quién pasa: por ejemplo, los dos mejores terceros', function () {
+    $this->grupos->update(['configuracion' => [...$this->grupos->configuracion, 'clasificados' => ['por_grupo' => 2]]]);
+    app(SortearGrupos::class)->handle($this->grupos, $this->propietario);
+    app(GenerarPartidos::class)->handle($this->grupos->refresh(), $this->propietario);
+
+    $pagina = fasesDe($this->categoria);
+    $automatico = fn (): string => FaseForm::esquema(['regla_de_cruces' => 'entre_grupos'], $pagina->instance(), $this->cuadro)->toHtml();
+    expect($automatico())->toContain('Bye');
+
+    $pagina->assertActionHidden(TestAction::make('edit')->table($this->grupos))
+        ->callAction(TestAction::make('quienPasa')->table($this->grupos), ['por_grupo' => 2, 'cuantos_mejores' => 2, 'mejores_de_posicion' => 3])
+        ->assertHasNoActionErrors()
+        ->assertNotified('Guardado');
+
+    $regla = $this->grupos->refresh()->configuracionDeGrupos()->clasificados;
+    expect($regla->porGrupo)->toBe(2)->and($regla->cuantosMejores)->toBe(2)->and($regla->mejoresDePosicion)->toBe(3)
+        ->and($automatico())->toContain('Mejor 3º nº 1')->not->toContain('Bye');
+});
+
+test('con el cuadro a mano, en cada hueco va cualquier posición y la fase de grupos pasa a clasificar justo a esos', function () {
+    // Solo los primeros y el mejor segundo.
+    fasesDe($this->categoria)
+        ->callAction(TestAction::make('edit')->table($this->cuadro), ['configuracion' => [
+            'regla_de_cruces' => 'a_posiciones',
+            'mejores_de' => 2,
+            'cruces_por_posicion' => [['local' => '1A', 'visitante' => 'M1'], ['local' => '1B', 'visitante' => '1C']],
+            'tercer_y_cuarto_puesto' => false,
+            'consolacion' => 'ninguna',
+        ]])
+        ->assertHasNoActionErrors()
+        ->assertNotified('Cuadro guardado');
+
+    $regla = $this->grupos->refresh()->configuracionDeGrupos()->clasificados;
+    expect($regla->porGrupo)->toBe(1)->and($regla->cuantosMejores)->toBe(1)->and($regla->mejoresDePosicion)->toBe(2)
+        ->and($this->cuadro->refresh()->configuracion['cruces_por_posicion'])->toBe([['1A', 'M1'], ['1B', '1C']]);
+
+    // Si pasa el 2º de un grupo, pasan los de todos.
+    expect(fn () => FaseForm::quienPasaDesde(['1A', '1B', '1C', '2A'], ['A', 'B', 'C'], 3))->toThrow(ConfiguracionInvalida::class)
+        ->and(FaseForm::quienPasaDesde(['1A', '1B', '1C', '2A', '2B', '2C', 'M1', 'M2'], ['A', 'B', 'C'], 3))->toBe(['por_grupo' => 2, 'cuantos_mejores' => 2, 'mejores_de_posicion' => 3]);
+});
+
+test('sin nada jugado, cada grupo sale ordenado por nivel, tenga o no cabeza de serie', function () {
+    // Niveles: cada pareja, el de su orden de alta (la primera, 1; la última, 12). Las tres primeras son cabezas de serie.
+    foreach ($this->categoria->participantes()->with('jugadores')->orderBy('id')->get()->values() as $i => $pareja) {
+        foreach ($pareja->jugadores as $jugador) {
+            $jugador->update(['nivel_declarado' => (string) ($i + 1)]);
+        }
+    }
+
+    app(SortearGrupos::class)->handle($this->grupos, $this->propietario);
+    app(GenerarPartidos::class)->handle($this->grupos->refresh(), $this->propietario);
+
+    foreach ($this->grupos->refresh()->grupos()->with('clasificaciones.participante.jugadores')->get() as $grupo) {
+        $niveles = $grupo->clasificaciones->map(fn ($linea): ?float => $linea->participante->nivelMedio())->values()->all();
+        $ordenado = $niveles;
+        rsort($ordenado);
+
+        expect($niveles)->toBe($ordenado)
+            // El cabeza de serie (de los niveles más bajos) va al final.
+            ->and($grupo->clasificaciones->last()->participante->cabeza_de_serie)->not->toBeNull()
+            ->and($grupo->clasificaciones->pluck('sorteo_desempate')->filter()->all())->toBe([]);
+    }
+});
+
+test('una fase se empieza de nuevo sin tocar las demás categorías: fuera sus grupos, sus partidos y sus horas', function () {
+    app(SortearGrupos::class)->handle($this->grupos, $this->propietario);
+    app(GenerarPartidos::class)->handle($this->grupos->refresh(), $this->propietario);
+    $pista = $this->torneo->torneoPistas()->firstOrFail()->pista_id;
+    $hora = now()->setTime(10, 0);
+    $conHora = function ($partido) use ($pista, &$hora) {
+        $franja = $this->torneo->franjas()->create(['pista_id' => $pista, 'inicio' => $hora, 'fin' => $hora->copy()->addMinutes(70), 'inicio_previsto' => $hora, 'bloqueada' => false]);
+        $partido->update(['franja_id' => $franja->id, 'pista_id' => $pista, 'estado' => EstadoPartido::Programado]);
+        $hora = $hora->copy()->addMinutes(70);
+
+        return $franja;
+    };
+    $deEsta = $conHora($this->grupos->partidos()->firstOrFail());
+
+    // Otra categoría con un partido con hora: no se toca.
+    $otraFase = Fase::factory()->grupos()->create(['categoria_id' => Categoria::factory()->create(['torneo_id' => $this->torneo->id])->id]);
+    $otro = Partido::factory()->create(['fase_id' => $otraFase->id]);
+    $deLaOtra = $conHora($otro);
+
+    fasesDe($this->categoria)
+        ->callAction(TestAction::make('empezarDeNuevo')->table($this->grupos))
+        ->assertHasNoActionErrors()
+        ->assertNotified('Fase lista para sortear de nuevo');
+
+    expect($this->grupos->refresh()->estado)->toBe(EstadoFase::Pendiente)
+        ->and($this->grupos->grupos()->count())->toBe(0)
+        ->and($this->grupos->partidos()->count())->toBe(0)
+        ->and(Franja::query()->find($deEsta->id))->toBeNull()
+        ->and($otro->refresh()->franja_id)->toBe($deLaOtra->id)
+        ->and(Franja::query()->find($deLaOtra->id))->not->toBeNull();
+
+    // Se vuelve a sortear como si nada.
+    app(SortearGrupos::class)->handle($this->grupos->refresh(), $this->propietario);
+    expect($this->grupos->grupos()->count())->toBe(3);
+});
+
+test('una fase «Todo a mano» empezada de nuevo se vuelve a abrir para colocar las parejas', function () {
+    app(SortearGrupos::class)->handle($this->grupos, $this->propietario);
+    $grupos = $this->grupos->refresh()->grupos()->with('participantes')->orderBy('orden')->get()
+        ->map(fn ($grupo): array => $grupo->participantes->pluck('id')->map(fn (mixed $id): int => (int) $id)->all())->all();
+    $this->grupos->update(['configuracion' => [...$this->grupos->configuracion, 'modo_de_sorteo' => ModoDeSorteo::Manual->value, 'grupos_manuales' => $grupos]]);
+
+    fasesDe($this->categoria)
+        ->callAction(TestAction::make('empezarDeNuevo')->table($this->grupos))
+        ->assertHasNoActionErrors();
+
+    expect($this->grupos->refresh()->configuracion['grupos_manuales'] ?? null)->toBe([])
+        ->and($this->grupos->configuracionDeGrupos()->modoDeSorteo)->toBe(ModoDeSorteo::Manual);
+
+    fasesDe($this->categoria)
+        ->mountAction(TestAction::make('sortear')->table($this->grupos))
+        ->assertActionMounted(TestAction::make('sortear')->table($this->grupos));
+});
+
+test('con resultados, empezar de nuevo pide confirmarlo', function () {
+    app(SortearGrupos::class)->handle($this->grupos, $this->propietario);
+    app(GenerarPartidos::class)->handle($this->grupos->refresh(), $this->propietario);
+    app(RegistrarResultado::class)->handle($this->grupos->partidos()->firstOrFail(), new Resultado([new Set(6, 1), new Set(6, 1)]), $this->propietario);
+
+    fasesDe($this->categoria)
+        ->callAction(TestAction::make('empezarDeNuevo')->table($this->grupos), ['aunque' => false])
+        ->assertHasActionErrors(['aunque']);
+    expect($this->grupos->partidos()->count())->toBeGreaterThan(0);
+
+    fasesDe($this->categoria)
+        ->callAction(TestAction::make('empezarDeNuevo')->table($this->grupos), ['aunque' => true])
+        ->assertHasNoActionErrors();
+    expect($this->grupos->partidos()->count())->toBe(0);
+});
+
+/** Sortea, juega y cierra los grupos: el cuadro de cuartos queda hecho. */
+function cuadroHecho(object $prueba): Fase
+{
+    fasesDe($prueba->categoria)->callAction(TestAction::make('sortear')->table($prueba->grupos));
+    jugarTodosLosPartidosDe($prueba->grupos->refresh(), $prueba->propietario);
+    fasesDe($prueba->categoria)->callAction(TestAction::make('cerrar')->table($prueba->grupos->refresh()))->assertNotified('Fase cerrada');
+
+    return $prueba->cuadro->refresh();
+}
+
+/**
+ * @param  list<int|null>  $huecos
+ * @return array<string, string|null>
+ */
+function datosDeCruces(array $huecos): array
+{
+    $datos = [];
+    foreach ($huecos as $i => $id) {
+        $datos["hueco_{$i}"] = $id === null ? null : (string) $id;
+    }
+
+    return $datos;
+}
+
+test('los cruces del cuadro se cambian a mano y cada partido conserva su hora', function () {
+    $cuadro = cuadroHecho($this);
+    $huecos = CambiarCruces::huecos($cuadro);
+    expect($huecos)->toHaveCount(8)->not->toContain(null);
+
+    $pista = $this->torneo->torneoPistas()->firstOrFail()->pista_id;
+    $hora = now()->setTime(10, 0);
+    $franja = $this->torneo->franjas()->create(['pista_id' => $pista, 'inicio' => $hora, 'fin' => $hora->copy()->addMinutes(60), 'inicio_previsto' => $hora, 'bloqueada' => false]);
+    $cuadro->partidos()->where('ronda', 1)->where('posicion', 1)->firstOrFail()->update(['franja_id' => $franja->id, 'pista_id' => $pista, 'estado' => EstadoPartido::Programado]);
+
+    // La segunda pareja del primer cruce y la primera del segundo se intercambian.
+    $nuevos = $huecos;
+    [$nuevos[1], $nuevos[2]] = [$huecos[2], $huecos[1]];
+
+    fasesDe($this->categoria)
+        ->assertActionVisible(TestAction::make('cambiarCruces')->table($cuadro))
+        ->callAction(TestAction::make('cambiarCruces')->table($cuadro), datosDeCruces($nuevos))
+        ->assertHasNoActionErrors()
+        ->assertNotified('Cruces guardados');
+
+    $primero = $cuadro->partidos()->where('ronda', 1)->where('posicion', 1)->firstOrFail();
+    expect(CambiarCruces::huecos($cuadro->refresh()))->toBe($nuevos)
+        ->and($cuadro->partidos()->count())->toBe(7)
+        ->and([$primero->local_id, $primero->visitante_id])->toBe([$nuevos[0], $nuevos[1]])
+        ->and($primero->franja_id)->toBe($franja->id)
+        ->and($primero->estado)->toBe(EstadoPartido::Programado);
+
+    // Una pareja en dos cruces no se guarda.
+    $repetida = $nuevos;
+    $repetida[3] = $nuevos[0];
+    fasesDe($this->categoria)
+        ->callAction(TestAction::make('cambiarCruces')->table($cuadro), datosDeCruces($repetida))
+        ->assertNotified('No se han cambiado los cruces');
+    expect(CambiarCruces::huecos($cuadro->refresh()))->toBe($nuevos);
+
+    // En cuanto se juega un partido del cuadro, los cruces ya no se cambian.
+    app(RegistrarResultado::class)->handle($primero->refresh(), new Resultado([new Set(6, 1), new Set(6, 1)]), $this->propietario);
+    fasesDe($this->categoria)->assertActionHidden(TestAction::make('cambiarCruces')->table($cuadro->refresh()));
+});
+
+test('al cambiar los cruces, un hueco vacío es un bye: la otra pareja pasa sola y su hora se suelta', function () {
+    $cuadro = cuadroHecho($this);
+    $huecos = CambiarCruces::huecos($cuadro);
+
+    $pista = $this->torneo->torneoPistas()->firstOrFail()->pista_id;
+    $hora = now()->setTime(10, 0);
+    $franja = $this->torneo->franjas()->create(['pista_id' => $pista, 'inicio' => $hora, 'fin' => $hora->copy()->addMinutes(60), 'inicio_previsto' => $hora, 'bloqueada' => false]);
+    $cuadro->partidos()->where('ronda', 1)->where('posicion', 1)->firstOrFail()->update(['franja_id' => $franja->id, 'pista_id' => $pista, 'estado' => EstadoPartido::Programado]);
+
+    $nuevos = $huecos;
+    $nuevos[1] = null;
+    expect(app(CambiarCruces::class)->handle($cuadro, $nuevos, $this->propietario))->toBeTrue();
+
+    $primero = $cuadro->partidos()->where('ronda', 1)->where('posicion', 1)->firstOrFail();
+    $semifinal = $cuadro->partidos()->where('ronda', 2)->where('posicion', 1)->firstOrFail();
+    expect($primero->estado)->toBe(EstadoPartido::Walkover)
+        ->and($primero->ganador_id)->toBe($huecos[0])
+        ->and($primero->franja_id)->toBeNull()
+        ->and(Franja::query()->find($franja->id))->toBeNull()
+        ->and($semifinal->local_id)->toBe($huecos[0]);
+
+    // Un cruce sin nadie no vale.
+    $vacio = $nuevos;
+    $vacio[0] = null;
+    expect(fn () => app(CambiarCruces::class)->handle($cuadro->refresh(), $vacio, $this->propietario))->toThrow(OperacionNoPermitida::class);
 });

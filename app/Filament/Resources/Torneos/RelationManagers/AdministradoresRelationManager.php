@@ -20,6 +20,12 @@ use Illuminate\Database\Eloquent\Model;
  */
 class AdministradoresRelationManager extends RelationManager
 {
+    /** En la ficha del torneo (de solo lectura) esta pestaña se sigue gestionando. */
+    public function isReadOnly(): bool
+    {
+        return false;
+    }
+
     protected static string $relationship = 'administradores';
 
     /** La relación de vuelta en User: para no ofrecer a quien ya está. */

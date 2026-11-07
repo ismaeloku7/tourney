@@ -27,6 +27,9 @@ class TorneoForm
             ->columns(1)
             ->components([
                 Section::make('Datos')
+                    ->id('torneo-datos')
+                    ->collapsible()
+                    ->persistCollapsed()
                     ->columns(2)
                     ->schema([
                         TextInput::make('nombre')
@@ -93,6 +96,9 @@ class TorneoForm
                             ->columnSpanFull(),
                     ]),
                 Section::make('Reglas')
+                    ->id('torneo-reglas')
+                    ->collapsible()
+                    ->persistCollapsed()
                     ->columns(2)
                     ->schema([
                         Select::make('resultados_por_jugadores')
@@ -118,7 +124,7 @@ class TorneoForm
                             ->minValue(0)
                             ->maxValue(600)
                             ->default(0)
-                            ->helperText('Desde que una pareja acaba hasta que vuelve a jugar. Con 0, enlaza: no calienta y el rival calienta solo. Nunca se juegan tres seguidos.'),
+                            ->helperText('Desde que una pareja acaba hasta que vuelve a jugar. Con 0, enlaza: no calienta y el rival calienta solo. Se procura no jugar seguidos.'),
                         Select::make('margen_entre_partidos_minutos')
                             ->label('Calentamiento en pista')
                             ->options([0 => 'Sin calentamiento', 5 => '5 minutos', 10 => '10 minutos', 15 => '15 minutos'])

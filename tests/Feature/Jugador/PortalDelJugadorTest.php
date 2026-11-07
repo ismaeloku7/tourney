@@ -22,6 +22,7 @@ use App\Models\Jugador;
 use App\Models\Organizador;
 use App\Models\Participante;
 use App\Models\Partido;
+use App\Models\Pista;
 use App\Models\RegistroDeCambio;
 use App\Models\Torneo;
 use App\Models\User;
@@ -81,7 +82,7 @@ test('el inicio saluda, resume y lista sus torneos con la pareja y lo pendiente'
     // Con el sorteo hecho, el próximo partido y su rival.
     sortearElTorneo($this->torneo, $this->categoria);
     $this->ana->update(['nivel_declarado' => '3']);
-    Livewire::test(Inicio::class)->assertSee('Contra ')->assertSee('Sin hora')->assertDontSee('Pon tu nivel de juego');
+    Livewire::test(Inicio::class)->assertSee('Contra ')->assertSee('Sin hora')->assertSee('Ver toda la información del torneo')->assertSeeInOrder(['Contra ', 'Contra ', 'Contra '])->assertDontSee('Pon tu nivel de juego');
 });
 
 test('el portal tiene menú propio y las rutas antiguas de la inscripción siguen funcionando', function () {
@@ -110,7 +111,7 @@ test('su torneo enseña su grupo con su pareja resaltada, los otros grupos y el 
     Fase::factory()->eliminatoria()->create(['categoria_id' => $this->categoria->id]);
 
     miTorneo($this->inscripcion)
-        ->assertSee('Mi grupo: A')
+        ->assertSee('Mi grupo · A')
         ->assertSee('tú')
         ->assertSee('García / López')
         ->assertSee('Cruce')
@@ -244,25 +245,26 @@ test('el jugador cambia su nivel desde sus datos', function () {
     expect($this->ana->refresh()->nivel_declarado)->toBe('3,5');
 });
 
-test('desde su torneo, cualquiera de la pareja pone el nivel de los dos, sea o no el capitán', function () {
+test('en sus datos, cualquiera de la pareja pone el nivel de los dos, sea o no el capitán', function () {
     $this->ana->update(['nivel_declarado' => '3']);
     $this->eva->update(['nivel_declarado' => '2']);
 
     // Eva no es la capitana (Ana es la jugadora 1).
     $this->actingAs($this->eva, 'jugador');
-    $this->get("http://norte.saas.test/jugador/torneos/{$this->inscripcion->id}")->assertOk()->assertSee('Open de Primavera')->assertSee('Mixta B');
+    $this->get("http://norte.saas.test/jugador/torneos/{$this->inscripcion->id}")->assertOk()->assertSee('Open de Primavera')->assertSee('Mixta B')->assertDontSee('Guardar niveles');
 
-    miTorneo($this->inscripcion)
-        ->assertSet('niveles', [$this->ana->id => '3', $this->eva->id => '2'])
-        ->set("niveles.{$this->ana->id}", '3,5')
-        ->set("niveles.{$this->eva->id}", '2,75')
-        ->call('guardarNiveles')
+    Livewire::test(MisDatos::class)
+        ->assertSet('nivel', '2')
+        ->assertSet('companeros', [$this->ana->id => '3'])
+        ->assertSee('El nivel de tus compañeros')
+        ->set('nivel', '2,75')
+        ->set("companeros.{$this->ana->id}", '3,5')
+        ->call('guardarDatos')
         ->assertHasNoErrors()
-        ->assertSee('Niveles guardados.')
-        ->assertSee('Media 3,13')
-        ->set("niveles.{$this->ana->id}", 'muy bueno')
-        ->call('guardarNiveles')
-        ->assertHasErrors("niveles.{$this->ana->id}");
+        ->assertSee('Datos guardados.')
+        ->set("companeros.{$this->ana->id}", 'muy bueno')
+        ->call('guardarDatos')
+        ->assertHasErrors("companeros.{$this->ana->id}");
 
     expect($this->ana->refresh()->nivel_declarado)->toBe('3,5')
         ->and($this->eva->refresh()->nivel_declarado)->toBe('2,75')
@@ -280,16 +282,125 @@ test('el torneo de otra pareja no se abre, y nadie cambia el nivel de otra parej
         ->and(CambiarNivel::puede($this->ana, $this->eva))->toBeTrue();
 });
 
-test('con el torneo terminado, los niveles ya no se cambian desde su torneo', function () {
+test('con el torneo terminado, el nivel del compañero ya no se cambia', function () {
     $this->torneo->update(['estado' => EstadoTorneo::Finalizado]);
 
     expect(CambiarNivel::companeros($this->ana))->toHaveCount(0)
         ->and(CambiarNivel::puede($this->ana, $this->eva))->toBeFalse()
         ->and(CambiarNivel::puede($this->ana, $this->ana))->toBeTrue();
 
+    Livewire::test(MisDatos::class)->assertSet('companeros', [])->assertDontSee('El nivel de tus compañeros');
+});
+
+test('su torneo enseña el cuadro entero previsto mientras se juegan los grupos, y sus partidos por jugar y jugados', function () {
+    $fase = sortearElTorneo($this->torneo, $this->categoria);
+    $cuadro = Fase::factory()->eliminatoria()->create(['categoria_id' => $this->categoria->id, 'nombre' => 'Cuadro final']);
+
+    // Un grupo de 4, pasan 2: la final, con quién va en cada lado.
     miTorneo($this->inscripcion)
-        ->assertSee('ya no se cambian')
-        ->assertDontSee('Guardar niveles')
-        ->call('guardarNiveles')
-        ->assertForbidden();
+        ->assertSee('Por jugar')
+        ->assertDontSee('Jugados')
+        ->assertSee('Cuadro final')
+        ->assertSee('Así quedaría el cuadro si los grupos acabasen ahora')
+        ->assertSee('(1º A)')
+        ->assertSee('(2º A)');
+
+    // Con dos grupos de 2: semifinales y una final con «Ganador S1».
+    $fase->update(['configuracion' => [...$fase->configuracion, 'tamano_de_grupo' => 2]]);
+    $organizacion = User::factory()->rol(Rol::Propietario)->create();
+    app(SortearGrupos::class)->handle($fase->refresh(), $organizacion, forzar: true);
+    // Al generar los partidos de los grupos nuevos sale su clasificación (a cero), y con ella el cuadro previsto.
+    app(GenerarPartidos::class)->handle($fase->refresh(), $organizacion);
+    miTorneo($this->inscripcion)->assertSee('Semifinales')->assertSee('Ganador S1')->assertSee('(1º B)');
+
+    // Si el cuadro no se enseña en la web, tampoco el previsto.
+    $cuadro->update(['visible_en_web' => false]);
+    miTorneo($this->inscripcion)->assertDontSee('Así quedaría el cuadro');
+});
+
+test('un cuadro visible que aún no tiene nada que enseñar dice qué falta para que se llene', function () {
+    $cuadro = Fase::factory()->eliminatoria()->create(['categoria_id' => $this->categoria->id, 'nombre' => 'Cuadro avanzado']);
+
+    // Sin grupos ni sorteo: el cuadro existe, pero no hay nada que prever.
+    miTorneo($this->inscripcion)->assertSee('Cuadro avanzado')->assertSee('Todavía no hay cuadro')->assertSee('cuando la organización haga el sorteo');
+
+    // Con fase de grupos sin sortear.
+    $grupos = Fase::factory()->grupos(['semilla' => 5])->create(['categoria_id' => $this->categoria->id]);
+    miTorneo($this->inscripcion)->assertSee('cuando se sorteen los grupos');
+
+    // Con los cruces por sorteo, aunque los grupos estén sorteados, no se adelanta nada.
+    $cuadro->update(['configuracion' => [...$cuadro->configuracion, 'regla_de_cruces' => 'sorteo']]);
+    $organizacion = User::factory()->rol(Rol::Propietario)->create();
+    app(SortearGrupos::class)->handle($grupos, $organizacion);
+    app(GenerarPartidos::class)->handle($grupos->refresh(), $organizacion);
+    miTorneo($this->inscripcion)->assertSee('Los cruces se sortean cuando acabe la fase de grupos')->assertDontSee('Así quedaría el cuadro');
+
+    // Con cruces entre grupos sí se adelanta, y la tarjeta de «falta» desaparece.
+    $cuadro->update(['configuracion' => [...$cuadro->configuracion, 'regla_de_cruces' => 'entre_grupos']]);
+    miTorneo($this->inscripcion)->assertSee('Así quedaría el cuadro')->assertDontSee('Todavía no hay cuadro');
+
+    // Oculto en la web, ni una cosa ni otra.
+    $cuadro->update(['visible_en_web' => false]);
+    miTorneo($this->inscripcion)->assertDontSee('Cuadro avanzado');
+});
+
+test('desde su torneo el jugador mira los grupos de otras categorías, y si su categoría no se enseña aún lo dice', function () {
+    $fase = sortearElTorneo($this->torneo, $this->categoria);
+    $otra = Categoria::factory()->create(['torneo_id' => $this->torneo->id, 'nombre' => 'Femenino']);
+    $parejas = [];
+    foreach (range(1, 4) as $i) {
+        $parejas[] = $pareja = Participante::factory()->create(['categoria_id' => $otra->id]);
+        Inscripcion::factory()->create(['participante_id' => $pareja->id]);
+    }
+    sortearElTorneo($this->torneo, $otra);
+    $nombre = $parejas[0]->refresh()->nombre;
+
+    miTorneo($this->inscripcion)
+        ->assertSee('Otras categorías')
+        ->assertSee('Femenino')
+        ->assertDontSee($nombre)
+        ->set('verCategoria', $otra->id)
+        ->assertSee($nombre)
+        ->assertSee('Grupo A');
+
+    // Con las fases de su categoría ocultas, se le dice que aún no se han publicado.
+    $fase->update(['visible_en_web' => false]);
+    miTorneo($this->inscripcion)->assertSee('La organización todavía no ha publicado los grupos ni el cuadro de tu categoría');
+});
+
+test('en su torneo los equipos salen por su nombre y la pista, una vez y a la vista', function () {
+    // Con alias en la web pública: en el portal, igualmente los nombres de equipo.
+    $this->torneo->update(['privacidad_alias' => true, 'horarios_publicados_en' => now(), 'web_horarios' => true]);
+    $this->ana->update(['alias' => 'Anita']);
+    $this->eva->update(['alias' => 'Evi']);
+    $fase = sortearElTorneo($this->torneo, $this->categoria);
+
+    $pista = Pista::factory()->create(['nombre' => 'Pista Central']);
+    $partido = $fase->partidos()->where(fn ($q) => $q->where('local_id', $this->nuestra->id)->orWhere('visitante_id', $this->nuestra->id))->orderBy('id')->firstOrFail();
+    $inicio = $this->torneo->fecha_inicio->copy()->setTime(10, 30);
+    $franja = $this->torneo->franjas()->create(['pista_id' => $pista->id, 'inicio' => $inicio, 'fin' => $inicio->copy()->addHour(), 'inicio_previsto' => $inicio, 'bloqueada' => false]);
+    $partido->update(['franja_id' => $franja->id, 'pista_id' => $pista->id, 'estado' => EstadoPartido::Programado]);
+    $rival = Participante::query()->findOrFail($partido->local_id === $this->nuestra->id ? $partido->visitante_id : $partido->local_id);
+
+    $html = miTorneo($this->inscripcion)
+        ->assertSee('Mi grupo · A')
+        ->assertSee('García / López')
+        ->assertSee($rival->nombre)
+        ->assertDontSee('Anita / Evi')
+        // En los partidos del grupo, la hora y la pista, sin el día.
+        ->assertSee('10:30 · Pista Central')
+        ->assertDontSee($inicio->translatedFormat('D j/n H:i').' · Pista Central')
+        ->html();
+
+    // La pista no va pegada a la fecha: una vez en su tarjeta de «Por jugar» y otra en el grupo; en el próximo partido, sola y en grande.
+    expect(substr_count($html, 'Pista Central'))->toBe(2)
+        ->and($html)->toContain($inicio->translatedFormat('D j/n H:i'));
+});
+
+test('con sesión de jugador, la portada y el logotipo llevan a su portal', function () {
+    $this->get('http://norte.saas.test/')->assertRedirect(route('jugador.portal'));
+    $this->get('http://norte.saas.test/jugador/partidos')->assertOk()->assertSee('href="'.route('jugador.portal').'"', false);
+
+    auth('jugador')->logout();
+    $this->get('http://norte.saas.test/')->assertOk();
 });

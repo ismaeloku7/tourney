@@ -153,8 +153,8 @@ class Panel extends Dashboard
                 : $torneo->fecha_inicio->translatedFormat('j').'–'.$torneo->fecha_fin->translatedFormat('j \d\e F'),
             'estado' => $torneo->estado->etiqueta(),
             'pendientes' => $pendientes,
-            'parejas' => TorneoResource::getUrl('edit', ['record' => $torneo, 'relation' => '1']),
-            'ficha' => TorneoResource::getUrl('edit', ['record' => $torneo]),
+            'parejas' => TorneoResource::getUrl('view', ['record' => $torneo, 'relation' => '1']),
+            'ficha' => TorneoResource::getUrl('view', ['record' => $torneo]),
             'competicion' => in_array($torneo->estado, [EstadoTorneo::Sorteo, EstadoTorneo::EnJuego], true) ? CompeticionDelTorneo::getUrl(['record' => $torneo]) : null,
         ];
     }

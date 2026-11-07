@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Competicion\PlanificarHorarios;
 use App\Enums\EstadoPartido;
 use App\Enums\EstadoTorneo;
 use App\Enums\Rol;
@@ -99,4 +100,46 @@ test('el tercer partido seguido de una pareja lleva un aviso en la vista', funct
 
     Livewire::test(HorariosDelTorneo::class, ['record' => $this->torneo->getRouteKey()])
         ->assertSee('¡Alguien juega su tercer partido seguido!');
+});
+
+test('uno que no cabía en la propuesta se arrastra al horario y se guarda al aplicarla', function () {
+    $colocado = colocadoEn($this->fase, $this->uno, $this->dia->setTime(9, 0));
+    $sinSitio = Partido::factory()->create(['fase_id' => $this->fase->id, 'estado' => 'pendiente']);
+    $huella = app(PlanificarHorarios::class)->huella($this->torneo);
+
+    $pagina = Livewire::test(HorariosDelTorneo::class, ['record' => $this->torneo->getRouteKey()])
+        ->set('propuesta', [
+            'colocados' => [],
+            'conflictos' => [[$sinSitio->id, 'sin_franja', 'No queda hueco.']],
+            'fin' => null, 'muertos' => 0, 'ocupacion' => 0,
+            'partidos' => [$sinSitio->id], 'huella' => $huella, 'rehacer' => false,
+        ])
+        ->assertSee('1 partido no cabe')
+        // Soltado a las 9:20 en la pista 1: dentro del colocado, va detrás de él.
+        ->call('moverPartido', $sinSitio->id, $this->uno->id, $this->dia->setTime(9, 20)->getTimestamp())
+        ->assertNotified('Partido movido')
+        ->assertDontSee('1 partido no cabe');
+
+    expect($pagina->get('propuesta')['colocados'])->toBe([[$sinSitio->id, $this->uno->id, $this->dia->setTime(10, 10)->getTimestamp(), $this->dia->setTime(11, 20)->getTimestamp()]]);
+
+    $pagina->callAction('aplicar')->assertNotified('1 partidos con hora y pista');
+    expect($sinSitio->refresh()->franja->inicio->format('H:i'))->toBe('10:10')
+        ->and($colocado->refresh()->franja->inicio->format('H:i'))->toBe('09:00');
+});
+
+test('la parrilla va más allá del horario de las pistas y admite dejar ahí un partido a mano', function () {
+    $a = colocadoEn($this->fase, $this->uno, $this->dia->setTime(9, 0));
+
+    // Las pistas abren de 9 a 21: la parrilla va de 8 a 24, y el tramo abierto se dibuja aparte.
+    $pagina = Livewire::test(HorariosDelTorneo::class, ['record' => $this->torneo->getRouteKey()])
+        ->assertSee('Fuera del horario de la pista');
+    $dia = $pagina->viewData('dias')[0];
+    expect($dia['base'])->toBe(8 * 60)
+        ->and($dia['minutos'])->toBe(16 * 60 - 4)
+        ->and($dia['pistas'][0]['abre'])->toHaveCount(1)
+        ->and($dia['pistas'][0]['abre'][0]['izquierda'])->toBe(round(100 * 60 / (16 * 60 - 4), 3));
+
+    // Un partido se deja a las 22:00, fuera del horario de la pista, y se guarda.
+    $pagina->call('moverPartido', $a->id, $this->dos->id, $this->dia->setTime(22, 0)->getTimestamp())->assertNotified('Partido movido');
+    expect($a->refresh()->pista_id)->toBe($this->dos->id)->and($a->franja->inicio->format('H:i'))->toBe('22:00');
 });

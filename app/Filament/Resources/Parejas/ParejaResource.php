@@ -69,13 +69,13 @@ class ParejaResource extends Resource
     {
         return $table
             ->defaultSort('id', 'desc')
-            ->paginated([25, 50, 100])
+            ->paginated([25, 50, 100, 'all'])
             ->defaultPaginationPageOption(50)
             ->emptyStateHeading('Sin parejas')
             ->emptyStateDescription('Se apuntan en cada categoría del torneo, se importan de un Excel desde el torneo o se inscriben ellas mismas si la inscripción online está abierta.')
             ->columns([
                 TextColumn::make('categoria.torneo.nombre')->label('Torneo')->toggleable(),
-                TextColumn::make('categoria.nombre')->label('Categoría')->badge()->color('gray'),
+                TextColumn::make('categoria.nombre')->label('Categoría')->badge()->color('gray')->toggleable(),
                 ColumnasDePareja::nombre()
                     ->searchable(query: fn (Builder $query, string $search): Builder => $query->whereHas('participante', fn (Builder $q) => $q->where(fn (Builder $o) => $o
                         ->where('nombre', 'like', "%{$search}%")
@@ -98,17 +98,21 @@ class ParejaResource extends Resource
                     ->options(fn (): array => self::categorias()->mapWithKeys(fn (Categoria $c): array => [$c->id => $c->torneo->nombre.' · '.$c->nombre])->all()),
                 SelectFilter::make('estado')->label('Estado')->options(EstadoInscripcion::opciones()),
             ])
-            ->recordUrl(fn (Inscripcion $record): string => self::getUrl('edit', ['record' => $record]))
-            ->recordActions([
+            ->headerActions([
+                ParaCopiar::copiarParaWhatsApp(),
+                ParaCopiar::boton(),
+            ])
+            ->recordUrl(fn (Inscripcion $record, mixed $livewire): ?string => ParaCopiar::enlace($livewire, self::getUrl('edit', ['record' => $record])))
+            ->recordActions(ParaCopiar::ocultando([
                 CompaneroDePareja::accion(),
                 NivelesDePareja::accion(),
                 MoverParejas::accion(),
                 Action::make('editar')->label('Editar')->icon(Heroicon::OutlinedPencilSquare)
                     ->url(fn (Inscripcion $record): string => self::getUrl('edit', ['record' => $record])),
-            ])
-            ->toolbarActions([
+            ]))
+            ->toolbarActions(ParaCopiar::ocultando([
                 MoverParejas::enBloque(),
-            ]);
+            ]));
     }
 
     public static function getPages(): array

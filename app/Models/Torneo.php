@@ -148,6 +148,41 @@ class Torneo extends Model
         return $this->hasMany(Disponibilidad::class);
     }
 
+    /**
+     * Los estados por los que pasa este torneo, en orden. Sin inscripción
+     * online, las parejas las apunta la organización y no hay periodo de
+     * inscripción: de borrador se pasa al sorteo (salvo que ya esté en uno
+     * de esos dos estados, que entonces siguen contando).
+     *
+     * @return list<EstadoTorneo>
+     */
+    public function caminoDeEstados(): array
+    {
+        $deInscripcion = [EstadoTorneo::InscripcionAbierta, EstadoTorneo::InscripcionCerrada];
+
+        if ($this->inscripcion_online || in_array($this->estado, $deInscripcion, true)) {
+            return EstadoTorneo::cases();
+        }
+
+        return array_values(array_filter(EstadoTorneo::cases(), fn (EstadoTorneo $e): bool => ! in_array($e, $deInscripcion, true)));
+    }
+
+    public function estadoSiguiente(): ?EstadoTorneo
+    {
+        $camino = $this->caminoDeEstados();
+        $indice = (int) array_search($this->estado, $camino, true);
+
+        return $camino[$indice + 1] ?? null;
+    }
+
+    public function estadoAnterior(): ?EstadoTorneo
+    {
+        $camino = $this->caminoDeEstados();
+        $indice = (int) array_search($this->estado, $camino, true);
+
+        return $indice > 0 ? $camino[$indice - 1] : null;
+    }
+
     public function inscripcionAbierta(): bool
     {
         return $this->estado === EstadoTorneo::InscripcionAbierta;

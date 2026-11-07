@@ -34,6 +34,12 @@ use Illuminate\Support\Facades\Gate;
  */
 class CategoriasRelationManager extends RelationManager
 {
+    /** En la ficha del torneo (de solo lectura) esta pestaña se sigue gestionando. */
+    public function isReadOnly(): bool
+    {
+        return false;
+    }
+
     protected static string $relationship = 'categorias';
 
     protected static ?string $title = 'Categorías';

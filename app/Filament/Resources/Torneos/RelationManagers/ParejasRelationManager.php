@@ -6,9 +6,12 @@ use App\Enums\EstadoInscripcion;
 use App\Filament\ConfirmarCompletas;
 use App\Filament\Resources\Parejas\ColumnasDePareja;
 use App\Filament\Resources\Parejas\CompaneroDePareja;
+use App\Filament\Resources\Parejas\ConVistaParaCopiar;
 use App\Filament\Resources\Parejas\MoverParejas;
 use App\Filament\Resources\Parejas\NivelesDePareja;
+use App\Filament\Resources\Parejas\ParaCopiar;
 use App\Filament\Resources\Parejas\ParejaResource;
+use App\Filament\Resources\Parejas\SeCopiaParaPegar;
 use App\Models\Categoria;
 use App\Models\Inscripcion;
 use App\Models\Torneo;
@@ -25,8 +28,16 @@ use Illuminate\Database\Eloquent\Model;
  * Todas las parejas del torneo de un vistazo, con su categoría. Para
  * confirmarlas, completarlas o darlas de baja se entra en su categoría.
  */
-class ParejasRelationManager extends RelationManager
+class ParejasRelationManager extends RelationManager implements SeCopiaParaPegar
 {
+    use ConVistaParaCopiar;
+
+    /** En la ficha del torneo (de solo lectura) esta pestaña se sigue gestionando. */
+    public function isReadOnly(): bool
+    {
+        return false;
+    }
+
     protected static string $relationship = 'inscripciones';
 
     protected static ?string $title = 'Parejas';
@@ -55,7 +66,7 @@ class ParejasRelationManager extends RelationManager
             ->emptyStateHeading('Sin parejas')
             ->emptyStateDescription('Se apuntan dentro de cada categoría (pestaña Categorías › Configurar › Inscripciones), con «Importar parejas» desde un Excel o, si la inscripción online está abierta, las propias parejas.')
             ->columns([
-                TextColumn::make('categoria.nombre')->label('Categoría')->badge()->color('gray'),
+                TextColumn::make('categoria.nombre')->label('Categoría')->badge()->color('gray')->toggleable(),
                 ColumnasDePareja::nombre(),
                 ColumnasDePareja::jugadores(),
                 ColumnasDePareja::niveles(),
@@ -70,19 +81,21 @@ class ParejasRelationManager extends RelationManager
                     ->query(fn (Builder $query, array $data): Builder => filled($data['value'] ?? null) ? $query->where('inscripciones.estado', (string) $data['value']) : $query),
             ])
             ->headerActions([
+                ParaCopiar::copiarParaWhatsApp(),
+                ParaCopiar::boton(),
                 ConfirmarCompletas::accion(fn (): Torneo => $this->torneo(), fn (): ?Categoria => null),
             ])
-            ->recordUrl(fn (Inscripcion $record): string => ParejaResource::getUrl('edit', ['record' => $record]))
-            ->recordActions([
+            ->recordUrl(fn (Inscripcion $record, mixed $livewire): ?string => ParaCopiar::enlace($livewire, ParejaResource::getUrl('edit', ['record' => $record])))
+            ->recordActions(ParaCopiar::ocultando([
                 CompaneroDePareja::accion(),
                 NivelesDePareja::accion(),
                 MoverParejas::accion(),
                 Action::make('editar')->label('Editar')->icon(Heroicon::OutlinedPencilSquare)
                     ->url(fn (Inscripcion $record): string => ParejaResource::getUrl('edit', ['record' => $record])),
-            ])
-            ->toolbarActions([
+            ]))
+            ->toolbarActions(ParaCopiar::ocultando([
                 MoverParejas::enBloque(),
-            ]);
+            ]));
     }
 
     private function torneo(): Torneo

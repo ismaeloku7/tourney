@@ -7,6 +7,7 @@ use App\Competicion\Errores\OperacionNoPermitida;
 use App\Competicion\GeneradorRoundRobin;
 use App\Enums\EstadoPartido;
 use App\Models\Fase;
+use App\Models\Partido;
 use App\Models\RegistroDeCambio;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
@@ -40,7 +41,7 @@ final class GenerarPartidos
         $configuracion = $fase->configuracionDeGrupos();
 
         return DB::transaction(function () use ($fase, $usuario, $configuracion): int {
-            $fase->partidos()->forceDelete();
+            Partido::borrarConSusHoras($fase->partidos());
             $creados = 0;
 
             foreach ($fase->grupos()->with('participantes')->get() as $grupo) {

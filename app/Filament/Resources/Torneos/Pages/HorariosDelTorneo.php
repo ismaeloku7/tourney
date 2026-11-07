@@ -5,6 +5,7 @@ namespace App\Filament\Resources\Torneos\Pages;
 use App\Actions\Competicion\DuracionesAprendidas;
 use App\Actions\Competicion\HorasEnDirecto;
 use App\Actions\Competicion\PlanificarHorarios;
+use App\Actions\Competicion\SoltarPartidosDePista;
 use App\Competicion\Datos\DisponibilidadDePista;
 use App\Competicion\Datos\PropuestaDeHorarios;
 use App\Competicion\Datos\SugerenciaDeRecolocacion;
@@ -16,6 +17,7 @@ use App\Competicion\PlanificadorContinuo;
 use App\Enums\EstadoPartido;
 use App\Filament\Avisos;
 use App\Filament\Competicion\Marcador;
+use App\Filament\Resources\Torneos\Pages\Concerns\BarraDelTorneo;
 use App\Filament\Resources\Torneos\TorneoResource;
 use App\Models\Franja;
 use App\Models\Partido;
@@ -32,6 +34,7 @@ use Filament\Resources\Pages\Concerns\InteractsWithRecord;
 use Filament\Resources\Pages\Page;
 use Filament\Support\Icons\Heroicon;
 use Illuminate\Contracts\Support\Htmlable;
+use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Gate;
 
@@ -42,9 +45,15 @@ use Illuminate\Support\Facades\Gate;
  */
 class HorariosDelTorneo extends Page
 {
+    use BarraDelTorneo;
     use InteractsWithRecord;
 
     protected static string $resource = TorneoResource::class;
+
+    /** La parrilla empieza antes de que abran las pistas y acaba después, para poder colocar a mano lo que no cabe. */
+    public const MARGEN_ANTES_MINUTOS = 60;
+
+    public const MARGEN_DESPUES_MINUTOS = 180;
 
     protected static ?string $breadcrumb = 'Horarios';
 
@@ -92,79 +101,108 @@ class HorariosDelTorneo extends Page
 
     protected function getHeaderActions(): array
     {
-        return [
-            Action::make('calcular')
-                ->label(fn (): string => $this->propuesta === null ? 'Calcular' : 'Volver a calcular')
-                ->icon(Heroicon::OutlinedSparkles)
-                ->visible(fn (): bool => Gate::allows('update', $this->torneo()))
-                ->modalHeading('Calcular los horarios')
-                ->modalDescription('Se calcula el plan y se enseña aquí, sin guardar nada. Cada partido reserva su pista el calentamiento más su duración estimada y el siguiente entra en cuanto acaba.')
-                ->modalSubmitActionLabel('Calcular')
-                ->schema([
-                    Toggle::make('rehacer')->label('Rehacer también los ya programados')->default(false)
-                        ->helperText('Los que no han empezado se vuelven a colocar desde ahora. Desmarcado, solo se colocan los que no tienen hora.'),
-                ])
-                ->action(function (array $data): void {
-                    $propuesta = app(PlanificarHorarios::class)->proponer($this->torneo(), (bool) ($data['rehacer'] ?? false));
-                    $this->propuesta = $propuesta->toArray();
+        return $this->barraDelTorneo('horarios');
+    }
 
-                    $plan = $propuesta->plan;
-                    $colocados = count($plan->colocados);
-                    if ($colocados === 0 && $plan->conflictos === []) {
-                        Avisos::aviso('No hay partidos que colocar');
-                    } else {
-                        Avisos::hecho('Plan calculado: revísalo y aplícalo', "{$colocados} partidos colocados".($plan->conflictos !== [] ? ', '.count($plan->conflictos).' sin sitio' : '').'.');
-                    }
-                }),
-            Action::make('recalcular')
-                ->label('Recalcular horas')
-                ->icon(Heroicon::OutlinedArrowPath)
-                ->color('gray')
-                ->visible(fn (): bool => $this->propuesta === null && HorasEnDirecto::activo($this->torneo()) && Gate::allows('update', $this->torneo()))
-                ->action(function (): void {
-                    $cambios = app(HorasEnDirecto::class)->recalcular($this->torneo());
-                    Avisos::hecho($cambios === [] ? 'Las horas ya estaban al día' : count($cambios).' partidos con nueva hora estimada');
-                }),
-            Action::make('aplicar')
-                ->label('Aplicar')
-                ->icon(Heroicon::OutlinedCheck)
-                ->color('success')
-                ->visible(fn (): bool => $this->propuesta !== null && ($this->propuesta['colocados'] ?? []) !== [] && Gate::allows('update', $this->torneo()))
-                ->requiresConfirmation()
-                ->modalHeading('Aplicar el plan')
-                ->modalDescription('Los partidos reciben su pista y su hora. Los jugadores lo ven cuando los horarios están publicados.')
-                ->modalSubmitActionLabel('Aplicar')
-                ->action(function (): void {
-                    $propuesta = PropuestaDeHorarios::desdeArray((array) $this->propuesta);
+    // Lo propio de los horarios va en la página (horarios.blade.php), no en la barra de arriba.
 
-                    try {
-                        app(PlanificarHorarios::class)->aplicar($this->torneo(), $propuesta, $this->usuario());
-                    } catch (ErrorDeCompeticion $e) {
-                        Avisos::error('No se ha aplicado', [$e->getMessage()]);
+    public function calcularAction(): Action
+    {
+        return Action::make('calcular')
+            ->label(fn (): string => $this->propuesta === null ? 'Calcular' : 'Volver a calcular')
+            ->icon(Heroicon::OutlinedSparkles)
+            ->visible(fn (): bool => Gate::allows('update', $this->torneo()))
+            ->modalHeading('Calcular los horarios')
+            ->modalDescription('Se calcula el plan y se enseña aquí, sin guardar nada. Cada partido reserva su pista el calentamiento más su duración estimada y el siguiente entra en cuanto acaba.')
+            ->modalSubmitActionLabel('Calcular')
+            ->schema([
+                Toggle::make('rehacer')->label('Rehacer también los ya programados')->default(false)
+                    ->helperText('Los que no han empezado se vuelven a colocar desde ahora. Desmarcado, solo se colocan los que no tienen hora.'),
+            ])
+            ->action(function (array $data): void {
+                $propuesta = app(PlanificarHorarios::class)->proponer($this->torneo(), (bool) ($data['rehacer'] ?? false));
+                $this->propuesta = $propuesta->toArray();
 
-                        return;
-                    }
+                $plan = $propuesta->plan;
+                $colocados = count($plan->colocados);
+                if ($colocados === 0 && $plan->conflictos === []) {
+                    Avisos::aviso('No hay partidos que colocar');
+                } else {
+                    Avisos::hecho('Plan calculado: revísalo y aplícalo', "{$colocados} partidos colocados".($plan->conflictos !== [] ? ', '.count($plan->conflictos).' sin sitio' : '').'.');
+                }
+            });
+    }
 
-                    $this->propuesta = null;
-                    Avisos::hecho(count($propuesta->plan->colocados).' partidos con hora y pista', self::resumen($propuesta));
-                }),
-            Action::make('descartar')
-                ->label('Descartar')
-                ->icon(Heroicon::OutlinedXMark)
-                ->color('gray')
-                ->visible(fn (): bool => $this->propuesta !== null)
-                ->action(fn () => $this->propuesta = null),
-            Action::make('partidos')
-                ->label('Partidos')
-                ->icon(Heroicon::OutlinedTableCells)
-                ->color('gray')
-                ->url(fn (): string => PartidosDelTorneo::getUrl(['record' => $this->torneo()])),
-            Action::make('torneo')
-                ->label('Volver al torneo')
-                ->icon(Heroicon::OutlinedArrowUturnLeft)
-                ->color('gray')
-                ->url(fn (): string => TorneoResource::getUrl('edit', ['record' => $this->torneo()])),
-        ];
+    public function soltarHuerfanosAction(): Action
+    {
+        return Action::make('soltarHuerfanos')
+            ->label(fn (): string => 'Soltar '.($this->huerfanos() === 1 ? '1 partido' : $this->huerfanos().' partidos').' de pistas quitadas')
+            ->icon(Heroicon::OutlinedExclamationTriangle)
+            ->color('warning')
+            ->visible(fn (): bool => $this->propuesta === null && $this->huerfanos() > 0 && Gate::allows('update', $this->torneo()))
+            ->requiresConfirmation()
+            ->modalHeading('Partidos en pistas que ya no son del torneo')
+            ->modalDescription('Se quedan sin hora ni pista. Después, «Calcular» los coloca en las pistas que quedan.')
+            ->modalSubmitActionLabel('Soltar')
+            ->action(function (): void {
+                $soltados = app(SoltarPartidosDePista::class)->huerfanos($this->torneo(), $this->usuario());
+                Avisos::hecho($soltados === 1 ? 'Un partido sin hora' : "{$soltados} partidos sin hora", 'Pulsa «Calcular» para colocarlos.');
+            });
+    }
+
+    private function huerfanos(): int
+    {
+        return SoltarPartidosDePista::enPistasQuitadas($this->torneo())->count();
+    }
+
+    public function recalcularAction(): Action
+    {
+        return Action::make('recalcular')
+            ->label('Recalcular horas')
+            ->icon(Heroicon::OutlinedArrowPath)
+            ->color('gray')
+            ->visible(fn (): bool => $this->propuesta === null && HorasEnDirecto::activo($this->torneo()) && Gate::allows('update', $this->torneo()))
+            ->action(function (): void {
+                $cambios = app(HorasEnDirecto::class)->recalcular($this->torneo());
+                Avisos::hecho($cambios === [] ? 'Las horas ya estaban al día' : count($cambios).' partidos con nueva hora estimada');
+            });
+    }
+
+    public function aplicarAction(): Action
+    {
+        return Action::make('aplicar')
+            ->label('Aplicar')
+            ->icon(Heroicon::OutlinedCheck)
+            ->color('success')
+            ->visible(fn (): bool => $this->propuesta !== null && ($this->propuesta['colocados'] ?? []) !== [] && Gate::allows('update', $this->torneo()))
+            ->requiresConfirmation()
+            ->modalHeading('Aplicar el plan')
+            ->modalDescription('Los partidos reciben su pista y su hora. Los jugadores lo ven cuando los horarios están publicados.')
+            ->modalSubmitActionLabel('Aplicar')
+            ->action(function (): void {
+                $propuesta = PropuestaDeHorarios::desdeArray((array) $this->propuesta);
+
+                try {
+                    app(PlanificarHorarios::class)->aplicar($this->torneo(), $propuesta, $this->usuario());
+                } catch (ErrorDeCompeticion $e) {
+                    Avisos::error('No se ha aplicado', [$e->getMessage()]);
+
+                    return;
+                }
+
+                $this->propuesta = null;
+                Avisos::hecho(count($propuesta->plan->colocados).' partidos con hora y pista', self::resumen($propuesta));
+            });
+    }
+
+    public function descartarAction(): Action
+    {
+        return Action::make('descartar')
+            ->label('Descartar')
+            ->icon(Heroicon::OutlinedXMark)
+            ->color('gray')
+            ->visible(fn (): bool => $this->propuesta !== null)
+            ->action(fn () => $this->propuesta = null);
     }
 
     /** «Termina el sábado 14 a las 19:40 · pistas ocupadas al 96 % · 25 min de pista parada.» */
@@ -194,6 +232,8 @@ class HorariosDelTorneo extends Page
             'sugerencia' => $sugerencia !== null && ! in_array($sugerencia->clave(), $this->ignoradas, true) ? $this->describir($sugerencia) : null,
             'retrasoMinimo' => HorasEnDirecto::RETRASO_MINUTOS,
             'esPropuesta' => $propuesta !== null,
+            'huerfanos' => $this->huerfanos(),
+            'sinHora' => $propuesta === null ? Partido::query()->whereHas('fase.categoria', fn (Builder $q) => $q->where('torneo_id', $this->torneo()->id))->whereNotNull('local_id')->whereNotNull('visitante_id')->whereNull('franja_id')->whereIn('estado', [EstadoPartido::Pendiente->value, EstadoPartido::Programado->value])->count() : 0,
             'resumen' => $propuesta !== null ? self::resumen($propuesta) : null,
             'dias' => $this->dias($propuesta),
             'conflictos' => $propuesta !== null ? $this->conflictos($propuesta) : [],
@@ -206,7 +246,7 @@ class HorariosDelTorneo extends Page
      * Cada día con sus pistas y lo que ocupa cada una: lo guardado y, si
      * hay una propuesta, lo propuesto en lugar de lo que se recoloca.
      *
-     * @return list<array{titulo: string, desde: int, minutos: int, horas: list<array{etiqueta: string, izquierda: float}>, pistas: list<array{id: int, nombre: string, bloques: list<array{partido: int|null, movible: bool, tercero: bool, izquierda: float, ancho: float, calentamiento: float, hora: string, texto: string, detalle: string, color: string, nuevo: bool}>}>}>
+     * @return list<array{titulo: string, desde: int, minutos: int, base: int, horas: list<array{etiqueta: string, izquierda: float}>, pistas: list<array{id: int, nombre: string, abre: list<array{izquierda: float, ancho: float}>, bloques: list<array{partido: int|null, movible: bool, tercero: bool, izquierda: float, ancho: float, calentamiento: float, hora: string, texto: string, detalle: string, color: string, nuevo: bool}>}>}>
      */
     private function dias(?PropuestaDeHorarios $propuesta): array
     {
@@ -247,9 +287,13 @@ class HorariosDelTorneo extends Page
 
         $pistas = $torneo->torneoPistas()->with('pista')->orderBy('orden')->get();
 
-        // Los límites de cada día: lo que abren las pistas, ampliado si algo se sale.
+        // Los límites de cada día: lo que abren las pistas, ampliado si algo se
+        // sale, y con margen por delante y por detrás para poder colocar a mano
+        // lo que no cabe en el horario de las pistas.
         /** @var array<string, array{0: CarbonImmutable, 1: CarbonImmutable}> $limites */
         $limites = [];
+        /** @var array<string, array<int, list<array{0: CarbonImmutable, 1: CarbonImmutable}>>> $disponibles Día → pista → tramos en que abre. */
+        $disponibles = [];
         foreach ($pistas as $torneoPista) {
             /** @var TorneoPista $torneoPista */
             try {
@@ -261,11 +305,18 @@ class HorariosDelTorneo extends Page
                 $desde = CarbonImmutable::parse($tramo->fecha.' '.$tramo->desde);
                 $hasta = CarbonImmutable::parse($tramo->fecha.' '.$tramo->hasta);
                 $limites[$tramo->fecha] = isset($limites[$tramo->fecha]) ? [$limites[$tramo->fecha][0]->min($desde), $limites[$tramo->fecha][1]->max($hasta)] : [$desde, $hasta];
+                $disponibles[$tramo->fecha][$torneoPista->pista_id][] = [$desde, $hasta];
             }
         }
         foreach ($ocupaciones as $o) {
             $fecha = $o['inicio']->toDateString();
             $limites[$fecha] = isset($limites[$fecha]) ? [$limites[$fecha][0]->min($o['inicio']), $limites[$fecha][1]->max($o['fin'])] : [$o['inicio'], $o['fin']];
+        }
+        foreach ($limites as $fecha => [$desde, $hasta]) {
+            $limites[$fecha] = [
+                $desde->subMinutes(self::MARGEN_ANTES_MINUTOS)->max($desde->startOfDay()),
+                $hasta->addMinutes(self::MARGEN_DESPUES_MINUTOS)->min($desde->startOfDay()->addDay()->subMinutes(4)),
+            ];
         }
         ksort($limites);
 
@@ -308,10 +359,15 @@ class HorariosDelTorneo extends Page
                     ];
                 }
 
-                $filas[] = ['id' => $torneoPista->pista_id, 'nombre' => $torneoPista->pista->nombre.($torneoPista->pista->exterior ? ' · exterior' : ''), 'bloques' => $bloques];
+                $abre = [];
+                foreach ($disponibles[$fecha][$torneoPista->pista_id] ?? [] as [$abreDesde, $abreHasta]) {
+                    $abre[] = ['izquierda' => $posicion($abreDesde->max($desde)), 'ancho' => round(100 * max(0, $abreDesde->max($desde)->diffInMinutes($abreHasta->min($hasta), false)) / $total, 3)];
+                }
+
+                $filas[] = ['id' => $torneoPista->pista_id, 'nombre' => $torneoPista->pista->nombre.($torneoPista->pista->exterior ? ' · exterior' : ''), 'abre' => $abre, 'bloques' => $bloques];
             }
 
-            $dias[] = ['titulo' => ucfirst($desde->translatedFormat('l j \d\e F')), 'desde' => $desde->getTimestamp(), 'minutos' => (int) $total, 'horas' => $horas, 'pistas' => $filas];
+            $dias[] = ['titulo' => ucfirst($desde->translatedFormat('l j \d\e F')), 'desde' => $desde->getTimestamp(), 'minutos' => (int) $total, 'base' => $desde->hour * 60 + $desde->minute, 'horas' => $horas, 'pistas' => $filas];
         }
 
         return $dias;
@@ -324,13 +380,49 @@ class HorariosDelTorneo extends Page
      */
     public function moverPartido(int $partido, int $pista, int $inicio): void
     {
-        $this->cambiarHorario(fn (array $ocupaciones, int $calentamiento): array => app(MoverEnElHorario::class)->mover($ocupaciones, $partido, $pista, CarbonImmutable::now()->setTimestamp($inicio)->roundMinutes(5)->getTimestamp(), $calentamiento));
+        $this->cambiarHorario(function (array $ocupaciones, int $calentamiento) use ($partido, $pista, $inicio): array {
+            // Uno que no cabía en la propuesta entra desde fuera del horario.
+            if (! in_array($partido, array_column($ocupaciones, 'id'), true)) {
+                $ocupaciones[] = $this->sinSitio($partido, $calentamiento);
+            }
+
+            return app(MoverEnElHorario::class)->mover($ocupaciones, $partido, $pista, CarbonImmutable::now()->setTimestamp($inicio)->roundMinutes(5)->getTimestamp(), $calentamiento);
+        });
     }
 
     /** Soltado sobre otro partido: se intercambian. */
     public function intercambiarPartidos(int $partido, int $otro): void
     {
         $this->cambiarHorario(fn (array $ocupaciones, int $calentamiento): array => app(MoverEnElHorario::class)->intercambiar($ocupaciones, $partido, $otro, $calentamiento));
+    }
+
+    /**
+     * Un partido que se quedó sin sitio en la propuesta, listo para
+     * colocarlo a mano (fuera de toda pista hasta que se suelta).
+     *
+     * @return array{id: int, pista: int, inicio: int, fin: int, movible: bool, jugadores: list<int>}
+     *
+     * @throws OperacionNoPermitida
+     */
+    private function sinSitio(int $id, int $calentamiento): array
+    {
+        $propuesta = $this->propuesta !== null ? PropuestaDeHorarios::desdeArray($this->propuesta) : null;
+        $sinSitio = array_map(fn ($c): int => $c->partido, $propuesta->plan->conflictos ?? []);
+        $partido = in_array($id, $sinSitio, true)
+            ? Partido::query()->with(['local.participanteJugadores', 'visitante.participanteJugadores', 'fase.categoria'])->find($id)
+            : null;
+        if ($partido === null || $partido->local === null || $partido->visitante === null) {
+            throw new OperacionNoPermitida('Ese partido no está en el horario.');
+        }
+
+        return [
+            'id' => $partido->id,
+            'pista' => 0,
+            'inicio' => 0,
+            'fin' => ($calentamiento + app(DuracionesAprendidas::class)->minutosDe($partido)) * 60,
+            'movible' => true,
+            'jugadores' => array_values(array_unique([...$partido->local->idsDeJugadores(), ...$partido->visitante->idsDeJugadores()])),
+        ];
     }
 
     /**
@@ -356,13 +448,22 @@ class HorariosDelTorneo extends Page
 
         if ($this->propuesta !== null) {
             $colocados = [];
+            $estaban = [];
             foreach ((array) ($this->propuesta['colocados'] ?? []) as $c) {
                 $c = array_values((array) $c);
+                $estaban[] = (int) $c[0];
                 $nuevo = $resultado['cambios'][(int) $c[0]] ?? null;
                 $colocados[] = $nuevo !== null ? [(int) $c[0], $nuevo['pista'], $nuevo['inicio'], $nuevo['fin']] : $c;
             }
+            // Los que no tenían sitio y se han soltado en el horario: dejan de ser conflicto.
+            foreach ($resultado['cambios'] as $id => $nuevo) {
+                if (! in_array($id, $estaban, true)) {
+                    $colocados[] = [$id, $nuevo['pista'], $nuevo['inicio'], $nuevo['fin']];
+                    $this->propuesta['conflictos'] = array_values(array_filter((array) ($this->propuesta['conflictos'] ?? []), fn (mixed $c): bool => (int) (array_values((array) $c)[0] ?? 0) !== $id));
+                }
+            }
             $this->propuesta['colocados'] = $colocados;
-            $this->propuesta['fin'] = $colocados === [] ? null : max(array_map(fn (array $c): int => (int) $c[3], $colocados));
+            $this->propuesta['fin'] = max(array_map(fn (array $c): int => (int) $c[3], $colocados));
         } else {
             try {
                 $this->guardarCambios($resultado['cambios']);
@@ -545,7 +646,7 @@ class HorariosDelTorneo extends Page
         ];
     }
 
-    /** @return list<string> */
+    /** @return list<array{partido: int, texto: string, movible: bool}> */
     private function conflictos(PropuestaDeHorarios $propuesta): array
     {
         $partidos = Partido::query()
@@ -557,9 +658,14 @@ class HorariosDelTorneo extends Page
         $lineas = [];
         foreach ($propuesta->plan->conflictos as $conflicto) {
             $partido = $partidos->get($conflicto->partido);
-            $lineas[] = ($partido !== null
-                ? $partido->fase->categoria->nombre.' · '.Marcador::lado($partido, true).' – '.Marcador::lado($partido, false)
-                : 'P'.$conflicto->partido).': '.$conflicto->detalle;
+            $lineas[] = [
+                'partido' => $conflicto->partido,
+                'texto' => ($partido !== null
+                    ? $partido->fase->categoria->nombre.' · '.Marcador::lado($partido, true).' – '.Marcador::lado($partido, false)
+                    : 'P'.$conflicto->partido).': '.$conflicto->detalle,
+                // Con sus dos parejas se puede soltar a mano en el horario.
+                'movible' => $partido !== null && $partido->local_id !== null && $partido->visitante_id !== null && Gate::allows('update', $this->torneo()),
+            ];
         }
 
         return $lineas;

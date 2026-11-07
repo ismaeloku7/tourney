@@ -2,10 +2,13 @@
 
 namespace App\Providers;
 
+use App\Auth\GuardDeSesion;
 use App\Push\Remitente;
 use App\Push\RemitenteWebPush;
 use App\Tenancy\OrganizadorActual;
 use Carbon\CarbonImmutable;
+use Illuminate\Foundation\Application;
+use Illuminate\Support\Facades\Auth;
 use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\ServiceProvider;
@@ -30,6 +33,27 @@ class AppServiceProvider extends ServiceProvider
      */
     public function boot(): void
     {
+        // Los guards de sesión del equipo y de los jugadores: salir en un sitio no echa de los demás.
+        // Laravel pasa la aplicación concreta, la que se lee como contenedor ($app['config']).
+        Auth::extend('sesion', function (Application $app, string $nombre, array $config): GuardDeSesion {
+            $guard = new GuardDeSesion(
+                $nombre,
+                Auth::createUserProvider($config['provider'] ?? null),
+                $app['session.store'],
+                rehashOnLogin: (bool) $app['config']->get('hashing.rehash_on_login', true),
+                timeboxDuration: (int) $app['config']->get('auth.timebox_duration', 200000),
+                hashKey: (string) $app['config']->get('app.key'),
+            );
+            $guard->setCookieJar($app['cookie']);
+            $guard->setDispatcher($app['events']);
+            $guard->setRequest($app->refresh('request', $guard, 'setRequest'));
+            if (isset($config['remember'])) {
+                $guard->setRememberDuration((int) $config['remember']);
+            }
+
+            return $guard;
+        });
+
         $this->configureDefaults();
     }
 

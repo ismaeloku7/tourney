@@ -73,11 +73,12 @@
                 @if ($proximo === null)
                     <p class="mt-2 text-sm text-tema-suave">Tu próximo partido saldrá aquí cuando la organización haga el sorteo.</p>
                 @else
-                    <a href="{{ $proximoInscripcion === null ? route('jugador.partidos') : route('jugador.inscripcion', $proximoInscripcion) }}" class="mt-3 block overflow-hidden rounded-[3px] p-5 text-white transition hover:brightness-95" style="background: var(--acento)">
+                    @php($enlaceDelTorneo = $proximoInscripcion === null ? route('jugador.partidos') : route('jugador.inscripcion', $proximoInscripcion))
+                    <a href="{{ $enlaceDelTorneo }}" class="mt-3 block overflow-hidden rounded-[3px] p-5 text-white transition hover:brightness-95" style="background: var(--acento)">
                         <div class="flex items-start gap-4">
                             <div class="shrink-0 rounded-[3px] bg-white/15 px-3 py-2 text-center leading-tight">
-                                <div class="text-[0.65rem] font-semibold uppercase tracking-wide">{{ $proximo['hora'] !== null ? \Illuminate\Support\Str::before($proximo['hora'], ' ') : 'Partido' }}</div>
-                                <div class="text-xl font-bold">{{ $proximo['hora'] !== null ? \Illuminate\Support\Str::of($proximo['hora'])->after(' ')->before(' ') : '?' }}</div>
+                                <div class="text-[0.65rem] font-semibold uppercase tracking-wide">{{ $proximo['pista'] !== null ? 'Pista' : 'Partido' }}</div>
+                                <div class="text-xl font-bold">{{ $proximo['pista'] !== null ? preg_replace('/^pista\s+/i', '', $proximo['pista']) : '?' }}</div>
                             </div>
                             <div class="min-w-0">
                                 <div class="text-lg font-semibold leading-tight">Contra {{ $proximo['rival'] }}</div>
@@ -86,6 +87,25 @@
                             </div>
                         </div>
                     </a>
+                    @if ($siguientes !== [])
+                        <ul class="mt-2 space-y-2">
+                            @foreach ($siguientes as $s)
+                                <li class="rounded-[3px] bg-tema-fondo p-4 text-tema-texto ring-1 ring-tema-borde" wire:key="siguiente-{{ $s['id'] }}">
+                                    <div class="flex items-start gap-4">
+                                        <div class="shrink-0 rounded-[3px] bg-white px-3 py-2 text-center leading-tight ring-1 ring-tema-borde">
+                                            <div class="text-[0.65rem] font-semibold uppercase tracking-wide text-tema-suave">{{ $s['pista'] !== null ? 'Pista' : 'Partido' }}</div>
+                                            <div class="text-xl font-bold">{{ $s['pista'] !== null ? preg_replace('/^pista\s+/i', '', $s['pista']) : '?' }}</div>
+                                        </div>
+                                        <div class="min-w-0">
+                                            <div class="font-semibold leading-tight">Contra {{ $s['rival'] }}</div>
+                                            <div class="mt-1 text-sm text-tema-suave">{{ $s['torneo'] }} · {{ $s['categoria'] }}@if ($s['hora']) · {{ $s['hora'] }}@else · sin hora todavía @endif</div>
+                                        </div>
+                                    </div>
+                                </li>
+                            @endforeach
+                        </ul>
+                    @endif
+                    <a href="{{ $enlaceDelTorneo }}" class="boton mt-3 w-full sm:w-auto">Ver toda la información del torneo</a>
                 @endif
             </section>
         </div>
