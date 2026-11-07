@@ -27,13 +27,23 @@
 
     @if ($proximo !== null)
         <section class="tarjeta border-l-4 border-tema-naranja p-5 sm:p-6">
-            <p class="text-xs font-semibold uppercase tracking-[0.14em] text-tema-naranja">Tu próximo partido</p>
-            <p class="mt-2 text-sm text-tema-suave">contra</p>
-            <p class="text-2xl font-semibold leading-tight text-tema-texto sm:text-3xl">{{ $proximo['rival'] }}</p>
-            <div class="mt-3 flex flex-wrap gap-2 text-sm">
-                <span class="rounded-full bg-tema-fondo px-3 py-1 font-medium">{{ $proximo['hora'] ?? 'Sin hora todavía' }}</span>
-                @if ($proximo['pista'])<span class="rounded-full bg-tema-fondo px-3 py-1 font-medium">{{ $proximo['pista'] }}</span>@endif
-                @if ($proximo['estado'] === \App\Enums\EstadoPartido::EnJuego)<span class="rounded-full bg-green-50 px-3 py-1 font-medium text-green-800">En juego{{ $proximo['enVivo'] !== '' ? ' · '.$proximo['enVivo'] : '' }}</span>@endif
+            <div class="flex items-start justify-between gap-4">
+                <div class="min-w-0">
+                    <p class="text-xs font-semibold uppercase tracking-[0.14em] text-tema-naranja">Tu próximo partido</p>
+                    <p class="mt-2 text-sm text-tema-suave">contra</p>
+                    <p class="text-2xl font-semibold leading-tight text-tema-texto sm:text-3xl">{{ $proximo['rival'] }}</p>
+                    <div class="mt-3 flex flex-wrap gap-2 text-sm">
+                        <span class="rounded-full bg-tema-fondo px-3 py-1 font-medium">{{ $proximo['hora'] ?? 'Sin hora todavía' }}</span>
+                        @if ($proximo['estado'] === \App\Enums\EstadoPartido::EnJuego)<span class="rounded-full bg-green-50 px-3 py-1 font-medium text-green-800">En juego{{ $proximo['enVivo'] !== '' ? ' · '.$proximo['enVivo'] : '' }}</span>@endif
+                    </div>
+                </div>
+                @if ($proximo['pista'])
+                    {{-- La pista, sola y en grande. --}}
+                    <div class="shrink-0 rounded-[3px] bg-tema-pizarra px-4 py-3 text-center leading-tight text-white">
+                        <div class="text-[0.7rem] font-semibold uppercase tracking-[0.12em] text-white/70">Pista</div>
+                        <div class="mt-0.5 text-3xl font-bold">{{ preg_replace('/^pista\s+/i', '', $proximo['pista']) }}</div>
+                    </div>
+                @endif
             </div>
             @if ($proximo['anterior'] !== null)
                 <p class="mt-2 text-sm text-tema-suave">{{ $proximo['anterior'] }}</p>
