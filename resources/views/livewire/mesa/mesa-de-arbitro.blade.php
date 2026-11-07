@@ -26,6 +26,12 @@
             </select>
         </div>
 
+        @foreach ($atascos as $atasco)
+            <p class="mt-4 rounded-[3px] border-2 border-red-600 bg-red-50 p-3 text-sm text-red-900" role="alert">
+                <strong>⚠ {{ $atasco['pista'] }} está parada.</strong>
+                «{{ $atasco['texto'] }}» debía empezar a las {{ $atasco['hora'] }} (hace {{ $atasco['minutos'] }} min): cierra el partido anterior o pulsa «Empezar».
+            </p>
+        @endforeach
         @if ($aviso) <p class="mt-4 rounded-[3px] bg-green-50 p-3 text-sm text-green-900">{{ $aviso }}</p> @endif
         @error('mesa') <p class="mt-4 rounded-[3px] bg-red-50 p-3 text-sm text-red-800">{{ $message }}</p> @enderror
         @error('portal') <p class="mt-4 rounded-[3px] bg-red-50 p-3 text-sm text-red-800">{{ $message }}</p> @enderror

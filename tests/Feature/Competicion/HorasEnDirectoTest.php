@@ -1,5 +1,6 @@
 <?php
 
+use App\Actions\Competicion\EmpezarPartido;
 use App\Actions\Competicion\HorasEnDirecto;
 use App\Actions\Competicion\PlanificarHorarios;
 use App\Actions\Competicion\RegistrarResultado;
@@ -19,6 +20,7 @@ use App\Models\Torneo;
 use App\Models\User;
 use App\Notifications\ACalentar;
 use App\Notifications\CambioDePista;
+use App\Notifications\NuevaHoraEstimada;
 use App\Notifications\SoisLosSiguientes;
 use Carbon\CarbonImmutable;
 use Database\Seeders\PlanesSeeder;
@@ -203,4 +205,83 @@ test('el planificador usa lo que duran de verdad los partidos de su formato', fu
     // 90 de juego más los 10 de calentamiento.
     expect($colocado)->not->toBeNull()
         ->and(intdiv($colocado->fin->getTimestamp() - $colocado->inicio->getTimestamp(), 60))->toBe(100);
+});
+
+test('al empezar un partido, el anterior de su pista acaba a esa hora y lo de detrás se reajusta y se avisa', function () {
+    $pista = $this->pistas[0];
+    $a = partidoEn($this->fase, $pista, $this->dia->setTime(9, 0));
+    $b = partidoEn($this->fase, $pista, $this->dia->setTime(10, 10));
+    $c = partidoEn($this->fase, $pista, $this->dia->setTime(11, 20));
+    $d = partidoEn($this->fase, $pista, $this->dia->setTime(12, 30));
+    Notification::fake();
+
+    // A empieza a las 9:02: se juega 60 minutos y B entra detrás, a las 10:02.
+    $this->travelTo($this->dia->setTime(9, 2));
+    app(EmpezarPartido::class)->handle($a->refresh(), $this->propietario);
+    expect($b->refresh()->franja->inicio->format('H:i'))->toBe('10:02')
+        ->and($c->refresh()->franja->inicio->format('H:i'))->toBe('11:12');
+
+    // B empieza a las 9:40 (A ha acabado antes, sin apuntar el resultado): A deja la pista a esa hora y lo de detrás sube.
+    $this->travelTo($this->dia->setTime(9, 40));
+    app(EmpezarPartido::class)->handle($b->refresh(), $this->propietario);
+    expect($a->refresh()->terminado_en?->format('H:i'))->toBe('09:40')
+        ->and($c->refresh()->franja->inicio->format('H:i'))->toBe('10:40')
+        ->and($d->refresh()->franja->inicio->format('H:i'))->toBe('11:50');
+    Notification::assertSentTo($c->local->jugadores->first(), NuevaHoraEstimada::class);
+    Notification::assertSentTo($d->visitante->jugadores->first(), NuevaHoraEstimada::class);
+
+    // B anota su resultado a las 10:20: se cierra en ese momento y C entra ya.
+    $this->travelTo($this->dia->setTime(10, 20));
+    terminarPartido($b, $this->propietario);
+    expect($c->refresh()->franja->inicio->format('H:i'))->toBe('10:20')
+        ->and($d->refresh()->franja->inicio->format('H:i'))->toBe('11:30');
+    Notification::assertSentTo($c->local->jugadores->first(), ACalentar::class);
+
+    // El resultado de A llega tarde: no mueve nada, A ya había dejado la pista.
+    $this->travelTo($this->dia->setTime(10, 22));
+    terminarPartido($a, $this->propietario);
+    expect($c->refresh()->franja->inicio->format('H:i'))->toBe('10:20');
+});
+
+test('con pequeños cambios de hora no se avisa; con 5 minutos o más, sí, y una sola vez por cambio', function () {
+    $pista = $this->pistas[0];
+    $a = partidoEn($this->fase, $pista, $this->dia->setTime(9, 0));
+    $b = partidoEn($this->fase, $pista, $this->dia->setTime(10, 10));
+    $c = partidoEn($this->fase, $pista, $this->dia->setTime(11, 20));
+    Notification::fake();
+
+    // A empieza 3 minutos tarde: B y C se mueven 3 minutos, sin aviso.
+    $this->travelTo($this->dia->setTime(9, 13));
+    app(EmpezarPartido::class)->handle($a->refresh(), $this->propietario);
+    expect($c->refresh()->franja->inicio->format('H:i'))->toBe('11:23');
+    Notification::assertNotSentTo($c->local->jugadores, NuevaHoraEstimada::class);
+});
+
+test('una pista cuyo partido debía haber empezado y no ha empezado sale en rojo y avisa', function () {
+    $pista = $this->pistas[0];
+    $a = partidoEn($this->fase, $pista, $this->dia->setTime(9, 0));
+    $b = partidoEn($this->fase, $pista, $this->dia->setTime(10, 10));
+
+    // A empieza a las 9:00 (B pasa a las 10:00); a las 10:20 nadie ha cerrado A ni empezado B.
+    $this->travelTo($this->dia->setTime(9, 0));
+    app(EmpezarPartido::class)->handle($a->refresh(), $this->propietario);
+    $this->travelTo($this->dia->setTime(10, 20));
+    expect(HorasEnDirecto::atascos($this->torneo->refresh()))->toBe([[
+        'partido' => $b->id,
+        'pista' => $pista->nombre,
+        'texto' => $b->local->nombre.' – '.$b->visitante->nombre,
+        'hora' => '10:00',
+        'minutos' => 20,
+    ]]);
+
+    $this->actingAs($this->propietario);
+    $pagina = Livewire::test(HorariosDelTorneo::class, ['record' => $this->torneo->getRouteKey()])
+        ->assertSee('Una pista está parada');
+    $bloques = collect($pagina->viewData('dias')[0]['pistas'])->flatMap(fn (array $p): array => $p['bloques']);
+    expect($bloques->firstWhere('partido', $b->id)['tarde'])->toBeTrue()
+        ->and($bloques->firstWhere('partido', $a->id)['tarde'])->toBeFalse();
+
+    // En cuanto B empieza, deja de estar parada.
+    app(EmpezarPartido::class)->handle($b->refresh(), $this->propietario);
+    expect(HorasEnDirecto::atascos($this->torneo->refresh()))->toBe([]);
 });

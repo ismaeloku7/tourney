@@ -32,6 +32,9 @@ final class EmpezarPartido
         $partido->fill(['estado' => EstadoPartido::EnJuego, 'empezado_en' => now(), 'marcador_en_vivo' => ['sets' => [], 'juegos' => [0, 0]]])->save();
         RegistroDeCambio::anotar('empezar_partido', $partido, $quien, null, ['empezado_en' => $partido->empezado_en?->toIso8601String()]);
 
+        // Uno detrás de otro: el anterior de la pista acaba ahora y lo de detrás se reajusta.
+        app(HorasEnDirecto::class)->trasEmpezar($partido);
+
         return $partido->refresh();
     }
 

@@ -235,6 +235,8 @@ class HorariosDelTorneo extends Page
             'esPropuesta' => $propuesta !== null,
             // Con el torneo en juego, la parrilla se refresca sola: avanza la línea de ahora y se mueve lo que empieza y acaba.
             'refrescar' => $propuesta === null && $this->torneo()->estado === EstadoTorneo::EnJuego,
+            // Las pistas atascadas: su partido debía haber empezado y no ha empezado.
+            'atascos' => $propuesta === null ? HorasEnDirecto::atascos($this->torneo()) : [],
             'huerfanos' => $this->huerfanos(),
             'sinHora' => $propuesta === null ? Partido::query()->whereHas('fase.categoria', fn (Builder $q) => $q->where('torneo_id', $this->torneo()->id))->whereNotNull('local_id')->whereNotNull('visitante_id')->whereNull('franja_id')->whereIn('estado', [EstadoPartido::Pendiente->value, EstadoPartido::Programado->value])->count() : 0,
             'resumen' => $propuesta !== null ? self::resumen($propuesta) : null,
@@ -249,7 +251,7 @@ class HorariosDelTorneo extends Page
      * Cada día con sus pistas y lo que ocupa cada una: lo guardado y, si
      * hay una propuesta, lo propuesto en lugar de lo que se recoloca.
      *
-     * @return list<array{titulo: string, desde: int, minutos: int, base: int, horas: list<array{etiqueta: string, izquierda: float}>, pistas: list<array{id: int, nombre: string, abre: list<array{izquierda: float, ancho: float}>, bloques: list<array{partido: int|null, movible: bool, tercero: bool, real: bool, enJuego: bool, izquierda: float, ancho: float, calentamiento: float, hora: string, texto: string, detalle: string, color: string, nuevo: bool}>}>, ahora: array{izquierda: float, hora: string}|null}>
+     * @return list<array{titulo: string, desde: int, minutos: int, base: int, horas: list<array{etiqueta: string, izquierda: float}>, pistas: list<array{id: int, nombre: string, abre: list<array{izquierda: float, ancho: float}>, bloques: list<array{partido: int|null, movible: bool, tercero: bool, real: bool, enJuego: bool, tarde: bool, izquierda: float, ancho: float, calentamiento: float, hora: string, texto: string, detalle: string, color: string, nuevo: bool}>}>, ahora: array{izquierda: float, hora: string}|null}>
      */
     private function dias(?PropuestaDeHorarios $propuesta): array
     {
@@ -359,10 +361,14 @@ class HorariosDelTorneo extends Page
                     $texto = $partido !== null ? Marcador::lado($partido, true).' – '.Marcador::lado($partido, false) : 'Bloqueada';
                     $categoria = $partido?->fase->categoria;
                     $real = $partido !== null && isset($reales[$partido->id]);
-                    $enJuego = $partido !== null && $partido->estado === EstadoPartido::EnJuego;
+                    $enJuego = $partido !== null && $partido->estado === EstadoPartido::EnJuego && $partido->terminado_en === null;
+                    // Debía haber empezado y no ha empezado (el anterior no se ha cerrado o nadie ha pulsado «Empezar»).
+                    $tarde = $partido !== null && ! $real && $torneo->estado === EstadoTorneo::EnJuego
+                        && in_array($partido->estado, [EstadoPartido::Pendiente, EstadoPartido::Programado], true)
+                        && $o['inicio']->lte($ahora->subMinutes(HorasEnDirecto::TOLERANCIA_MINUTOS));
                     $cuando = $real
-                        ? ($enJuego ? 'Se está jugando desde las '.$o['inicio']->format('H:i') : 'Se jugó de '.$o['inicio']->format('H:i').' a '.$o['fin']->format('H:i'))
-                        : $o['inicio']->format('H:i').'–'.$o['fin']->format('H:i');
+                        ? ($enJuego ? 'Se está jugando desde las '.$o['inicio']->format('H:i') : 'Se jugó de '.$o['inicio']->format('H:i').' a '.$o['fin']->format('H:i').(($partido?->cerrado() ?? true) ? '' : ' (falta el resultado)'))
+                        : $o['inicio']->format('H:i').'–'.$o['fin']->format('H:i').($tarde ? ' · ¡Debía haber empezado!' : '');
 
                     $bloques[] = [
                         'partido' => $partido?->id,
@@ -381,6 +387,7 @@ class HorariosDelTorneo extends Page
                         'tercero' => $partido !== null && isset($terceros[$partido->id]),
                         'real' => $real,
                         'enJuego' => $enJuego,
+                        'tarde' => $tarde,
                     ];
                 }
 
@@ -416,6 +423,11 @@ class HorariosDelTorneo extends Page
 
         $empieza = self::aCincoMinutos(CarbonImmutable::instance($partido->empezado_en));
         $estimado = $empieza->addMinutes(max(5, (int) $inicio->diffInMinutes($fin) - $calentamiento));
+
+        // Dejó la pista al empezar el siguiente, aunque aún no tenga resultado.
+        if ($partido->terminado_en !== null) {
+            return [$empieza, self::aCincoMinutos(CarbonImmutable::instance($partido->terminado_en))->max($empieza->addMinutes(5))];
+        }
 
         if ($partido->estado === EstadoPartido::EnJuego) {
             return [$empieza, $estimado->max(self::aCincoMinutos($ahora))];
