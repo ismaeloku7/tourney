@@ -1,7 +1,9 @@
 <?php
 
+use App\Enums\EstadoTorneo;
 use App\Enums\Rol;
 use App\Models\Organizador;
+use App\Models\Torneo;
 use App\Models\User;
 use Database\Seeders\PlanesSeeder;
 
@@ -70,4 +72,21 @@ test('el menú del administrador no tiene instalaciones ni equipo', function () 
         ->assertDontSee('http://padel-norte.test/panel/equipo', false);
 
     $this->actingAs($administrador)->get('http://padel-norte.test/panel/equipo')->assertForbidden();
+});
+
+test('lo primero del menú es el próximo torneo, con su ficha, competición, partidos y horarios', function () {
+    [$propietario, $torneo] = comoOrganizador($this->organizador, fn () => [
+        User::factory()->rol(Rol::Propietario)->create(),
+        Torneo::factory()->create(['nombre' => 'Rally de pádel', 'estado' => EstadoTorneo::InscripcionAbierta, 'fecha_inicio' => today()->addDays(3)->toDateString(), 'fecha_fin' => today()->addDays(4)->toDateString()]),
+    ]);
+
+    $this->actingAs($propietario)->get('http://padel-norte.test/panel')->assertOk()
+        ->assertSeeInOrder([
+            'Rally de pádel',
+            'http://padel-norte.test/panel/torneos/'.$torneo->id.'"',
+            'http://padel-norte.test/panel/torneos/'.$torneo->id.'/competicion',
+            'http://padel-norte.test/panel/torneos/'.$torneo->id.'/partidos',
+            'http://padel-norte.test/panel/torneos/'.$torneo->id.'/horarios',
+            'http://padel-norte.test/panel/torneos"',
+        ], false);
 });

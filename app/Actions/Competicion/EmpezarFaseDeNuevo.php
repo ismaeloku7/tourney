@@ -4,6 +4,7 @@ namespace App\Actions\Competicion;
 
 use App\Competicion\Errores\OperacionNoPermitida;
 use App\Enums\EstadoFase;
+use App\Enums\ModoDeSorteo;
 use App\Enums\TipoDeFase;
 use App\Models\Fase;
 use App\Models\Partido;
@@ -44,7 +45,13 @@ final class EmpezarFaseDeNuevo
             $fase->grupos()->delete();
 
             $configuracion = $fase->configuracion;
-            unset($configuracion['grupos_manuales'], $configuracion['repartidos']);
+            unset($configuracion['repartidos']);
+            // «Todo a mano» sin lista de grupos no es una configuración válida: se queda vacía.
+            if (($configuracion['modo_de_sorteo'] ?? null) === ModoDeSorteo::Manual->value) {
+                $configuracion['grupos_manuales'] = [];
+            } else {
+                unset($configuracion['grupos_manuales']);
+            }
             $fase->update(['estado' => EstadoFase::Pendiente, 'configuracion' => $configuracion]);
 
             if ($cuadro !== null) {
