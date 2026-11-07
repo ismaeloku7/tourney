@@ -366,3 +366,11 @@ test('desde su torneo el jugador mira los grupos de otras categorías, y si su c
     $fase->update(['visible_en_web' => false]);
     miTorneo($this->inscripcion)->assertSee('La organización todavía no ha publicado los grupos ni el cuadro de tu categoría');
 });
+
+test('con sesión de jugador, la portada y el logotipo llevan a su portal', function () {
+    $this->get('http://norte.saas.test/')->assertRedirect(route('jugador.portal'));
+    $this->get('http://norte.saas.test/jugador/partidos')->assertOk()->assertSee('href="'.route('jugador.portal').'"', false);
+
+    auth('jugador')->logout();
+    $this->get('http://norte.saas.test/')->assertOk();
+});
