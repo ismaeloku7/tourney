@@ -55,6 +55,11 @@
         .hor-ahora-hora { position: absolute; top: 0; transform: translateX(-50%); background: #e03131; color: #fff; font-size: .6875rem; font-weight: 700; border-radius: .25rem; padding: 0 .3rem; white-space: nowrap; z-index: 4; }
         .hor-bloque.real { box-shadow: inset 0 0 0 1px rgb(255 255 255 / .55); }
         .hor-bloque.enjuego { box-shadow: 0 0 0 2px #e03131; }
+        .hor-bloque.tarde { background: #e03131 !important; color: #e03131 !important; box-shadow: 0 0 0 2px #fff, 0 0 0 4px #e03131; animation: hor-parpadeo 1.6s ease-in-out infinite; }
+        @keyframes hor-parpadeo { 0%, 100% { opacity: 1; } 50% { opacity: .7; } }
+        .hor-atasco { border: 2px solid #e03131; background: #fff1f1; color: #8a1c1c; border-radius: .75rem; padding: .75rem 1rem; font-size: .875rem; }
+        .hor-atasco strong { display: block; margin-bottom: .25rem; }
+        .hor-atasco ul { margin: .25rem 0 0 1rem; list-style: disc; }
         .hor-pelota { display: inline-block; margin-right: .2rem; font-size: .95rem; line-height: 1; filter: drop-shadow(0 0 1px #fff) drop-shadow(0 0 1px #fff); animation: hor-bote 1.2s ease-in-out infinite; }
         @keyframes hor-bote { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2px); } }
     </style>
@@ -67,6 +72,17 @@
             {{ $this->aplicarAction }}
             {{ $this->descartarAction }}
         </div>
+
+        @if ($atascos !== [])
+            <div class="hor-atasco" role="alert">
+                <strong>⚠ {{ count($atascos) === 1 ? 'Una pista está parada' : count($atascos).' pistas están paradas' }}: mira qué pasa.</strong>
+                <ul>
+                    @foreach ($atascos as $atasco)
+                        <li><b>{{ $atasco['pista'] }}</b>: «{{ $atasco['texto'] }}» debía empezar a las {{ $atasco['hora'] }} (hace {{ $atasco['minutos'] }} min) y no ha empezado; el anterior sigue sin cerrar o nadie ha pulsado «Empezar».</li>
+                    @endforeach
+                </ul>
+            </div>
+        @endif
 
         @if ($directo !== null)
             <div class="hor-dia">
@@ -164,6 +180,7 @@
             @endif
             <span><i style="background: #6d7a84; box-shadow: inset 0 0 0 1px rgb(255 255 255 / .55)"></i>Empezado: a su hora real, de 5 en 5 minutos</span>
             <span>🎾 Se está jugando ahora</span>
+            <span><i style="background: #e03131"></i>Debía haber empezado y no ha empezado</span>
             <span><i style="width: 2px; background: #e03131"></i>Ahora</span>
             <span><i style="background: #c4c9ce"></i>Pista bloqueada</span>
             <span><i style="background: repeating-linear-gradient(135deg, #f3f4f6 0 3px, #d9dde2 3px 6px)"></i>Fuera del horario de la pista (se puede colocar a mano)</span>
@@ -230,7 +247,7 @@
                                 @endif
                                 @foreach ($pista['bloques'] as $bloque)
                                     <div
-                                        @class(['hor-bloque', 'nuevo' => $esPropuesta && $bloque['nuevo'], 'viejo' => $esPropuesta && ! $bloque['nuevo'], 'movible' => $bloque['movible'], 'real' => $bloque['real'], 'enjuego' => $bloque['enJuego']])
+                                        @class(['hor-bloque', 'nuevo' => $esPropuesta && $bloque['nuevo'], 'viejo' => $esPropuesta && ! $bloque['nuevo'], 'movible' => $bloque['movible'], 'real' => $bloque['real'], 'enjuego' => $bloque['enJuego'], 'tarde' => $bloque['tarde']])
                                         style="left: {{ $bloque['izquierda'] }}%; width: {{ $bloque['ancho'] }}%; background: {{ $bloque['color'] }}; color: {{ $bloque['color'] }}"
                                         title="{{ $bloque['detalle'] }}"
                                         @if ($bloque['movible'])

@@ -16,6 +16,9 @@ use App\Competicion\Datos\SugerenciaDeRecolocacion;
  * viene de jugar no calienta: su siguiente partido puede ir calentando
  * mientras acaba.
  *
+ * Lo que se ha marcado como empezado es lo que está en su pista, desde la
+ * hora a la que empezó: lo de detrás va a continuación.
+ *
  * Si una pista se retrasa, propone pasar uno de sus partidos (nunca el
  * siguiente, y solo con tiempo para avisar) a otra pista que vaya bien.
  */
@@ -61,7 +64,8 @@ final readonly class PistasEnDirecto
         }
 
         $pendientes = array_values(array_filter($partidos, fn (PartidoEnDirecto $p): bool => ! $p->cerrado));
-        usort($pendientes, fn (PartidoEnDirecto $a, PartidoEnDirecto $b): int => [$a->orden ?? (float) $a->inicio, $a->pista, $a->id] <=> [$b->orden ?? (float) $b->inicio, $b->pista, $b->id]);
+        // Lo que ya se está jugando va primero en su pista: los demás, detrás.
+        usort($pendientes, fn (PartidoEnDirecto $a, PartidoEnDirecto $b): int => [$a->empezado ? 0 : 1, $a->orden ?? (float) $a->inicio, $a->pista, $a->id] <=> [$b->empezado ? 0 : 1, $b->orden ?? (float) $b->inicio, $b->pista, $b->id]);
 
         $salida = [];
 
@@ -78,7 +82,7 @@ final readonly class PistasEnDirecto
                 $pudoEmpezar = $pudoEmpezar && ($fin[$previo] ?? PHP_INT_MIN) <= $p->inicio;
             }
 
-            if (! isset($enJuego[$pista]) && $pudoEmpezar) {
+            if (! isset($enJuego[$pista]) && ($p->empezado || $pudoEmpezar)) {
                 // El que está en la pista: ya empezó; acaba cuando le toque, o en cualquier momento si se alarga.
                 $inicio = $p->inicio;
                 $acaba = max($inicio + $duracion, $ahora);

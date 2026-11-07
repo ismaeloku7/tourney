@@ -3,6 +3,7 @@
 namespace App\Livewire\Mesa;
 
 use App\Actions\Competicion\AnotarMarcador;
+use App\Actions\Competicion\HorasEnDirecto;
 use App\Actions\Competicion\RegistrarResultado;
 use App\Actions\Competicion\ValidarResultado;
 use App\Avisos\EnlaceDeWhatsApp;
@@ -135,6 +136,8 @@ class MesaDeArbitro extends Component
             'dias' => $dias,
             'pistas' => $pistas,
             'partidos' => $partidos,
+            // Las pistas suyas que están paradas: su partido debía haber empezado y no ha empezado.
+            'atascos' => $torneo instanceof Torneo ? HorasEnDirecto::atascos($torneo, array_values($pistas->pluck('id')->map(fn (mixed $id): int => (int) $id)->all())) : [],
         ]);
     }
 

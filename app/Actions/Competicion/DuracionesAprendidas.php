@@ -64,7 +64,11 @@ final class DuracionesAprendidas
         }
 
         $calentamiento = $partido->fase->categoria->torneo->margen_entre_partidos_minutos;
-        $minutos = intdiv($partido->registrado_en->getTimestamp() - $franja->inicio->getTimestamp(), 60) - $calentamiento;
+        // Lo que de verdad ocupó la pista: de «Empezar» a que la dejó (empezó el siguiente o se anotó el resultado).
+        $acaba = ($partido->terminado_en ?? $partido->registrado_en)->getTimestamp();
+        $minutos = $partido->empezado_en !== null
+            ? intdiv($acaba - $partido->empezado_en->getTimestamp(), 60)
+            : intdiv($acaba - $franja->inicio->getTimestamp(), 60) - $calentamiento;
 
         if ($minutos < self::MINIMO_CREIBLE || $minutos > self::MAXIMO_CREIBLE) {
             return;

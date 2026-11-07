@@ -51,12 +51,14 @@ use Illuminate\Support\Carbon;
  * @property Carbon|null $aviso_siguientes_en
  * @property Carbon|null $aviso_calentar_en
  * @property Carbon|null $empezado_en
+ * @property Carbon|null $terminado_en
+ * @property Carbon|null $inicio_avisado
  * @property array{sets: list<array{0: int, 1: int}>, juegos: array{0: int, 1: int}}|null $marcador_en_vivo
  * @property int|null $minutos_jugados
  * @property int|null $formato_medido_id
  * @property bool|null $parejas_igualadas
  */
-#[Fillable(['fase_id', 'grupo_id', 'jornada', 'ronda', 'posicion', 'es_tercer_puesto', 'local_id', 'visitante_id', 'origen_local', 'origen_visitante', 'formato_partido_id', 'pista_id', 'franja_id', 'estado', 'especial', 'ganador_id', 'registrado_por_jugador_id', 'registrado_en', 'validacion_vence_en', 'validado_en', 'validado_por', 'notas', 'aviso_proximo_en', 'aviso_siguientes_en', 'aviso_calentar_en', 'empezado_en', 'marcador_en_vivo', 'minutos_jugados', 'formato_medido_id', 'parejas_igualadas'])]
+#[Fillable(['fase_id', 'grupo_id', 'jornada', 'ronda', 'posicion', 'es_tercer_puesto', 'local_id', 'visitante_id', 'origen_local', 'origen_visitante', 'formato_partido_id', 'pista_id', 'franja_id', 'estado', 'especial', 'ganador_id', 'registrado_por_jugador_id', 'registrado_en', 'validacion_vence_en', 'validado_en', 'validado_por', 'notas', 'aviso_proximo_en', 'aviso_siguientes_en', 'aviso_calentar_en', 'empezado_en', 'terminado_en', 'inicio_avisado', 'marcador_en_vivo', 'minutos_jugados', 'formato_medido_id', 'parejas_igualadas'])]
 class Partido extends Model
 {
     /** @use HasFactory<PartidoFactory> */
@@ -80,6 +82,8 @@ class Partido extends Model
             'aviso_siguientes_en' => 'datetime',
             'aviso_calentar_en' => 'datetime',
             'empezado_en' => 'datetime',
+            'terminado_en' => 'datetime',
+            'inicio_avisado' => 'datetime',
             'marcador_en_vivo' => 'array',
             'minutos_jugados' => 'integer',
             'formato_medido_id' => 'integer',

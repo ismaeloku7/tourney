@@ -44,6 +44,12 @@ final class HorasEnDirecto
     /** A partir de cuántos minutos de cambio en su hora estimada se avisa a una pareja al recolocar. */
     public const CAMBIO_QUE_SE_AVISA = 15;
 
+    /** A partir de cuántos minutos de cambio, contra lo último que se les dijo, se avisa al encadenar. */
+    public const AVISO_CAMBIO_MINUTOS = 5;
+
+    /** Minutos de margen antes de dar por atascada una pista cuyo partido no ha empezado a su hora. */
+    public const TOLERANCIA_MINUTOS = 5;
+
     public function __construct(private readonly PistasEnDirecto $motor = new PistasEnDirecto) {}
 
     public static function activo(Torneo $torneo): bool
@@ -68,6 +74,33 @@ final class HorasEnDirecto
         return $this->guardar($this->motor->recalcular($datos, now()->getTimestamp(), $torneo->descanso_minimo_minutos, $torneo->margen_entre_partidos_minutos), $modelos);
     }
 
+    /**
+     * Al empezar un partido: el que seguía en juego en su pista (sin
+     * resultado todavía) ha dejado la pista a esta hora justa. Lo de detrás
+     * se recalcula y se avisa a quien cambia de hora.
+     */
+    public function trasEmpezar(Partido $partido): void
+    {
+        $torneo = $partido->fase->categoria->torneo;
+
+        if (! self::activo($torneo)) {
+            return;
+        }
+
+        if ($partido->pista_id !== null) {
+            Partido::query()
+                ->where('pista_id', $partido->pista_id)
+                ->whereKeyNot($partido->id)
+                ->where('estado', EstadoPartido::EnJuego->value)
+                ->whereNull('terminado_en')
+                ->whereHas('fase.categoria', fn (Builder $q) => $q->where('torneo_id', $torneo->id))
+                ->update(['terminado_en' => now()]);
+        }
+
+        $this->recalcular($torneo);
+        $this->avisarCambiosDeHora($torneo);
+    }
+
     /** Tras un resultado: recalcula y avisa a la cola de esa pista. */
     public function trasResultado(Partido $partido): void
     {
@@ -89,6 +122,8 @@ final class HorasEnDirecto
         $cola = Partido::query()
             ->where('pista_id', $partido->pista_id)
             ->whereIn('estado', [EstadoPartido::Pendiente->value, EstadoPartido::Programado->value, EstadoPartido::EnJuego->value])
+            // Lo que ya dejó la pista (empezó el siguiente) no está en la cola.
+            ->whereNull('terminado_en')
             ->whereNotNull('franja_id')
             ->whereHas('fase.categoria', fn (Builder $q) => $q->where('torneo_id', $torneo->id))
             ->with(['franja', 'pista', 'fase', 'local.jugadores', 'visitante.jugadores'])
@@ -105,6 +140,77 @@ final class HorasEnDirecto
             $siguiente->forceFill([$campo => now()])->save();
             $this->avisar($siguiente, $posicion === 0 ? new ACalentar($siguiente) : new SoisLosSiguientes($siguiente));
         }
+
+        // A los de detrás cuya hora cambia, también (los dos primeros ya saben que les toca).
+        $this->avisarCambiosDeHora($torneo, array_values($cola->take(2)->pluck('id')->map(fn (mixed $id): int => (int) $id)->all()));
+    }
+
+    /**
+     * Avisa (push) a las parejas de lo que falta cuya hora estimada se ha
+     * movido bastante desde la última que se les dijo (o la planificada).
+     *
+     * @param  list<int>  $yaAvisados  Partidos que ya tienen su aviso: solo se anota su hora.
+     */
+    private function avisarCambiosDeHora(Torneo $torneo, array $yaAvisados = []): void
+    {
+        $partidos = Partido::query()
+            ->whereHas('fase.categoria', fn (Builder $q) => $q->where('torneo_id', $torneo->id))
+            ->whereIn('estado', [EstadoPartido::Pendiente->value, EstadoPartido::Programado->value])
+            ->whereNotNull('franja_id')
+            ->with(['franja', 'pista', 'fase', 'local.jugadores', 'visitante.jugadores'])
+            ->get();
+
+        foreach ($partidos as $partido) {
+            $franja = $partido->franja;
+            $dicho = $partido->inicio_avisado ?? $franja?->inicio_previsto;
+            if ($franja === null || $dicho === null || $franja->inicio->isPast()
+                || abs($franja->inicio->getTimestamp() - $dicho->getTimestamp()) < self::AVISO_CAMBIO_MINUTOS * 60) {
+                continue;
+            }
+
+            $partido->forceFill(['inicio_avisado' => $franja->inicio])->save();
+            if (! in_array($partido->id, $yaAvisados, true)) {
+                $this->avisar($partido, new NuevaHoraEstimada($partido));
+            }
+        }
+    }
+
+    /**
+     * Las pistas atascadas: su partido debía haber empezado hace más de
+     * TOLERANCIA_MINUTOS y no ha empezado (el anterior sigue sin cerrarse o
+     * nadie ha pulsado «Empezar»). Uno por pista, el primero.
+     *
+     * @param  list<int>|null  $pistas  Solo estas pistas; nulo, todas.
+     * @return list<array{partido: int, pista: string, texto: string, hora: string, minutos: int}>
+     */
+    public static function atascos(Torneo $torneo, ?array $pistas = null): array
+    {
+        if ($torneo->estado !== EstadoTorneo::EnJuego) {
+            return [];
+        }
+
+        $limite = now()->subMinutes(self::TOLERANCIA_MINUTOS);
+        $partidos = Partido::query()
+            ->whereHas('fase.categoria', fn (Builder $q) => $q->where('torneo_id', $torneo->id))
+            ->whereIn('partidos.estado', [EstadoPartido::Pendiente->value, EstadoPartido::Programado->value])
+            ->whereNotNull('partidos.pista_id')
+            ->when($pistas !== null, fn (Builder $q) => $q->whereIn('partidos.pista_id', $pistas ?? []))
+            ->join('franjas', 'franjas.id', '=', 'partidos.franja_id')
+            ->where('franjas.inicio', '<=', $limite)
+            ->whereDate('franjas.inicio', now()->toDateString())
+            ->orderBy('franjas.inicio')
+            ->select('partidos.*')
+            ->with(['franja', 'pista', 'local', 'visitante'])
+            ->get()
+            ->unique('pista_id');
+
+        return array_values($partidos->map(fn (Partido $p): array => [
+            'partido' => $p->id,
+            'pista' => $p->pista->nombre ?? '',
+            'texto' => Marcador::lado($p, true).' – '.Marcador::lado($p, false),
+            'hora' => $p->franja?->inicio->format('H:i') ?? '',
+            'minutos' => $p->franja !== null ? (int) $p->franja->inicio->diffInMinutes(now()) : 0,
+        ])->all());
     }
 
     /** La recolocación que propone ahora, si alguna pista va atrasada. */
@@ -232,7 +338,13 @@ final class HorasEnDirecto
                 continue;
             }
 
-            $cerrado = $partido->cerrado() || $partido->estado === EstadoPartido::PendienteValidacion;
+            $conResultado = $partido->cerrado() || $partido->estado === EstadoPartido::PendienteValidacion;
+            // Dejó la pista sin resultado todavía: empezó el siguiente de su pista.
+            $terminado = $partido->terminado_en !== null;
+            $cerrado = $conResultado || $terminado;
+            // Se está jugando: desde que empezó, con lo que le queda de juego (sin calentamiento).
+            $empezado = ! $cerrado && $partido->estado === EstadoPartido::EnJuego && $partido->empezado_en !== null;
+            $minutos = max(1, intdiv($franja->fin->getTimestamp() - $franja->inicio->getTimestamp(), 60));
             $dependeDe = [];
             foreach ([$partido->origenLocalDto(), $partido->origenVisitanteDto()] as $origen) {
                 if ($origen !== null && $origen->apuntaA($origen->referencia) && $modelos->has($origen->referencia)) {
@@ -243,13 +355,15 @@ final class HorasEnDirecto
             $datos[] = new PartidoEnDirecto(
                 $partido->id,
                 $franja->pista_id,
-                $franja->inicio->getTimestamp(),
-                max(1, intdiv($franja->fin->getTimestamp() - $franja->inicio->getTimestamp(), 60)),
+                $empezado ? $partido->empezado_en->getTimestamp() : $franja->inicio->getTimestamp(),
+                $empezado ? max(1, $minutos - $torneo->margen_entre_partidos_minutos) : $minutos,
                 array_values(array_unique([...($partido->local?->idsDeJugadores() ?? []), ...($partido->visitante?->idsDeJugadores() ?? [])])),
                 $dependeDe,
                 $cerrado,
-                $cerrado ? $partido->registrado_en?->getTimestamp() : null,
+                // Acabó cuando dejó la pista: al empezar el siguiente o, si no, al anotar el resultado.
+                $cerrado ? ($partido->terminado_en ?? $partido->registrado_en)?->getTimestamp() : null,
                 $franja->inicio_previsto?->getTimestamp(),
+                empezado: $empezado,
             );
         }
 
@@ -270,8 +384,10 @@ final class HorasEnDirecto
         $cambios = [];
 
         foreach ($horas as $id => [$inicio]) {
-            $franja = $modelos->get($id)?->franja;
-            if ($franja === null) {
+            $partido = $modelos->get($id);
+            $franja = $partido?->franja;
+            // Lo que se está jugando se queda en su franja: su hora real es la de «Empezar».
+            if ($partido === null || $franja === null || ($partido->estado === EstadoPartido::EnJuego && $partido->empezado_en !== null)) {
                 continue;
             }
 

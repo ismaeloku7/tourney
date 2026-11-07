@@ -50,5 +50,6 @@ test('guardar sin tocar el correo ni el teléfono no los borra', function () {
 test('un árbitro no edita jugadores', function () {
     $this->actingAs(User::factory()->rol(Rol::Arbitro)->create());
 
-    Livewire::test(EditJugador::class, ['record' => $this->ana->getRouteKey()])->assertForbidden();
+    // Un árbitro solo ve los jugadores de los torneos que arbitra: los demás, ni existen para él.
+    Livewire::test(EditJugador::class, ['record' => $this->ana->getRouteKey()])->assertNotFound();
 });

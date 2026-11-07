@@ -15,6 +15,7 @@ final readonly class PartidoEnDirecto
      * @param  list<int>  $dependeDe  Partidos de los que salen sus parejas (aún por saber).
      * @param  float|null  $orden  Dónde va en la cola de su pista; sin él, por su hora.
      * @param  int|null  $noAntesDe  No empieza antes (para avisar con tiempo al moverlo).
+     * @param  bool  $empezado  Ya se está jugando: `inicio` es cuando empezó y `minutos`, lo que le queda de juego.
      */
     public function __construct(
         public int $id,
@@ -28,6 +29,7 @@ final readonly class PartidoEnDirecto
         public ?int $previsto = null,
         public ?float $orden = null,
         public ?int $noAntesDe = null,
+        public bool $empezado = false,
     ) {}
 
     public function fin(): int
@@ -37,6 +39,6 @@ final readonly class PartidoEnDirecto
 
     public function con(int $pista, int $inicio, ?float $orden = null, ?int $noAntesDe = null): self
     {
-        return new self($this->id, $pista, $inicio, $this->minutos, $this->jugadores, $this->dependeDe, $this->cerrado, $this->finReal, $this->previsto, $orden, $noAntesDe);
+        return new self($this->id, $pista, $inicio, $this->minutos, $this->jugadores, $this->dependeDe, $this->cerrado, $this->finReal, $this->previsto, $orden, $noAntesDe, $this->empezado);
     }
 }
