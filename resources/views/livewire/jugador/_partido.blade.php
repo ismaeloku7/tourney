@@ -2,9 +2,15 @@
 <li class="tarjeta p-4" wire:key="partido-{{ $p['id'] }}">
     <div class="flex flex-wrap items-center justify-between gap-2">
         <span class="text-xs font-semibold uppercase tracking-[0.12em] text-tema-suave">{{ ($enSuTorneo ?? false) ? 'Contra' : $p['torneo'].' · '.$p['categoria'] }}</span>
-        @if ($p['hora'] !== null || $p['porJugar'])
-            <span class="rounded-full bg-tema-fondo px-2.5 py-0.5 text-xs font-medium text-tema-azul">{{ $p['hora'] ?? 'Sin hora todavía' }}</span>
-        @endif
+        <div class="flex flex-wrap items-center gap-1.5">
+            @if ($p['hora'] !== null || $p['porJugar'])
+                <span class="rounded-full bg-tema-fondo px-2.5 py-0.5 text-xs font-medium text-tema-azul">{{ $p['hora'] ?? 'Sin hora todavía' }}</span>
+            @endif
+            {{-- La pista, una vez y bien a la vista: es lo que se busca al llegar. --}}
+            @if ($p['porJugar'] && $p['pista'] !== null)
+                <span class="rounded-[3px] bg-tema-pizarra px-2.5 py-0.5 text-sm font-bold text-white">{{ $p['pista'] }}</span>
+            @endif
+        </div>
     </div>
     <div class="mt-1.5 text-lg font-semibold leading-snug">{{ ($enSuTorneo ?? false) ? $p['rival'] : $p['texto'] }}</div>
     @if ($p['anterior'] !== null)

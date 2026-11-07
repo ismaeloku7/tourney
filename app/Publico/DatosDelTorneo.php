@@ -31,7 +31,16 @@ use Illuminate\Database\Eloquent\Collection;
  */
 final class DatosDelTorneo
 {
-    public function __construct(public readonly Torneo $torneo) {}
+    /**
+     * Con $nombresDeEquipo (el portal del jugador), cada pareja sale por el
+     * nombre de su equipo, aunque la web pública use los alias.
+     */
+    public function __construct(public readonly Torneo $torneo, public readonly bool $nombresDeEquipo = false) {}
+
+    private function nombre(?Participante $participante): ?string
+    {
+        return $this->nombresDeEquipo ? $participante?->nombre : NombrePublico::participante($participante, $this->torneo);
+    }
 
     /**
      * @return list<array{categoria: Categoria, confirmadas: list<string>, espera: int, plazas: int|null}>
@@ -49,7 +58,7 @@ final class DatosDelTorneo
 
             $salida[] = [
                 'categoria' => $categoria,
-                'confirmadas' => array_values($confirmadas->map(fn (Inscripcion $i): string => (string) NombrePublico::participante($i->participante, $this->torneo))->all()),
+                'confirmadas' => array_values($confirmadas->map(fn (Inscripcion $i): string => (string) $this->nombre($i->participante))->all()),
                 'espera' => $inscripciones->where('estado', EstadoInscripcion::ListaDeEspera)->count(),
                 'plazas' => $categoria->cupo === null ? null : max(0, $categoria->cupo - $confirmadas->count()),
             ];
@@ -62,7 +71,7 @@ final class DatosDelTorneo
      * Con la fase de grupos abierta y un cuadro detrás que no se sortea,
      * cada línea lleva el cruce previsto («2º B», «Bye») y `cruces` lo dice.
      *
-     * @return list<array{categoria: Categoria, fase: Fase, cruces: bool, grupos: list<array{grupo: Grupo, lineas: list<array{participante: int, posicion: int, nombre: string, puntos: int, pj: int, pg: int, pp: int, sets: string, juegos: string, clasificado: bool, cruce: string|null}>, partidos: list<array{partido: string, resultado: string, hora: string|null, enVivo: string, ganaLocal: bool|null}>}>}>
+     * @return list<array{categoria: Categoria, fase: Fase, cruces: bool, grupos: list<array{grupo: Grupo, lineas: list<array{participante: int, posicion: int, nombre: string, puntos: int, pj: int, pg: int, pp: int, sets: string, juegos: string, clasificado: bool, cruce: string|null}>, partidos: list<array{partido: string, resultado: string, hora: string|null, horaSola: string|null, pista: string|null, enVivo: string, ganaLocal: bool|null}>}>}>
      */
     public function grupos(): array
     {
@@ -81,7 +90,7 @@ final class DatosDelTorneo
                     'lineas' => array_values($grupo->clasificaciones->map(fn (Clasificacion $linea): array => [
                         'participante' => $linea->participante_id,
                         'posicion' => $linea->posicion,
-                        'nombre' => (string) NombrePublico::participante($linea->participante, $this->torneo),
+                        'nombre' => (string) $this->nombre($linea->participante),
                         'puntos' => $linea->puntos, 'pj' => $linea->pj, 'pg' => $linea->pg, 'pp' => $linea->pp,
                         'sets' => "{$linea->sets_favor}-{$linea->sets_contra}",
                         'juegos' => "{$linea->juegos_favor}-{$linea->juegos_contra}",
@@ -99,7 +108,7 @@ final class DatosDelTorneo
     }
 
     /**
-     * @return list<array{categoria: Categoria, fase: Fase, rondas: list<array{nombre: string, partidos: list<array{partido: string, resultado: string, hora: string|null, enVivo: string, ganaLocal: bool|null}>}>}>
+     * @return list<array{categoria: Categoria, fase: Fase, rondas: list<array{nombre: string, partidos: list<array{partido: string, resultado: string, hora: string|null, horaSola: string|null, pista: string|null, enVivo: string, ganaLocal: bool|null}>}>}>
      */
     public function cuadros(): array
     {
@@ -155,7 +164,7 @@ final class DatosDelTorneo
             [$construido, $clasificados] = $previsto;
 
             $nombres = Participante::query()->with('jugadores')->whereIn('id', array_keys($clasificados))->get()
-                ->mapWithKeys(fn (Participante $p): array => [$p->id => (string) NombrePublico::participante($p, $this->torneo)])->all();
+                ->mapWithKeys(fn (Participante $p): array => [$p->id => (string) $this->nombre($p)])->all();
 
             // Cada cruce con su código: O1…, C1…, S1, S2, F.
             $codigo = [];
@@ -253,17 +262,22 @@ final class DatosDelTorneo
      * Un partido en juego lleva cómo va (`enVivo`), si la mesa o los
      * jugadores llevan el marcador.
      *
-     * @return array{partido: string, resultado: string, hora: string|null, enVivo: string, ganaLocal: bool|null}
+     * `hora` lleva el día y la pista («sáb 8/11 10:00 · Pista 3»); `horaSola`
+     * y `pista`, cada cosa por su lado.
+     *
+     * @return array{partido: string, resultado: string, hora: string|null, horaSola: string|null, pista: string|null, enVivo: string, ganaLocal: bool|null}
      */
     public function partido(Partido $p): array
     {
-        $local = NombrePublico::participante($p->local, $this->torneo) ?? Marcador::lado($p, true);
-        $visitante = NombrePublico::participante($p->visitante, $this->torneo) ?? Marcador::lado($p, false);
+        $local = $this->nombre($p->local) ?? Marcador::lado($p, true);
+        $visitante = $this->nombre($p->visitante) ?? Marcador::lado($p, false);
 
         return [
             'partido' => "{$local} – {$visitante}",
             'resultado' => $p->cerrado() ? Marcador::resultado($p) : '',
             'hora' => $p->franja !== null && $this->horariosVisibles() ? $p->franja->inicio->translatedFormat('D j/n H:i').($p->pista !== null ? ' · '.$p->pista->nombre : '') : null,
+            'horaSola' => $p->franja !== null && $this->horariosVisibles() ? $p->franja->inicio->format('H:i') : null,
+            'pista' => $p->franja !== null && $this->horariosVisibles() ? $p->pista?->nombre : null,
             'enVivo' => $p->estado === EstadoPartido::EnJuego ? AnotarMarcador::texto($p) : '',
             'ganaLocal' => $p->ganador_id === null ? null : $p->ganador_id === $p->local_id,
         ];

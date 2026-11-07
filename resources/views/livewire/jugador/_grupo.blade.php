@@ -1,4 +1,4 @@
-{{-- La clasificación y los partidos de un grupo. Espera $g (del bloque de DatosDelTorneo, con 'cruces') y $miParticipante. --}}
+{{-- La clasificación y los partidos de un grupo, por nombre de equipo. Espera $g (del bloque de DatosDelTorneo, con 'cruces') y $miParticipante. --}}
 <table class="w-full text-[0.9375rem]">
     <thead class="text-left text-xs uppercase tracking-[0.08em] text-tema-suave"><tr><th class="py-1.5 font-semibold">#</th><th class="font-semibold">Equipo</th><th class="text-right font-semibold">Pts</th><th class="text-right font-semibold">PJ</th><th class="hidden text-right font-semibold sm:table-cell">Sets</th><th class="hidden text-right font-semibold sm:table-cell">Juegos</th>@if ($g['cruces'])<th class="text-right font-semibold">Cruce</th>@endif</tr></thead>
     <tbody>
@@ -19,7 +19,9 @@
     <h3 class="mt-4 border-t border-tema-borde pt-3 text-xs font-semibold uppercase tracking-[0.08em] text-tema-suave">Partidos del grupo</h3>
     <ul class="mt-2 divide-y divide-tema-borde text-sm">
         @foreach ($g['partidos'] as $p)
-            <li class="flex justify-between gap-3 py-1.5"><span>{{ $p['partido'] }}</span><span @class(['whitespace-nowrap tabular-nums', 'font-semibold' => $p['resultado'] !== '', 'text-tema-suave' => $p['resultado'] === ''])>{{ $p['resultado'] ?: ($p['enVivo'] !== '' ? 'va '.$p['enVivo'] : ($p['hora'] ?? 'Por jugar')) }}</span></li>
+            {{-- Sin el día: la hora y la pista. --}}
+            @php($cuando = ($p['horaSola'] ?? null) !== null ? $p['horaSola'].(($p['pista'] ?? null) !== null ? ' · '.$p['pista'] : '') : 'Por jugar')
+            <li class="flex justify-between gap-3 py-1.5"><span>{{ $p['partido'] }}</span><span @class(['whitespace-nowrap tabular-nums', 'font-semibold' => $p['resultado'] !== '', 'text-tema-suave' => $p['resultado'] === ''])>{{ $p['resultado'] ?: ($p['enVivo'] !== '' ? 'va '.$p['enVivo'] : $cuando) }}</span></li>
         @endforeach
     </ul>
 @endif

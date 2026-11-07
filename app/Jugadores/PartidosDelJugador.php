@@ -10,7 +10,6 @@ use App\Filament\Competicion\Marcador;
 use App\Models\Jugador;
 use App\Models\Partido;
 use App\Publico\DatosDelTorneo;
-use App\Publico\NombrePublico;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Collection;
 
@@ -48,11 +47,10 @@ final class PartidosDelJugador
             return 'Primer partido de la pista';
         }
 
-        $torneo = $anterior->fase->categoria->torneo;
         $enVivo = AnotarMarcador::texto($anterior);
 
         return ($anterior->estado === EstadoPartido::EnJuego ? 'Ahora juegan ' : 'Después de ')
-            .(NombrePublico::participante($anterior->local, $torneo) ?? Marcador::lado($anterior, true)).' – '.(NombrePublico::participante($anterior->visitante, $torneo) ?? Marcador::lado($anterior, false))
+            .($anterior->local->nombre ?? Marcador::lado($anterior, true)).' – '.($anterior->visitante->nombre ?? Marcador::lado($anterior, false))
             .($enVivo !== '' ? " (va {$enVivo})" : '');
     }
 
@@ -98,9 +96,11 @@ final class PartidosDelJugador
     public function fila(Partido $p, Jugador $yo): array
     {
         $torneo = $p->fase->categoria->torneo;
-        $datos = (new DatosDelTorneo($torneo))->partido($p);
-        $local = NombrePublico::participante($p->local, $torneo) ?? Marcador::lado($p, true);
-        $visitante = NombrePublico::participante($p->visitante, $torneo) ?? Marcador::lado($p, false);
+        // En el portal, cada pareja por el nombre de su equipo.
+        $publico = new DatosDelTorneo($torneo, nombresDeEquipo: true);
+        $datos = $publico->partido($p);
+        $local = $p->local->nombre ?? Marcador::lado($p, true);
+        $visitante = $p->visitante->nombre ?? Marcador::lado($p, false);
 
         $registrador = $p->registrado_por_jugador_id;
         $miLadoEsLocal = $p->local !== null && in_array($yo->id, $p->local->idsDeJugadores(), true);
@@ -116,7 +116,8 @@ final class PartidosDelJugador
             'local' => $local,
             'visitante' => $visitante,
             'resultado' => $datos['resultado'] !== '' ? $datos['resultado'] : ($p->estado === EstadoPartido::PendienteValidacion ? Marcador::resultado($p).' (sin validar)' : ''),
-            'hora' => $datos['hora'],
+            // El día y la hora; la pista va aparte, para destacarla.
+            'hora' => $datos['hora'] !== null && $p->franja !== null ? $p->franja->inicio->translatedFormat('D j/n H:i') : null,
             'pista' => $p->pista?->nombre,
             'estado' => $p->estado,
             'porJugar' => $this->porJugar($p),
