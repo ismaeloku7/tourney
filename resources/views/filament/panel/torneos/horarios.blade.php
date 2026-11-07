@@ -1,7 +1,9 @@
 {{--
     Los horarios del torneo (App\Filament\Resources\Torneos\Pages\HorariosDelTorneo):
     un día por bloque, una fila por pista y cada partido como una barra desde
-    su calentamiento (rayado) hasta su final estimado. Con una propuesta,
+    su calentamiento (rayado) hasta su final estimado; lo ya empezado, a su
+    hora real (de 5 en 5 minutos), con una 🎾 si se está jugando, y una
+    línea roja marca la hora de ahora. Con una propuesta,
     lo nuevo va resaltado y arriba sale el resumen y lo que no cabe.
     Los partidos se arrastran: a otra pista u hora (moverPartido) o sobre
     otro partido para intercambiarlos (intercambiarPartidos).
@@ -49,9 +51,15 @@
         .hor-suave { color: #8a939b; }
         .hor-tarde { color: #d9480f; font-weight: 700; }
         .hor-bien { color: #2f9e44; }
+        .hor-ahora { position: absolute; top: -.25rem; bottom: -.25rem; width: 2px; margin-left: -1px; background: #e03131; pointer-events: none; z-index: 4; }
+        .hor-ahora-hora { position: absolute; top: 0; transform: translateX(-50%); background: #e03131; color: #fff; font-size: .6875rem; font-weight: 700; border-radius: .25rem; padding: 0 .3rem; white-space: nowrap; z-index: 4; }
+        .hor-bloque.real { box-shadow: inset 0 0 0 1px rgb(255 255 255 / .55); }
+        .hor-bloque.enjuego { box-shadow: 0 0 0 2px #e03131; }
+        .hor-pelota { display: inline-block; margin-right: .2rem; font-size: .95rem; line-height: 1; filter: drop-shadow(0 0 1px #fff) drop-shadow(0 0 1px #fff); animation: hor-bote 1.2s ease-in-out infinite; }
+        @keyframes hor-bote { 0%, 100% { transform: translateY(0); } 50% { transform: translateY(-2px); } }
     </style>
 
-    <div class="hor" x-data="{ cogido: null, agarre: 0 }">
+    <div class="hor" x-data="{ cogido: null, agarre: 0 }" @if ($refrescar) wire:poll.60s @endif>
         <div class="hor-herramientas">
             {{ $this->calcularAction }}
             {{ $this->soltarHuerfanosAction }}
@@ -154,6 +162,9 @@
             @if ($esPropuesta)
                 <span><i style="background: #6d7a84; opacity: .45"></i>Ya programado (no se toca)</span>
             @endif
+            <span><i style="background: #6d7a84; box-shadow: inset 0 0 0 1px rgb(255 255 255 / .55)"></i>Empezado: a su hora real, de 5 en 5 minutos</span>
+            <span>🎾 Se está jugando ahora</span>
+            <span><i style="width: 2px; background: #e03131"></i>Ahora</span>
             <span><i style="background: #c4c9ce"></i>Pista bloqueada</span>
             <span><i style="background: repeating-linear-gradient(135deg, #f3f4f6 0 3px, #d9dde2 3px 6px)"></i>Fuera del horario de la pista (se puede colocar a mano)</span>
             <span><i style="background: #6d7a84; position: relative"><b style="position: absolute; top: -.2rem; right: -.35rem; width: .75rem; height: .75rem; border-radius: 999px; background: #fff; color: #d9480f; font-size: .55rem; line-height: .75rem; text-align: center; box-shadow: 0 0 0 1px #e6e8eb">!</b></i>Tercer partido seguido de alguien</span>
@@ -172,6 +183,9 @@
                             @foreach ($dia['horas'] as $hora)
                                 <span class="hor-hora" style="left: {{ $hora['izquierda'] }}%">{{ $hora['etiqueta'] }}</span>
                             @endforeach
+                            @if ($dia['ahora'] !== null)
+                                <span class="hor-ahora-hora" style="left: {{ $dia['ahora']['izquierda'] }}%">{{ $dia['ahora']['hora'] }}</span>
+                            @endif
                         </div>
                     </div>
                     @foreach ($dia['pistas'] as $pista)
@@ -211,9 +225,12 @@
                                 @foreach ($dia['horas'] as $hora)
                                     <span class="hor-marca" style="left: {{ $hora['izquierda'] }}%"></span>
                                 @endforeach
+                                @if ($dia['ahora'] !== null)
+                                    <span class="hor-ahora" style="left: {{ $dia['ahora']['izquierda'] }}%" title="Ahora: {{ $dia['ahora']['hora'] }}"></span>
+                                @endif
                                 @foreach ($pista['bloques'] as $bloque)
                                     <div
-                                        @class(['hor-bloque', 'nuevo' => $esPropuesta && $bloque['nuevo'], 'viejo' => $esPropuesta && ! $bloque['nuevo'], 'movible' => $bloque['movible']])
+                                        @class(['hor-bloque', 'nuevo' => $esPropuesta && $bloque['nuevo'], 'viejo' => $esPropuesta && ! $bloque['nuevo'], 'movible' => $bloque['movible'], 'real' => $bloque['real'], 'enjuego' => $bloque['enJuego']])
                                         style="left: {{ $bloque['izquierda'] }}%; width: {{ $bloque['ancho'] }}%; background: {{ $bloque['color'] }}; color: {{ $bloque['color'] }}"
                                         title="{{ $bloque['detalle'] }}"
                                         @if ($bloque['movible'])
@@ -232,7 +249,7 @@
                                         @endif
                                     >
                                         <div class="hor-cal" style="width: {{ $bloque['calentamiento'] }}%"></div>
-                                        <span style="color: #fff"><b>{{ $bloque['hora'] }}</b> {{ $bloque['texto'] }}</span>
+                                        <span style="color: #fff">@if ($bloque['enJuego'])<span class="hor-pelota" role="img" aria-label="Se está jugando">🎾</span>@endif<b>{{ $bloque['hora'] }}</b> {{ $bloque['texto'] }}</span>
                                         @if ($bloque['tercero'])
                                             <span class="hor-alerta" aria-label="Alguien juega su tercer partido seguido">!</span>
                                         @endif

@@ -15,6 +15,7 @@ use App\Competicion\Errores\OperacionNoPermitida;
 use App\Competicion\MoverEnElHorario;
 use App\Competicion\PlanificadorContinuo;
 use App\Enums\EstadoPartido;
+use App\Enums\EstadoTorneo;
 use App\Filament\Avisos;
 use App\Filament\Competicion\Marcador;
 use App\Filament\Resources\Torneos\Pages\Concerns\BarraDelTorneo;
@@ -232,6 +233,8 @@ class HorariosDelTorneo extends Page
             'sugerencia' => $sugerencia !== null && ! in_array($sugerencia->clave(), $this->ignoradas, true) ? $this->describir($sugerencia) : null,
             'retrasoMinimo' => HorasEnDirecto::RETRASO_MINUTOS,
             'esPropuesta' => $propuesta !== null,
+            // Con el torneo en juego, la parrilla se refresca sola: avanza la línea de ahora y se mueve lo que empieza y acaba.
+            'refrescar' => $propuesta === null && $this->torneo()->estado === EstadoTorneo::EnJuego,
             'huerfanos' => $this->huerfanos(),
             'sinHora' => $propuesta === null ? Partido::query()->whereHas('fase.categoria', fn (Builder $q) => $q->where('torneo_id', $this->torneo()->id))->whereNotNull('local_id')->whereNotNull('visitante_id')->whereNull('franja_id')->whereIn('estado', [EstadoPartido::Pendiente->value, EstadoPartido::Programado->value])->count() : 0,
             'resumen' => $propuesta !== null ? self::resumen($propuesta) : null,
@@ -246,7 +249,7 @@ class HorariosDelTorneo extends Page
      * Cada día con sus pistas y lo que ocupa cada una: lo guardado y, si
      * hay una propuesta, lo propuesto en lugar de lo que se recoloca.
      *
-     * @return list<array{titulo: string, desde: int, minutos: int, base: int, horas: list<array{etiqueta: string, izquierda: float}>, pistas: list<array{id: int, nombre: string, abre: list<array{izquierda: float, ancho: float}>, bloques: list<array{partido: int|null, movible: bool, tercero: bool, izquierda: float, ancho: float, calentamiento: float, hora: string, texto: string, detalle: string, color: string, nuevo: bool}>}>}>
+     * @return list<array{titulo: string, desde: int, minutos: int, base: int, horas: list<array{etiqueta: string, izquierda: float}>, pistas: list<array{id: int, nombre: string, abre: list<array{izquierda: float, ancho: float}>, bloques: list<array{partido: int|null, movible: bool, tercero: bool, real: bool, enJuego: bool, izquierda: float, ancho: float, calentamiento: float, hora: string, texto: string, detalle: string, color: string, nuevo: bool}>}>, ahora: array{izquierda: float, hora: string}|null}>
      */
     private function dias(?PropuestaDeHorarios $propuesta): array
     {
@@ -278,6 +281,20 @@ class HorariosDelTorneo extends Page
             ->get()
             ->keyBy('id');
         $sePuedeMover = Gate::allows('update', $torneo);
+
+        // Lo que ya ha empezado se ve donde de verdad se juega (o se jugó), de 5 en 5 minutos;
+        // lo que nadie ha empezado sigue en su hora prevista, aunque se solape.
+        $ahora = CarbonImmutable::now();
+        $reales = [];
+        foreach ($ocupaciones as $i => $o) {
+            $partido = $o['partido'] !== null && ! $o['nuevo'] ? $partidos->get($o['partido']) : null;
+            $donde = $partido !== null ? self::horaReal($partido, $o['inicio'], $o['fin'], $calentamiento, $ahora) : null;
+            if ($partido !== null && $donde !== null) {
+                $ocupaciones[$i] = ['partido' => $o['partido'], 'pista' => $o['pista'], 'inicio' => $donde[0], 'fin' => $donde[1], 'nuevo' => false];
+                $reales[$partido->id] = true;
+            }
+        }
+
         $terceros = self::tercerosSeguidos($ocupaciones, $partidos->all(), $calentamiento);
 
         $colores = [];
@@ -341,6 +358,11 @@ class HorariosDelTorneo extends Page
                     $minutos = max(1, $o['inicio']->diffInMinutes($o['fin']));
                     $texto = $partido !== null ? Marcador::lado($partido, true).' – '.Marcador::lado($partido, false) : 'Bloqueada';
                     $categoria = $partido?->fase->categoria;
+                    $real = $partido !== null && isset($reales[$partido->id]);
+                    $enJuego = $partido !== null && $partido->estado === EstadoPartido::EnJuego;
+                    $cuando = $real
+                        ? ($enJuego ? 'Se está jugando desde las '.$o['inicio']->format('H:i') : 'Se jugó de '.$o['inicio']->format('H:i').' a '.$o['fin']->format('H:i'))
+                        : $o['inicio']->format('H:i').'–'.$o['fin']->format('H:i');
 
                     $bloques[] = [
                         'partido' => $partido?->id,
@@ -348,14 +370,17 @@ class HorariosDelTorneo extends Page
                         'movible' => $sePuedeMover && $partido !== null && ($propuesta !== null ? $o['nuevo'] : self::movible($partido)),
                         'izquierda' => $posicion($o['inicio']),
                         'ancho' => round(100 * $minutos / $total, 3),
-                        'calentamiento' => $partido !== null ? round(100 * min($calentamiento, $minutos) / $minutos, 3) : 0.0,
+                        // Lo ya empezado se pinta desde que empezó a jugarse: sin calentamiento.
+                        'calentamiento' => $partido !== null && ! $real ? round(100 * min($calentamiento, $minutos) / $minutos, 3) : 0.0,
                         'hora' => $o['inicio']->format('H:i'),
                         'texto' => $texto,
-                        'detalle' => $o['inicio']->format('H:i').'–'.$o['fin']->format('H:i').($categoria !== null ? ' · '.$categoria->nombre : '').($partido !== null ? ' · P'.$partido->id : '').' · '.$texto
+                        'detalle' => $cuando.($categoria !== null ? ' · '.$categoria->nombre : '').($partido !== null ? ' · P'.$partido->id : '').' · '.$texto
                             .($partido !== null && isset($terceros[$partido->id]) ? ' · ¡Alguien juega su tercer partido seguido!' : ''),
                         'color' => $categoria !== null ? ($colores[$categoria->id] ?? '#6d7a84') : '#c4c9ce',
                         'nuevo' => $o['nuevo'],
                         'tercero' => $partido !== null && isset($terceros[$partido->id]),
+                        'real' => $real,
+                        'enJuego' => $enJuego,
                     ];
                 }
 
@@ -367,10 +392,45 @@ class HorariosDelTorneo extends Page
                 $filas[] = ['id' => $torneoPista->pista_id, 'nombre' => $torneoPista->pista->nombre.($torneoPista->pista->exterior ? ' · exterior' : ''), 'abre' => $abre, 'bloques' => $bloques];
             }
 
-            $dias[] = ['titulo' => ucfirst($desde->translatedFormat('l j \d\e F')), 'desde' => $desde->getTimestamp(), 'minutos' => (int) $total, 'base' => $desde->hour * 60 + $desde->minute, 'horas' => $horas, 'pistas' => $filas];
+            // La línea roja de ahora, si ahora cae en este día.
+            $marcaAhora = $ahora->betweenIncluded($desde, $hasta) ? ['izquierda' => $posicion($ahora), 'hora' => $ahora->format('H:i')] : null;
+
+            $dias[] = ['titulo' => ucfirst($desde->translatedFormat('l j \d\e F')), 'desde' => $desde->getTimestamp(), 'minutos' => (int) $total, 'base' => $desde->hour * 60 + $desde->minute, 'horas' => $horas, 'pistas' => $filas, 'ahora' => $marcaAhora];
         }
 
         return $dias;
+    }
+
+    /**
+     * Dónde se ve un partido que ya ha empezado: desde que empezó hasta que
+     * acabó o, si se está jugando, hasta su final estimado (o ahora, si se
+     * alarga), de 5 en 5 minutos. Sin «empezar», en su hora prevista (nulo).
+     *
+     * @return array{0: CarbonImmutable, 1: CarbonImmutable}|null
+     */
+    private static function horaReal(Partido $partido, CarbonImmutable $inicio, CarbonImmutable $fin, int $calentamiento, CarbonImmutable $ahora): ?array
+    {
+        if ($partido->empezado_en === null) {
+            return null;
+        }
+
+        $empieza = self::aCincoMinutos(CarbonImmutable::instance($partido->empezado_en));
+        $estimado = $empieza->addMinutes(max(5, (int) $inicio->diffInMinutes($fin) - $calentamiento));
+
+        if ($partido->estado === EstadoPartido::EnJuego) {
+            return [$empieza, $estimado->max(self::aCincoMinutos($ahora))];
+        }
+
+        if ($partido->registrado_en !== null && $partido->registrado_en->greaterThan($partido->empezado_en)) {
+            return [$empieza, self::aCincoMinutos(CarbonImmutable::instance($partido->registrado_en))->max($empieza->addMinutes(5))];
+        }
+
+        return [$empieza, $estimado];
+    }
+
+    private static function aCincoMinutos(CarbonImmutable $momento): CarbonImmutable
+    {
+        return $momento->setTimestamp((int) (round($momento->getTimestamp() / 300) * 300));
     }
 
     /**
