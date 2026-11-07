@@ -143,3 +143,29 @@ test('la parrilla va más allá del horario de las pistas y admite dejar ahí un
     $pagina->call('moverPartido', $a->id, $this->dos->id, $this->dia->setTime(22, 0)->getTimestamp())->assertNotified('Partido movido');
     expect($a->refresh()->pista_id)->toBe($this->dos->id)->and($a->franja->inicio->format('H:i'))->toBe('22:00');
 });
+
+test('lo que empieza y acaba se ve a su hora real, de 5 en 5 minutos, con la línea de ahora y la pelota en lo que se juega', function () {
+    $this->torneo->update(['estado' => EstadoTorneo::EnJuego]);
+    $this->travelTo($this->dia->setTime(10, 42));
+
+    // Previsto a las 9:00; empezó a las 9:23 y acabó a las 10:31.
+    $jugado = colocadoEn($this->fase, $this->uno, $this->dia->setTime(9, 0), EstadoPartido::Jugado->value, ['empezado_en' => $this->dia->setTime(9, 23), 'registrado_en' => $this->dia->setTime(10, 31)]);
+    // Previsto a las 9:00; nadie lo empezó: se queda donde estaba, aunque se solape.
+    $sinApuntar = colocadoEn($this->fase, $this->dos, $this->dia->setTime(9, 0));
+    // Previsto a las 10:10; empezó a las 10:02 y se está jugando: hasta su final estimado (60 minutos).
+    $enJuego = colocadoEn($this->fase, $this->dos, $this->dia->setTime(10, 10), EstadoPartido::EnJuego->value, ['empezado_en' => $this->dia->setTime(10, 2)]);
+
+    $pagina = Livewire::test(HorariosDelTorneo::class, ['record' => $this->torneo->getRouteKey()])
+        ->assertSeeHtml('wire:poll.60s')
+        ->assertSee('🎾');
+    $dia = $pagina->viewData('dias')[0];
+    $bloque = fn (Partido $p): array => collect($dia['pistas'])->flatMap(fn (array $pista): array => $pista['bloques'])->firstWhere('partido', $p->id);
+    $minuto = fn (string $hora): float => round(100 * (CarbonImmutable::parse($this->dia->toDateString().' '.$hora)->diffInMinutes($this->dia->setTime(8, 0), true)) / $dia['minutos'], 3);
+
+    expect($bloque($jugado))->toMatchArray(['real' => true, 'enJuego' => false, 'hora' => '09:25', 'izquierda' => $minuto('09:25'), 'calentamiento' => 0.0])
+        ->and($bloque($jugado)['detalle'])->toContain('Se jugó de 09:25 a 10:30')
+        ->and($bloque($sinApuntar))->toMatchArray(['real' => false, 'hora' => '09:00'])
+        ->and($bloque($enJuego))->toMatchArray(['real' => true, 'enJuego' => true, 'hora' => '10:00'])
+        ->and($bloque($enJuego)['ancho'])->toBe(round(100 * 60 / $dia['minutos'], 3))
+        ->and($dia['ahora'])->toBe(['izquierda' => $minuto('10:42'), 'hora' => '10:42']);
+});
